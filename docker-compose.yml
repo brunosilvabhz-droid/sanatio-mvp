@@ -1,0 +1,47 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: sanatio
+      POSTGRES_USER: sanatio
+      POSTGRES_PASSWORD: sanatio
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U sanatio -d sanatio"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  backend:
+    build: ./backend
+    environment:
+      DATABASE_URL: postgresql+psycopg://sanatio:sanatio@postgres:5432/sanatio
+      SECRET_KEY: change-me-in-production
+      ACCESS_TOKEN_EXPIRE_MINUTES: 720
+      USE_MOCK_SOULMV: "true"
+      SOULMV_ORACLE_HOST: ""
+      SOULMV_ORACLE_PORT: "1521"
+      SOULMV_ORACLE_SERVICE: ""
+      SOULMV_ORACLE_USER: ""
+      SOULMV_ORACLE_PASSWORD: ""
+      CORS_ORIGINS: http://localhost:5173,http://127.0.0.1:5173
+    ports:
+      - "8000:8000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  frontend:
+    build: ./frontend
+    environment:
+      VITE_API_URL: http://localhost:8000
+    ports:
+      - "5173:5173"
+    depends_on:
+      - backend
+
+volumes:
+  postgres_data:
