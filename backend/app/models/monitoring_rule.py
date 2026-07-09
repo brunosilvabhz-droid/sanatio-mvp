@@ -14,7 +14,7 @@ class MonitoringRule(Base):
     description: Mapped[str | None] = mapped_column(Text)
     rule_type: Mapped[str] = mapped_column(String(80), nullable=False)
     parameter_key: Mapped[str] = mapped_column(String(120), nullable=False)
-    parameter_value: Mapped[str] = mapped_column(String(120), nullable=False)
+    parameter_value: Mapped[str] = mapped_column(Text, nullable=False)
     severity: Mapped[str] = mapped_column(String(40), nullable=False)
     active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())

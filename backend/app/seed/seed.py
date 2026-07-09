@@ -25,6 +25,7 @@ RULES = [
     ("Procedimento invasivo ativo por mais de 7 dias", "INVASIVE_GT7", "dias_permanencia", "7", "MEDIA"),
     ("Paciente internado há mais de 10 dias", "LONG_STAY", "dias_internacao", "10", "MEDIA"),
     ("Isolamento ativo", "ACTIVE_ISOLATION", "sn_ativo", "S", "ALTA"),
+    ("Cultura positiva com antimicrobiano prolongado", "COMPOSITE", "all", '["positive_culture","antimicrobial_gt7"]', "ALTA"),
 ]
 
 SETTINGS = [

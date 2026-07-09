@@ -1,6 +1,7 @@
 import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom';
 import AppLayout from '../layouts/AppLayout';
 import AlertAudit from '../pages/AlertAudit/AlertAudit';
+import AlertRules from '../pages/AlertRules/AlertRules';
 import Alerts from '../pages/Alerts/Alerts';
 import Dashboard from '../pages/Dashboard/Dashboard';
 import Login from '../pages/Login/Login';
@@ -31,6 +32,7 @@ export default function App() {
           <Route path="patients" element={<Patients />} />
           <Route path="patients/:cdAtendimento" element={<PatientDetail />} />
           <Route path="alerts" element={<Alerts />} />
+          <Route path="alert-rules" element={<AlertRules />} />
           <Route path="alert-audit" element={<AlertAudit />} />
           <Route path="users" element={<Users />} />
           <Route path="settings" element={<Settings />} />

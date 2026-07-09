@@ -3,6 +3,7 @@ import FactCheckIcon from '@mui/icons-material/FactCheck';
 import GroupIcon from '@mui/icons-material/Group';
 import LogoutIcon from '@mui/icons-material/Logout';
 import NotificationsActiveIcon from '@mui/icons-material/NotificationsActive';
+import RuleIcon from '@mui/icons-material/Rule';
 import SettingsIcon from '@mui/icons-material/Settings';
 import SickIcon from '@mui/icons-material/Sick';
 import {
@@ -24,6 +25,7 @@ const items = [
   { label: 'Dashboard', path: '/dashboard', icon: <DashboardIcon /> },
   { label: 'Pacientes', path: '/patients', icon: <SickIcon /> },
   { label: 'Alertas', path: '/alerts', icon: <NotificationsActiveIcon /> },
+  { label: 'Config. Alertas', path: '/alert-rules', icon: <RuleIcon /> },
   { label: 'Relatório', path: '/alert-audit', icon: <FactCheckIcon /> },
   { label: 'Usuários', path: '/users', icon: <GroupIcon /> },
   { label: 'Configurações', path: '/settings', icon: <SettingsIcon /> }

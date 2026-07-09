@@ -1,3 +1,5 @@
+import json
+
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
@@ -11,6 +13,21 @@ RULE_MAP = {
     "LONG_STAY": "long_stay",
     "ACTIVE_ISOLATION": "active_isolation",
 }
+
+
+def rule_matches(rule: MonitoringRule, criteria: dict) -> bool:
+    if rule.rule_type == "COMPOSITE":
+        try:
+            selected = json.loads(rule.parameter_value)
+        except json.JSONDecodeError:
+            return False
+        if not isinstance(selected, list) or not selected:
+            return False
+        values = [bool(criteria.get(str(item))) for item in selected]
+        return all(values) if rule.parameter_key == "all" else any(values)
+
+    criterion = RULE_MAP.get(rule.rule_type)
+    return bool(criterion and criteria.get(criterion))
 
 
 def patient_with_risk(patient: dict) -> dict:
@@ -32,8 +49,7 @@ def run_monitoring(db: Session) -> dict:
         enriched = patient_with_risk(patient)
         criteria = enriched["_risk"]["criteria"]
         for rule in rules:
-            criterion = RULE_MAP.get(rule.rule_type)
-            if not criterion or not criteria.get(criterion):
+            if not rule_matches(rule, criteria):
                 continue
             alert = alert_service.create_alert_if_missing(
                 db,

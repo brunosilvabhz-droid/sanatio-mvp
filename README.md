@@ -92,6 +92,9 @@ python -m app.seed.seed
 - `GET /patients/{cd_atendimento}/isolations`
 - `GET /patients/{cd_atendimento}/alerts`
 - `POST /monitoring/run`
+- `GET /monitoring/rules`
+- `POST /monitoring/rules`
+- `PATCH /monitoring/rules/{id}`
 - `GET /alerts`
 - `GET /alerts/{id}`
 - `PATCH /alerts/{id}/status`
@@ -113,6 +116,7 @@ python -m app.seed.seed
 - Abas de antimicrobianos, culturas, procedimentos invasivos, isolamentos e alertas
 - Motor simples de risco em `backend/app/services/risk_service.py`
 - Regras configuráveis em `monitoring_rules`
+- Tela de configuração de alertas para criar regras simples ou combinadas entre views diferentes
 - Geração de alertas por `POST /monitoring/run`, evitando duplicidade aberta para mesma regra e atendimento
 - Histórico de ações em `alert_actions` para alterações de status e observações
 - Dashboard inicial com indicadores básicos

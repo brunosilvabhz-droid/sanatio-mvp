@@ -98,3 +98,16 @@ export type AlertActionReport = {
   comment?: string;
   created_at: string;
 };
+
+export type MonitoringRule = {
+  id: number;
+  name: string;
+  description?: string;
+  rule_type: string;
+  parameter_key: string;
+  parameter_value: string;
+  severity: string;
+  active: boolean;
+  created_at: string;
+  updated_at: string;
+};
