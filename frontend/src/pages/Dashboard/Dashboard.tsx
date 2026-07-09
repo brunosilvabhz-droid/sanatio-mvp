@@ -24,16 +24,28 @@ export default function Dashboard() {
   const [patients, setPatients] = useState<Patient[]>([]);
   const [alerts, setAlerts] = useState<Alert[]>([]);
   const [message, setMessage] = useState('');
+  const [loadError, setLoadError] = useState('');
 
   async function load() {
-    const [summaryResponse, patientsResponse, alertsResponse] = await Promise.all([
+    setLoadError('');
+    const [summaryResponse, patientsResponse, alertsResponse] = await Promise.allSettled([
       api.get('/dashboard/summary'),
       api.get('/patients'),
       api.get('/alerts')
     ]);
-    setSummary(summaryResponse.data);
-    setPatients(patientsResponse.data);
-    setAlerts(alertsResponse.data);
+
+    if (summaryResponse.status === 'fulfilled') {
+      setSummary(summaryResponse.value.data);
+    }
+    if (patientsResponse.status === 'fulfilled') {
+      setPatients(patientsResponse.value.data);
+    }
+    if (alertsResponse.status === 'fulfilled') {
+      setAlerts(alertsResponse.value.data);
+    }
+    if ([summaryResponse, patientsResponse, alertsResponse].some((response) => response.status === 'rejected')) {
+      setLoadError('Alguns indicadores não foram carregados. Verifique se o backend está ativo e se o token de login ainda é válido.');
+    }
   }
 
   async function runMonitoring() {
@@ -94,6 +106,7 @@ export default function Dashboard() {
       </Stack>
 
       {message && <MuiAlert severity="success">{message}</MuiAlert>}
+      {loadError && <MuiAlert severity="warning">{loadError}</MuiAlert>}
 
       <Grid container spacing={2}>
         {Object.entries(labels).map(([key, label]) => (
