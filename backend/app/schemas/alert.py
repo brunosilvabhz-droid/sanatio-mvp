@@ -44,3 +44,21 @@ class AlertRead(BaseModel):
     actions: list[AlertActionRead] = []
 
     model_config = {"from_attributes": True}
+
+
+class AlertActionReportRead(BaseModel):
+    action_id: int
+    alert_id: int
+    cd_atendimento: str
+    cd_paciente: str
+    patient_name: str
+    unit: str | None
+    alert_title: str
+    alert_status: str
+    severity: str
+    user_id: int | None
+    user_name: str | None
+    user_email: str | None
+    action: str
+    comment: str | None
+    created_at: datetime

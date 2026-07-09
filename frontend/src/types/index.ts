@@ -80,3 +80,21 @@ export type Alert = {
   created_at: string;
   actions: AlertAction[];
 };
+
+export type AlertActionReport = {
+  action_id: number;
+  alert_id: number;
+  cd_atendimento: string;
+  cd_paciente: string;
+  patient_name: string;
+  unit?: string;
+  alert_title: string;
+  alert_status: string;
+  severity: string;
+  user_id?: number;
+  user_name?: string;
+  user_email?: string;
+  action: string;
+  comment?: string;
+  created_at: string;
+};
