@@ -4,7 +4,7 @@ export type User = { id: number; email: string; full_name: string; active: boole
 export type Patient = {
   cd_atendimento: string;
   cd_paciente: string;
-  nm_paciente: string;
+  nm_paciente?: string;
   dt_nascimento: string;
   tp_sexo: string;
   dt_atendimento: string;
@@ -69,7 +69,7 @@ export type Alert = {
   id: number;
   cd_atendimento: string;
   cd_paciente: string;
-  patient_name: string;
+  patient_name?: string;
   unit?: string;
   alert_type: string;
   severity: string;
@@ -86,7 +86,7 @@ export type AlertActionReport = {
   alert_id: number;
   cd_atendimento: string;
   cd_paciente: string;
-  patient_name: string;
+  patient_name?: string;
   unit?: string;
   alert_title: string;
   alert_status: string;

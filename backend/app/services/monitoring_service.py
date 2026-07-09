@@ -42,7 +42,7 @@ def patient_with_risk(patient: dict) -> dict:
 
 def run_monitoring(db: Session) -> dict:
     rules = db.scalars(select(MonitoringRule).where(MonitoringRule.active.is_(True))).all()
-    patients = soulmv_adapter.get_patients()
+    patients = soulmv_adapter.get_patients_internal()
     created = 0
 
     for patient in patients:
@@ -56,7 +56,7 @@ def run_monitoring(db: Session) -> dict:
                 {
                     "cd_atendimento": str(patient["cd_atendimento"]),
                     "cd_paciente": str(patient["cd_paciente"]),
-                    "patient_name": patient["nm_paciente"],
+                    "patient_name": None,
                     "unit": patient["ds_unidade"],
                     "rule_id": rule.id,
                     "alert_type": rule.rule_type,

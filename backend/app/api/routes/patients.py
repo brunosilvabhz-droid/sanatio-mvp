@@ -30,7 +30,7 @@ def list_patients(
     return [
         p
         for p in patients
-        if _contains(p["nm_paciente"], nome)
+        if _contains(p["cd_paciente"], nome)
         and _contains(p["cd_atendimento"], atendimento)
         and _contains(p["ds_unidade"], unidade)
         and _contains(p["ds_leito"], leito)

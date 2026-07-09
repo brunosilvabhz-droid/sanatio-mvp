@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { api } from '../../api/client';
 import { RiskChip, SeverityChip } from '../../components/StatusChip';
+import PatientName from '../../components/PatientName';
 import { Alert, Antimicrobial, Culture, InvasiveProcedure, Isolation, Patient } from '../../types';
 
 type Detail = {
@@ -39,9 +40,9 @@ export default function PatientDetail() {
         Voltar
       </Button>
       <Box>
-        <Typography variant="h4" fontWeight={700}>
-          {p.nm_paciente}
-        </Typography>
+        <Box sx={{ '& .MuiTypography-body1': { fontSize: '2.125rem', fontWeight: 700, lineHeight: 1.2 } }}>
+          <PatientName cdPaciente={p.cd_paciente} cdAtendimento={p.cd_atendimento} fallbackName={p.nm_paciente} />
+        </Box>
         <Stack direction="row" spacing={1} alignItems="center">
           <Typography color="text.secondary">Atendimento {p.cd_atendimento}</Typography>
           <RiskChip value={p.status_risco} />

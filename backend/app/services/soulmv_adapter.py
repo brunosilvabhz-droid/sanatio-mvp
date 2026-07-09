@@ -69,11 +69,23 @@ def _with_procedure_metrics(row: dict) -> dict:
 
 def get_patients() -> list[dict]:
     rows = mock_data.mock_patients() if settings.use_mock_soulmv else _oracle_select("VW_SANATIO_PACIENTES_INTERNADOS")
+    patients = [_with_patient_metrics(row) for row in rows]
+    if settings.expose_patient_names_in_api:
+        return patients
+    return [{**patient, "nm_paciente": None} for patient in patients]
+
+
+def get_patients_internal() -> list[dict]:
+    rows = mock_data.mock_patients() if settings.use_mock_soulmv else _oracle_select("VW_SANATIO_PACIENTES_INTERNADOS")
     return [_with_patient_metrics(row) for row in rows]
 
 
 def get_patient(cd_atendimento: str) -> dict | None:
     return next((p for p in get_patients() if str(p["cd_atendimento"]) == str(cd_atendimento)), None)
+
+
+def get_patient_internal(cd_atendimento: str) -> dict | None:
+    return next((p for p in get_patients_internal() if str(p["cd_atendimento"]) == str(cd_atendimento)), None)
 
 
 def _filter(rows: Iterable[dict], cd_atendimento: str) -> list[dict]:

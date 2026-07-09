@@ -22,6 +22,7 @@ services:
       SECRET_KEY: change-me-in-production
       ACCESS_TOKEN_EXPIRE_MINUTES: 720
       USE_MOCK_SOULMV: "true"
+      EXPOSE_PATIENT_NAMES_IN_API: "false"
       SOULMV_ORACLE_HOST: ""
       SOULMV_ORACLE_PORT: "1521"
       SOULMV_ORACLE_SERVICE: ""
@@ -38,6 +39,7 @@ services:
     build: ./frontend
     environment:
       VITE_API_URL: http://localhost:8000
+      VITE_PATIENT_NAME_RESOLVER_URL: ""
     ports:
       - "5173:5173"
     depends_on:

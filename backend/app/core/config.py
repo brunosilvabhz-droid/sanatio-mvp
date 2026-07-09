@@ -14,6 +14,7 @@ class Settings(BaseSettings):
     access_token_expire_minutes: int = 720
     cors_origins: str = "http://localhost:5173,http://127.0.0.1:5173"
     use_mock_soulmv: bool = True
+    expose_patient_names_in_api: bool = False
 
     soulmv_oracle_host: str = ""
     soulmv_oracle_port: int = 1521

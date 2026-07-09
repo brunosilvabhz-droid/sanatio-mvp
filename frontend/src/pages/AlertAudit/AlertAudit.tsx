@@ -17,6 +17,7 @@ import {
 import { useEffect, useState } from 'react';
 import { api } from '../../api/client';
 import { SeverityChip } from '../../components/StatusChip';
+import PatientName from '../../components/PatientName';
 import { AlertActionReport } from '../../types';
 
 export default function AlertAudit() {
@@ -106,7 +107,9 @@ export default function AlertAudit() {
                 <TableCell>
                   <Chip size="small" label={row.action} />
                 </TableCell>
-                <TableCell>{row.patient_name}</TableCell>
+                <TableCell>
+                  <PatientName cdPaciente={row.cd_paciente} cdAtendimento={row.cd_atendimento} fallbackName={row.patient_name} dense />
+                </TableCell>
                 <TableCell>{row.cd_atendimento}</TableCell>
                 <TableCell>{row.alert_title}</TableCell>
                 <TableCell>

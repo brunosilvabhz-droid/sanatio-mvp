@@ -17,6 +17,7 @@ import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { api } from '../../api/client';
 import { RiskChip } from '../../components/StatusChip';
+import PatientName from '../../components/PatientName';
 import { Patient } from '../../types';
 
 export default function Patients() {
@@ -90,7 +91,9 @@ export default function Patients() {
           <TableBody>
             {patients.map((p) => (
               <TableRow key={p.cd_atendimento} hover onClick={() => navigate(`/patients/${p.cd_atendimento}`)} sx={{ cursor: 'pointer' }}>
-                <TableCell>{p.nm_paciente}</TableCell>
+                <TableCell>
+                  <PatientName cdPaciente={p.cd_paciente} cdAtendimento={p.cd_atendimento} fallbackName={p.nm_paciente} dense />
+                </TableCell>
                 <TableCell>{p.cd_atendimento}</TableCell>
                 <TableCell>{p.idade}</TableCell>
                 <TableCell>{p.tp_sexo}</TableCell>

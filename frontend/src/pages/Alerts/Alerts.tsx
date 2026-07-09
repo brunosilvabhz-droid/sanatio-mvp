@@ -21,6 +21,7 @@ import {
 import { useEffect, useState } from 'react';
 import { api } from '../../api/client';
 import { SeverityChip } from '../../components/StatusChip';
+import PatientName from '../../components/PatientName';
 import { Alert } from '../../types';
 
 export default function Alerts() {
@@ -89,7 +90,9 @@ export default function Alerts() {
           <TableBody>
             {alerts.map((alert) => (
               <TableRow key={alert.id} hover>
-                <TableCell>{alert.patient_name}</TableCell>
+                <TableCell>
+                  <PatientName cdPaciente={alert.cd_paciente} cdAtendimento={alert.cd_atendimento} fallbackName={alert.patient_name} dense />
+                </TableCell>
                 <TableCell>{alert.cd_atendimento}</TableCell>
                 <TableCell>{alert.unit}</TableCell>
                 <TableCell>{alert.title}</TableCell>

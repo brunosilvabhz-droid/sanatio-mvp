@@ -32,7 +32,7 @@ def list_alerts(
     if atendimento:
         stmt = stmt.where(Alert.cd_atendimento.ilike(f"%{atendimento}%"))
     if paciente:
-        stmt = stmt.where(Alert.patient_name.ilike(f"%{paciente}%"))
+        stmt = stmt.where(Alert.cd_paciente.ilike(f"%{paciente}%"))
     return list(db.scalars(stmt))
 
 
@@ -60,7 +60,7 @@ def alert_actions_report(
     if atendimento:
         stmt = stmt.where(Alert.cd_atendimento.ilike(f"%{atendimento}%"))
     if paciente:
-        stmt = stmt.where(Alert.patient_name.ilike(f"%{paciente}%"))
+        stmt = stmt.where(Alert.cd_paciente.ilike(f"%{paciente}%"))
     if usuario:
         stmt = stmt.where((User.full_name.ilike(f"%{usuario}%")) | (User.email.ilike(f"%{usuario}%")))
     if action:

@@ -6,7 +6,7 @@ from pydantic import BaseModel
 class Patient(BaseModel):
     cd_atendimento: str
     cd_paciente: str
-    nm_paciente: str
+    nm_paciente: str | None = None
     dt_nascimento: date
     tp_sexo: str
     dt_atendimento: datetime

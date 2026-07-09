@@ -28,7 +28,7 @@ class AlertRead(BaseModel):
     id: int
     cd_atendimento: str
     cd_paciente: str
-    patient_name: str
+    patient_name: str | None
     unit: str | None
     rule_id: int | None
     alert_type: str
@@ -51,7 +51,7 @@ class AlertActionReportRead(BaseModel):
     alert_id: int
     cd_atendimento: str
     cd_paciente: str
-    patient_name: str
+    patient_name: str | None
     unit: str | None
     alert_title: str
     alert_status: str

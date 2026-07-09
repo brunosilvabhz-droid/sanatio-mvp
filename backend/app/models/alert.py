@@ -12,7 +12,7 @@ class Alert(Base):
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     cd_atendimento: Mapped[str] = mapped_column(String(60), index=True, nullable=False)
     cd_paciente: Mapped[str] = mapped_column(String(60), index=True, nullable=False)
-    patient_name: Mapped[str] = mapped_column(String(255), nullable=False)
+    patient_name: Mapped[str | None] = mapped_column(String(255), nullable=True)
     unit: Mapped[str | None] = mapped_column(String(120), index=True)
     rule_id: Mapped[int | None] = mapped_column(ForeignKey("monitoring_rules.id"))
     alert_type: Mapped[str] = mapped_column(String(80), nullable=False)

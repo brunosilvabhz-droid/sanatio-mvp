@@ -120,3 +120,33 @@ python -m app.seed.seed
 - Geração de alertas por `POST /monitoring/run`, evitando duplicidade aberta para mesma regra e atendimento
 - Histórico de ações em `alert_actions` para alterações de status e observações
 - Dashboard inicial com indicadores básicos
+
+## Privacidade do nome do paciente
+
+O banco interno da aplicacao deve armazenar apenas identificadores assistenciais, como `cd_atendimento` e `cd_paciente`. Alertas e historico de acoes nao persistem o nome do paciente.
+
+Por padrao, o backend tambem nao expoe `nm_paciente` nas APIs:
+
+```env
+EXPOSE_PATIENT_NAMES_IN_API=false
+```
+
+Para exibir nomes na tela, configure no frontend um servico de resolucao acessivel somente a partir da rede autorizada do cliente:
+
+```env
+VITE_PATIENT_NAME_RESOLVER_URL=http://resolvedor-interno.local
+```
+
+Contrato esperado do resolvedor:
+
+```http
+GET /patients/{cd_paciente}?cd_atendimento={cd_atendimento}
+```
+
+Resposta esperada:
+
+```json
+{ "name": "Nome do Paciente" }
+```
+
+Se o navegador estiver fora da rede autorizada ou o firewall bloquear esse servico, a aplicacao exibira apenas `Paciente #{cd_paciente}`.
