@@ -44,8 +44,24 @@ export default function AntimicrobialAudits() {
     min_days: '7',
     active_only: true
   });
+  const [sortBy, setSortBy] = useState('priority_desc');
 
   const pendingCount = useMemo(() => rows.filter((row) => ['PENDENTE', 'EM_ANALISE'].includes(row.status)).length, [rows]);
+  const sortedRows = useMemo(() => {
+    const priorityRank: Record<string, number> = { ALTA: 3, MEDIA: 2, BAIXA: 1 };
+    const statusRank: Record<string, number> = { PENDENTE: 5, EM_ANALISE: 4, INTERVENCAO_SUGERIDA: 3, JUSTIFICADO: 2, MONITORADO: 1, RESOLVIDO: 0, ENCERRADO: 0 };
+    return [...rows].sort((a, b) => {
+      if (sortBy === 'priority_desc') {
+        return (priorityRank[b.priority] || 0) - (priorityRank[a.priority] || 0) || b.days_in_use - a.days_in_use || (statusRank[b.status] || 0) - (statusRank[a.status] || 0);
+      }
+      if (sortBy === 'days_desc') return b.days_in_use - a.days_in_use;
+      if (sortBy === 'status') return (statusRank[b.status] || 0) - (statusRank[a.status] || 0);
+      if (sortBy === 'antimicrobial') return a.antimicrobial_name.localeCompare(b.antimicrobial_name);
+      if (sortBy === 'unit') return (a.unit || '').localeCompare(b.unit || '');
+      if (sortBy === 'reviewed_desc') return new Date(b.reviewed_at || 0).getTime() - new Date(a.reviewed_at || 0).getTime();
+      return 0;
+    });
+  }, [rows, sortBy]);
 
   async function load() {
     const params = Object.fromEntries(
@@ -119,6 +135,14 @@ export default function AntimicrobialAudits() {
             control={<Checkbox checked={filters.active_only} onChange={(e) => setFilters({ ...filters, active_only: e.target.checked })} />}
             label="Ativos"
           />
+          <TextField select size="small" label="ordenar" value={sortBy} sx={{ minWidth: 220 }} onChange={(e) => setSortBy(e.target.value)}>
+            <MenuItem value="priority_desc">Maior prioridade primeiro</MenuItem>
+            <MenuItem value="days_desc">Mais dias de uso</MenuItem>
+            <MenuItem value="status">Status mais pendente</MenuItem>
+            <MenuItem value="antimicrobial">Antimicrobiano</MenuItem>
+            <MenuItem value="unit">Unidade</MenuItem>
+            <MenuItem value="reviewed_desc">Ultima revisao</MenuItem>
+          </TextField>
           <Button startIcon={<SearchIcon />} variant="contained" onClick={load}>
             Filtrar
           </Button>
@@ -142,7 +166,7 @@ export default function AntimicrobialAudits() {
             </TableRow>
           </TableHead>
           <TableBody>
-            {rows.map((row) => (
+            {sortedRows.map((row) => (
               <TableRow key={row.id} hover>
                 <TableCell>
                   <PatientName cdPaciente={row.cd_paciente} cdAtendimento={row.cd_atendimento} dense />

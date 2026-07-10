@@ -2,7 +2,7 @@ import csv
 import io
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Response
-from sqlalchemy import select
+from sqlalchemy import case, select
 from sqlalchemy.orm import Session, selectinload
 
 from app.api.deps import get_current_user
@@ -76,7 +76,11 @@ def list_alerts(
     db: Session = Depends(get_db),
     _: User = Depends(get_current_user),
 ) -> list[Alert]:
-    stmt = select(Alert).options(selectinload(Alert.actions)).order_by(Alert.created_at.desc())
+    stmt = (
+        select(Alert)
+        .options(selectinload(Alert.actions))
+        .order_by(case((Alert.severity == "ALTA", 3), (Alert.severity == "MEDIA", 2), else_=1).desc(), Alert.created_at.desc())
+    )
     if status:
         stmt = stmt.where(Alert.status == status)
     if severity:

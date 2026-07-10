@@ -1,5 +1,5 @@
 from fastapi import APIRouter, Depends, HTTPException
-from sqlalchemy import select
+from sqlalchemy import case, select
 from sqlalchemy.orm import Session, selectinload
 
 from app.api.deps import get_current_user
@@ -78,7 +78,11 @@ def list_audits(
             selectinload(AntimicrobialAudit.actions).selectinload(AntimicrobialAuditAction.user),
             selectinload(AntimicrobialAudit.reviewed_by),
         )
-        .order_by(AntimicrobialAudit.priority.desc(), AntimicrobialAudit.days_in_use.desc(), AntimicrobialAudit.updated_at.desc())
+        .order_by(
+            case((AntimicrobialAudit.priority == "ALTA", 3), (AntimicrobialAudit.priority == "MEDIA", 2), else_=1).desc(),
+            AntimicrobialAudit.days_in_use.desc(),
+            AntimicrobialAudit.updated_at.desc(),
+        )
     )
     if status:
         stmt = stmt.where(AntimicrobialAudit.status == status)

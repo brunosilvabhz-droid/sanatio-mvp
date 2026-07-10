@@ -13,7 +13,7 @@ import {
   TextField,
   Typography
 } from '@mui/material';
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { api } from '../../api/client';
 import { RiskChip } from '../../components/StatusChip';
@@ -24,6 +24,7 @@ export default function Patients() {
   const navigate = useNavigate();
   const [patients, setPatients] = useState<Patient[]>([]);
   const [filters, setFilters] = useState({ nome: '', atendimento: '', unidade: '', leito: '', medico: '', convenio: '', status_risco: '' });
+  const [sortBy, setSortBy] = useState('risk_desc');
 
   async function load() {
     const params = Object.fromEntries(Object.entries(filters).filter(([, value]) => value));
@@ -34,6 +35,18 @@ export default function Patients() {
   useEffect(() => {
     load();
   }, []);
+
+  const sortedPatients = useMemo(() => {
+    const riskRank: Record<string, number> = { alto: 3, medio: 2, baixo: 1 };
+    return [...patients].sort((a, b) => {
+      if (sortBy === 'risk_desc') return (riskRank[b.status_risco] || 0) - (riskRank[a.status_risco] || 0) || b.dias_internacao - a.dias_internacao;
+      if (sortBy === 'days_desc') return b.dias_internacao - a.dias_internacao;
+      if (sortBy === 'unit') return a.ds_unidade.localeCompare(b.ds_unidade) || a.ds_leito.localeCompare(b.ds_leito);
+      if (sortBy === 'doctor') return a.nm_prestador.localeCompare(b.nm_prestador);
+      if (sortBy === 'attendance') return String(a.cd_atendimento).localeCompare(String(b.cd_atendimento));
+      return 0;
+    });
+  }, [patients, sortBy]);
 
   return (
     <Stack spacing={2}>
@@ -67,6 +80,13 @@ export default function Patients() {
             <MenuItem value="medio">Médio</MenuItem>
             <MenuItem value="alto">Alto</MenuItem>
           </TextField>
+          <TextField select size="small" label="ordenar" value={sortBy} sx={{ minWidth: 210 }} onChange={(e) => setSortBy(e.target.value)}>
+            <MenuItem value="risk_desc">Maior risco primeiro</MenuItem>
+            <MenuItem value="days_desc">Mais dias internado</MenuItem>
+            <MenuItem value="unit">Unidade e leito</MenuItem>
+            <MenuItem value="doctor">Medico</MenuItem>
+            <MenuItem value="attendance">Atendimento</MenuItem>
+          </TextField>
           <Button startIcon={<SearchIcon />} variant="contained" onClick={load}>
             Filtrar
           </Button>
@@ -89,7 +109,7 @@ export default function Patients() {
             </TableRow>
           </TableHead>
           <TableBody>
-            {patients.map((p) => (
+            {sortedPatients.map((p) => (
               <TableRow key={p.cd_atendimento} hover onClick={() => navigate(`/patients/${p.cd_atendimento}`)} sx={{ cursor: 'pointer' }}>
                 <TableCell>
                   <PatientName cdPaciente={p.cd_paciente} cdAtendimento={p.cd_atendimento} fallbackName={p.nm_paciente} dense />

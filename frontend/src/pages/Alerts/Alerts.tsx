@@ -18,7 +18,7 @@ import {
   TextField,
   Typography
 } from '@mui/material';
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { api } from '../../api/client';
 import { SeverityChip } from '../../components/StatusChip';
 import PatientName from '../../components/PatientName';
@@ -27,6 +27,7 @@ import { Alert } from '../../types';
 export default function Alerts() {
   const [alerts, setAlerts] = useState<Alert[]>([]);
   const [filters, setFilters] = useState({ status: '', severity: '', unidade: '', atendimento: '', paciente: '' });
+  const [sortBy, setSortBy] = useState('risk_desc');
   const [selected, setSelected] = useState<Alert | null>(null);
   const [status, setStatus] = useState('EM_ANALISE');
   const [comment, setComment] = useState('');
@@ -56,6 +57,21 @@ export default function Alerts() {
     load();
   }, []);
 
+  const sortedAlerts = useMemo(() => {
+    const severityRank: Record<string, number> = { ALTA: 3, MEDIA: 2, BAIXA: 1 };
+    const statusRank: Record<string, number> = { ABERTO: 4, EM_ANALISE: 3, RESOLVIDO: 2, IGNORADO: 1 };
+    return [...alerts].sort((a, b) => {
+      if (sortBy === 'risk_desc') {
+        return (severityRank[b.severity] || 0) - (severityRank[a.severity] || 0) || statusRank[b.status] - statusRank[a.status] || new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
+      }
+      if (sortBy === 'newest') return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
+      if (sortBy === 'oldest') return new Date(a.created_at).getTime() - new Date(b.created_at).getTime();
+      if (sortBy === 'status') return (statusRank[b.status] || 0) - (statusRank[a.status] || 0);
+      if (sortBy === 'unit') return (a.unit || '').localeCompare(b.unit || '');
+      return 0;
+    });
+  }, [alerts, sortBy]);
+
   return (
     <Stack spacing={2}>
       <Box>
@@ -78,6 +94,13 @@ export default function Alerts() {
           {(['unidade', 'atendimento', 'paciente'] as const).map((key) => (
             <TextField key={key} size="small" label={key} value={filters[key]} onChange={(e) => setFilters({ ...filters, [key]: e.target.value })} />
           ))}
+          <TextField select size="small" label="ordenar" value={sortBy} sx={{ minWidth: 210 }} onChange={(e) => setSortBy(e.target.value)}>
+            <MenuItem value="risk_desc">Maior risco primeiro</MenuItem>
+            <MenuItem value="newest">Mais recentes</MenuItem>
+            <MenuItem value="oldest">Mais antigos</MenuItem>
+            <MenuItem value="status">Status mais aberto</MenuItem>
+            <MenuItem value="unit">Unidade</MenuItem>
+          </TextField>
           <Button variant="contained" onClick={load}>Filtrar</Button>
         </Stack>
       </Paper>
@@ -95,7 +118,7 @@ export default function Alerts() {
             </TableRow>
           </TableHead>
           <TableBody>
-            {alerts.map((alert) => (
+            {sortedAlerts.map((alert) => (
               <TableRow key={alert.id} hover>
                 <TableCell>
                   <PatientName cdPaciente={alert.cd_paciente} cdAtendimento={alert.cd_atendimento} fallbackName={alert.patient_name} dense />
