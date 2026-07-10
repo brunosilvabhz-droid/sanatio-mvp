@@ -36,6 +36,10 @@ SETTINGS = [
     ("soulmv.view.invasive_procedures", "VW_SANATIO_PROCEDIMENTOS_INVASIVOS", "View de procedimentos invasivos"),
     ("soulmv.view.isolations", "VW_SANATIO_ISOLAMENTOS", "View de isolamentos"),
     ("general.institution_name", "Hospital Demonstração", "Nome da instituição"),
+    ("monitoring.schedule.enabled", "false", "Ativa a execucao automatica do monitoramento"),
+    ("monitoring.schedule.interval_minutes", "60", "Intervalo entre execucoes automaticas em minutos"),
+    ("monitoring.schedule.daily_time", "07:00", "Horario preferencial de execucao diaria"),
+    ("monitoring.schedule.timezone", "America/Sao_Paulo", "Fuso horario da agenda automatica"),
 ]
 
 

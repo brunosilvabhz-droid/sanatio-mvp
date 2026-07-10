@@ -126,6 +126,13 @@ export type MonitoringRun = {
   finished_at?: string;
 };
 
+export type MonitoringSchedule = {
+  enabled: boolean;
+  interval_minutes: number;
+  daily_time: string;
+  timezone: string;
+};
+
 export type AntimicrobialAuditAction = {
   id: number;
   audit_id: number;

@@ -22,7 +22,7 @@ import {
 } from '@mui/material';
 import { useEffect, useMemo, useState } from 'react';
 import { api } from '../../api/client';
-import { MonitoringRule } from '../../types';
+import { MonitoringRule, MonitoringSchedule } from '../../types';
 
 const signalOptions = [
   {
@@ -83,6 +83,7 @@ const ruleTypesBySignal: Record<string, string> = {
 
 export default function AlertRules() {
   const [rules, setRules] = useState<MonitoringRule[]>([]);
+  const [schedule, setSchedule] = useState<MonitoringSchedule>({ enabled: false, interval_minutes: 60, daily_time: '07:00', timezone: 'America/Sao_Paulo' });
   const [message, setMessage] = useState('');
   const [form, setForm] = useState({
     name: '',
@@ -98,8 +99,9 @@ export default function AlertRules() {
   );
 
   async function load() {
-    const { data } = await api.get('/monitoring/rules');
-    setRules(data);
+    const [rulesResponse, scheduleResponse] = await Promise.all([api.get('/monitoring/rules'), api.get('/monitoring/schedule')]);
+    setRules(rulesResponse.data);
+    setSchedule(scheduleResponse.data);
   }
 
   useEffect(() => {
@@ -153,6 +155,12 @@ export default function AlertRules() {
     await load();
   }
 
+  async function saveSchedule() {
+    await api.patch('/monitoring/schedule', schedule);
+    setMessage('Agendamento do monitoramento salvo.');
+    await load();
+  }
+
   return (
     <Stack spacing={2}>
       <Box>
@@ -162,7 +170,53 @@ export default function AlertRules() {
         <Typography color="text.secondary">Monte regras usando indicadores gravados no banco do SANATIO</Typography>
       </Box>
 
-      {message && <Alert severity={message.includes('criada') ? 'success' : 'warning'}>{message}</Alert>}
+      {message && <Alert severity={message.includes('criada') || message.includes('salvo') ? 'success' : 'warning'}>{message}</Alert>}
+
+      <Paper sx={{ p: 2.5 }}>
+        <Stack spacing={2}>
+          <Stack direction={{ xs: 'column', md: 'row' }} justifyContent="space-between" alignItems={{ xs: 'flex-start', md: 'center' }} gap={2}>
+            <Box>
+              <Typography variant="h6" fontWeight={700}>
+                Execucao automatica do monitoramento
+              </Typography>
+              <Typography color="text.secondary">
+                Parametrize a agenda que o servico local usara para disparar o monitoramento sem acao manual.
+              </Typography>
+            </Box>
+            <FormControlLabel
+              control={<Switch checked={schedule.enabled} onChange={(event) => setSchedule({ ...schedule, enabled: event.target.checked })} />}
+              label={schedule.enabled ? 'Ativa' : 'Inativa'}
+            />
+          </Stack>
+          <Stack direction={{ xs: 'column', md: 'row' }} spacing={1.5}>
+            <TextField
+              label="Intervalo em minutos"
+              type="number"
+              value={schedule.interval_minutes}
+              onChange={(event) => setSchedule({ ...schedule, interval_minutes: Number(event.target.value) })}
+              inputProps={{ min: 5, max: 1440 }}
+              fullWidth
+            />
+            <TextField
+              label="Horario preferencial"
+              type="time"
+              value={schedule.daily_time}
+              onChange={(event) => setSchedule({ ...schedule, daily_time: event.target.value })}
+              InputLabelProps={{ shrink: true }}
+              fullWidth
+            />
+            <TextField
+              label="Fuso horario"
+              value={schedule.timezone}
+              onChange={(event) => setSchedule({ ...schedule, timezone: event.target.value })}
+              fullWidth
+            />
+            <Button startIcon={<SaveIcon />} variant="contained" onClick={saveSchedule} sx={{ minWidth: 180 }}>
+              Salvar agenda
+            </Button>
+          </Stack>
+        </Stack>
+      </Paper>
 
       <Grid container spacing={2}>
         <Grid item xs={12} lg={5}>
