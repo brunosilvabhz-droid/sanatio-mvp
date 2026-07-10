@@ -85,7 +85,7 @@ def run(db: Session = Depends(get_db), current_user: User = Depends(get_current_
     run_id = monitoring_run.id
 
     try:
-        result = run_monitoring(db)
+        result = run_monitoring(db, monitoring_run_id=run_id)
     except Exception as exc:
         db.rollback()
         finished_at = datetime.now(timezone.utc)

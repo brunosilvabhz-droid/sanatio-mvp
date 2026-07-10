@@ -28,49 +28,57 @@ const signalOptions = [
   {
     key: 'positive_culture',
     label: 'Cultura positiva',
-    view: 'VW_SANATIO_CULTURAS',
-    description: 'Resultado positivo em cultura do atendimento.'
+    field: 'has_positive_culture',
+    description: 'Flag consolidada no SANATIO a partir dos eventos do atendimento.'
   },
   {
     key: 'antimicrobial_gt7',
-    label: 'Antimicrobiano > 7 dias',
-    view: 'VW_SANATIO_ANTIMICROBIANOS',
-    description: 'Antimicrobiano ativo com uso prolongado.'
+    label: 'Antimicrobiano >= 7 dias',
+    field: 'max_antimicrobial_days',
+    description: 'Maior tempo de antimicrobiano ativo gravado no snapshot do atendimento.'
   },
   {
     key: 'long_stay',
-    label: 'Internação >= 10 dias',
-    view: 'VW_SANATIO_PACIENTES_INTERNADOS',
-    description: 'Tempo de internação elevado.'
+    label: 'Internacao >= 10 dias',
+    field: 'days_in_hospital',
+    description: 'Tempo de internacao consolidado no banco da aplicacao.'
   },
   {
     key: 'invasive_gt7',
-    label: 'Procedimento invasivo > 7 dias',
-    view: 'VW_SANATIO_PROCEDIMENTOS_INVASIVOS',
-    description: 'Dispositivo invasivo ativo por período prolongado.'
+    label: 'Dispositivo invasivo >= 7 dias',
+    field: 'max_invasive_device_days',
+    description: 'Maior permanencia de dispositivo invasivo ativo no snapshot.'
   },
   {
     key: 'active_isolation',
     label: 'Isolamento ativo',
-    view: 'VW_SANATIO_ISOLAMENTOS',
-    description: 'Paciente com isolamento ativo.'
+    field: 'has_active_isolation',
+    description: 'Flag interna indicando isolamento ativo no atendimento.'
+  },
+  {
+    key: 'high_risk',
+    label: 'Risco alto',
+    field: 'risk_status',
+    description: 'Classificacao de risco calculada e gravada pelo SANATIO.'
   }
 ];
 
 const simpleRuleTypes: Record<string, { key: string; value: string }> = {
-  positive_culture: { key: 'sn_positivo', value: 'S' },
-  antimicrobial_gt7: { key: 'dias_uso', value: '7' },
-  long_stay: { key: 'dias_internacao', value: '10' },
-  invasive_gt7: { key: 'dias_permanencia', value: '7' },
-  active_isolation: { key: 'sn_ativo', value: 'S' }
+  positive_culture: { key: 'has_positive_culture', value: 'true' },
+  antimicrobial_gt7: { key: 'max_antimicrobial_days', value: '7' },
+  long_stay: { key: 'days_in_hospital', value: '10' },
+  invasive_gt7: { key: 'max_invasive_device_days', value: '7' },
+  active_isolation: { key: 'has_active_isolation', value: 'true' },
+  high_risk: { key: 'risk_status', value: 'alto' }
 };
 
 const ruleTypesBySignal: Record<string, string> = {
   positive_culture: 'POSITIVE_CULTURE',
-  antimicrobial_gt7: 'ANTIMICROBIAL_GT7',
+  antimicrobial_gt7: 'ANTIMICROBIAL_DAYS',
   long_stay: 'LONG_STAY',
-  invasive_gt7: 'INVASIVE_GT7',
-  active_isolation: 'ACTIVE_ISOLATION'
+  invasive_gt7: 'INVASIVE_DEVICE_DAYS',
+  active_isolation: 'ACTIVE_ISOLATION',
+  high_risk: 'RISK_STATUS'
 };
 
 export default function AlertRules() {
@@ -84,8 +92,8 @@ export default function AlertRules() {
     selectedSignals: ['positive_culture', 'antimicrobial_gt7']
   });
 
-  const selectedViews = useMemo(
-    () => Array.from(new Set(signalOptions.filter((option) => form.selectedSignals.includes(option.key)).map((option) => option.view))),
+  const selectedFields = useMemo(
+    () => Array.from(new Set(signalOptions.filter((option) => form.selectedSignals.includes(option.key)).map((option) => option.field))),
     [form.selectedSignals]
   );
 
@@ -107,7 +115,7 @@ export default function AlertRules() {
 
   async function createRule() {
     if (!form.name || form.selectedSignals.length === 0) {
-      setMessage('Informe um nome e selecione ao menos um sinal.');
+      setMessage('Informe um nome e selecione ao menos um indicador.');
       return;
     }
 
@@ -126,9 +134,7 @@ export default function AlertRules() {
         }
       : {
           name: form.name,
-          description:
-            form.description ||
-            `Combina ${form.selectedSignals.length} sinais de ${selectedViews.length} view(s): ${selectedViews.join(', ')}.`,
+          description: form.description || `Combina ${form.selectedSignals.length} indicadores internos: ${selectedFields.join(', ')}.`,
           rule_type: 'COMPOSITE',
           parameter_key: form.matchMode,
           parameter_value: JSON.stringify(form.selectedSignals),
@@ -151,9 +157,9 @@ export default function AlertRules() {
     <Stack spacing={2}>
       <Box>
         <Typography variant="h4" fontWeight={700}>
-          Configuração de alertas
+          Configuracao de alertas
         </Typography>
-        <Typography color="text.secondary">Monte regras simples ou combinadas usando sinais das views do MV Soul</Typography>
+        <Typography color="text.secondary">Monte regras usando indicadores gravados no banco do SANATIO</Typography>
       </Box>
 
       {message && <Alert severity={message.includes('criada') ? 'success' : 'warning'}>{message}</Alert>}
@@ -167,7 +173,7 @@ export default function AlertRules() {
               </Typography>
               <TextField label="Nome da regra" value={form.name} onChange={(event) => setForm({ ...form, name: event.target.value })} fullWidth />
               <TextField
-                label="Descrição"
+                label="Descricao"
                 value={form.description}
                 onChange={(event) => setForm({ ...form, description: event.target.value })}
                 multiline
@@ -181,20 +187,20 @@ export default function AlertRules() {
                 </TextField>
                 <TextField
                   select
-                  label="Combinação"
+                  label="Combinacao"
                   value={form.matchMode}
                   onChange={(event) => setForm({ ...form, matchMode: event.target.value })}
                   fullWidth
                   disabled={form.selectedSignals.length <= 1}
                 >
-                  <MenuItem value="all">Todos os sinais</MenuItem>
-                  <MenuItem value="any">Qualquer sinal</MenuItem>
+                  <MenuItem value="all">Todos os indicadores</MenuItem>
+                  <MenuItem value="any">Qualquer indicador</MenuItem>
                 </TextField>
               </Stack>
 
               <Box>
                 <Typography fontWeight={700} sx={{ mb: 1 }}>
-                  Sinais monitorados
+                  Indicadores disponiveis no SANATIO
                 </Typography>
                 <Stack spacing={1}>
                   {signalOptions.map((option) => (
@@ -205,7 +211,7 @@ export default function AlertRules() {
                           <Box>
                             <Typography fontWeight={700}>{option.label}</Typography>
                             <Typography variant="body2" color="text.secondary">
-                              {option.view}
+                              Campo: {option.field}
                             </Typography>
                           </Box>
                         }
@@ -219,8 +225,8 @@ export default function AlertRules() {
               </Box>
 
               <Stack direction="row" spacing={1} flexWrap="wrap">
-                {selectedViews.map((view) => (
-                  <Chip key={view} size="small" label={view} />
+                {selectedFields.map((field) => (
+                  <Chip key={field} size="small" label={field} />
                 ))}
               </Stack>
 
@@ -246,7 +252,7 @@ export default function AlertRules() {
                 <TableRow>
                   <TableCell>Regra</TableCell>
                   <TableCell>Tipo</TableCell>
-                  <TableCell>Critérios</TableCell>
+                  <TableCell>Criterios</TableCell>
                   <TableCell>Severidade</TableCell>
                   <TableCell>Ativa</TableCell>
                 </TableRow>

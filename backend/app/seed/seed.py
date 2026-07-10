@@ -20,11 +20,11 @@ USERS = [
 ]
 
 RULES = [
-    ("Antimicrobiano ativo por mais de 7 dias", "ANTIMICROBIAL_GT7", "dias_uso", "7", "MEDIA"),
-    ("Cultura positiva", "POSITIVE_CULTURE", "sn_positivo", "S", "ALTA"),
-    ("Procedimento invasivo ativo por mais de 7 dias", "INVASIVE_GT7", "dias_permanencia", "7", "MEDIA"),
-    ("Paciente internado há mais de 10 dias", "LONG_STAY", "dias_internacao", "10", "MEDIA"),
-    ("Isolamento ativo", "ACTIVE_ISOLATION", "sn_ativo", "S", "ALTA"),
+    ("Antimicrobiano ativo por mais de 7 dias", "ANTIMICROBIAL_DAYS", "max_antimicrobial_days", "7", "MEDIA"),
+    ("Cultura positiva", "POSITIVE_CULTURE", "has_positive_culture", "true", "ALTA"),
+    ("Procedimento invasivo ativo por mais de 7 dias", "INVASIVE_DEVICE_DAYS", "max_invasive_device_days", "7", "MEDIA"),
+    ("Paciente internado há mais de 10 dias", "LONG_STAY", "days_in_hospital", "10", "MEDIA"),
+    ("Isolamento ativo", "ACTIVE_ISOLATION", "has_active_isolation", "true", "ALTA"),
     ("Cultura positiva com antimicrobiano prolongado", "COMPOSITE", "all", '["positive_culture","antimicrobial_gt7"]', "ALTA"),
 ]
 
