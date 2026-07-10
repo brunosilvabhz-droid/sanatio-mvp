@@ -3,6 +3,7 @@ import AppLayout from '../layouts/AppLayout';
 import AlertAudit from '../pages/AlertAudit/AlertAudit';
 import AlertRules from '../pages/AlertRules/AlertRules';
 import Alerts from '../pages/Alerts/Alerts';
+import AntimicrobialAudits from '../pages/AntimicrobialAudits/AntimicrobialAudits';
 import Dashboard from '../pages/Dashboard/Dashboard';
 import Login from '../pages/Login/Login';
 import MonitoringRuns from '../pages/MonitoringRuns/MonitoringRuns';
@@ -33,6 +34,7 @@ export default function App() {
           <Route path="patients" element={<Patients />} />
           <Route path="patients/:cdAtendimento" element={<PatientDetail />} />
           <Route path="alerts" element={<Alerts />} />
+          <Route path="antimicrobial-audits" element={<AntimicrobialAudits />} />
           <Route path="alert-rules" element={<AlertRules />} />
           <Route path="monitoring-runs" element={<MonitoringRuns />} />
           <Route path="alert-audit" element={<AlertAudit />} />

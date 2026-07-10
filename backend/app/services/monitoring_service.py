@@ -5,7 +5,7 @@ from sqlalchemy.orm import Session
 
 from app.models.patient_monitoring_snapshot import PatientMonitoringSnapshot
 from app.models.monitoring_rule import MonitoringRule
-from app.services import alert_service, risk_service, soulmv_adapter
+from app.services import alert_service, antimicrobial_audit_service, risk_service, soulmv_adapter
 
 RULE_MAP = {
     "ANTIMICROBIAL_DAYS": "antimicrobial_days",
@@ -49,7 +49,7 @@ def rule_matches(rule: MonitoringRule, criteria: dict) -> bool:
     return False
 
 
-def patient_monitoring_indicators(patient: dict) -> tuple[dict, dict]:
+def patient_monitoring_indicators(patient: dict) -> tuple[dict, dict, list[dict]]:
     cd = str(patient["cd_atendimento"])
     antimicrobials = soulmv_adapter.get_antimicrobials(cd)
     cultures = soulmv_adapter.get_cultures(cd)
@@ -71,11 +71,11 @@ def patient_monitoring_indicators(patient: dict) -> tuple[dict, dict]:
         "active_isolation": any(risk_service.active(item) for item in isolations),
         "risk_status": risk["status"],
     }
-    return indicators, risk
+    return indicators, risk, antimicrobials
 
 
 def patient_with_risk(patient: dict) -> dict:
-    _, risk = patient_monitoring_indicators(patient)
+    _, risk, _ = patient_monitoring_indicators(patient)
     return {**patient, "status_risco": risk["status"], "_risk": risk}
 
 
@@ -85,7 +85,8 @@ def run_monitoring(db: Session, monitoring_run_id: int | None = None) -> dict:
     created = 0
 
     for patient in patients:
-        indicators, _ = patient_monitoring_indicators(patient)
+        indicators, _, antimicrobials = patient_monitoring_indicators(patient)
+        antimicrobial_audit_service.sync_for_patient(db, patient, antimicrobials, monitoring_run_id)
         db.add(
             PatientMonitoringSnapshot(
                 monitoring_run_id=monitoring_run_id,

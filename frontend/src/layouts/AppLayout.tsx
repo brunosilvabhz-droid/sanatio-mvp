@@ -3,6 +3,7 @@ import FactCheckIcon from '@mui/icons-material/FactCheck';
 import GroupIcon from '@mui/icons-material/Group';
 import LogoutIcon from '@mui/icons-material/Logout';
 import ManageHistoryIcon from '@mui/icons-material/ManageHistory';
+import MedicationIcon from '@mui/icons-material/Medication';
 import NotificationsActiveIcon from '@mui/icons-material/NotificationsActive';
 import RuleIcon from '@mui/icons-material/Rule';
 import SettingsIcon from '@mui/icons-material/Settings';
@@ -26,6 +27,7 @@ const items = [
   { label: 'Dashboard', path: '/dashboard', icon: <DashboardIcon /> },
   { label: 'Pacientes', path: '/patients', icon: <SickIcon /> },
   { label: 'Alertas', path: '/alerts', icon: <NotificationsActiveIcon /> },
+  { label: 'Antimicrobianos', path: '/antimicrobial-audits', icon: <MedicationIcon /> },
   { label: 'Config. Alertas', path: '/alert-rules', icon: <RuleIcon /> },
   { label: 'Execuções', path: '/monitoring-runs', icon: <ManageHistoryIcon /> },
   { label: 'Relatório', path: '/alert-audit', icon: <FactCheckIcon /> },

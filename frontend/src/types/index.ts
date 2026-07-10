@@ -125,3 +125,43 @@ export type MonitoringRun = {
   started_at: string;
   finished_at?: string;
 };
+
+export type AntimicrobialAuditAction = {
+  id: number;
+  audit_id: number;
+  user_id?: number;
+  user_name?: string;
+  action: string;
+  status?: string;
+  decision?: string;
+  comment?: string;
+  created_at: string;
+};
+
+export type AntimicrobialAudit = {
+  id: number;
+  cd_atendimento: string;
+  cd_paciente: string;
+  unit?: string;
+  cd_prescricao: string;
+  cd_item_prescricao: string;
+  cd_produto?: string;
+  antimicrobial_name: string;
+  started_at: string;
+  ended_at?: string;
+  days_in_use: number;
+  active: boolean;
+  dose?: string;
+  route?: string;
+  frequency?: string;
+  status: string;
+  priority: string;
+  decision?: string;
+  justification?: string;
+  reviewed_by_user_id?: number;
+  reviewed_by_name?: string;
+  reviewed_at?: string;
+  created_at: string;
+  updated_at: string;
+  actions: AntimicrobialAuditAction[];
+};
