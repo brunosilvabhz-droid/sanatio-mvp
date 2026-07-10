@@ -1,4 +1,7 @@
-from fastapi import APIRouter, Depends, HTTPException, Query
+import csv
+import io
+
+from fastapi import APIRouter, Depends, HTTPException, Query, Response
 from sqlalchemy import select
 from sqlalchemy.orm import Session, selectinload
 
@@ -12,40 +15,14 @@ from app.services import alert_service
 router = APIRouter(prefix="/alerts", tags=["Alertas"])
 
 
-@router.get("", response_model=list[AlertRead])
-def list_alerts(
-    status: str | None = None,
-    severity: str | None = None,
-    unidade: str | None = None,
-    atendimento: str | None = None,
-    paciente: str | None = None,
-    db: Session = Depends(get_db),
-    _: User = Depends(get_current_user),
-) -> list[Alert]:
-    stmt = select(Alert).options(selectinload(Alert.actions)).order_by(Alert.created_at.desc())
-    if status:
-        stmt = stmt.where(Alert.status == status)
-    if severity:
-        stmt = stmt.where(Alert.severity == severity)
-    if unidade:
-        stmt = stmt.where(Alert.unit.ilike(f"%{unidade}%"))
-    if atendimento:
-        stmt = stmt.where(Alert.cd_atendimento.ilike(f"%{atendimento}%"))
-    if paciente:
-        stmt = stmt.where(Alert.cd_paciente.ilike(f"%{paciente}%"))
-    return list(db.scalars(stmt))
-
-
-@router.get("/actions/report", response_model=list[AlertActionReportRead])
-def alert_actions_report(
+def _alert_actions_report_rows(
+    db: Session,
     status: str | None = None,
     severity: str | None = None,
     atendimento: str | None = None,
     paciente: str | None = None,
     usuario: str | None = None,
     action: str | None = None,
-    db: Session = Depends(get_db),
-    _: User = Depends(get_current_user),
 ) -> list[dict]:
     stmt = (
         select(AlertAction, Alert, User)
@@ -89,6 +66,82 @@ def alert_actions_report(
     ]
 
 
+@router.get("", response_model=list[AlertRead])
+def list_alerts(
+    status: str | None = None,
+    severity: str | None = None,
+    unidade: str | None = None,
+    atendimento: str | None = None,
+    paciente: str | None = None,
+    db: Session = Depends(get_db),
+    _: User = Depends(get_current_user),
+) -> list[Alert]:
+    stmt = select(Alert).options(selectinload(Alert.actions)).order_by(Alert.created_at.desc())
+    if status:
+        stmt = stmt.where(Alert.status == status)
+    if severity:
+        stmt = stmt.where(Alert.severity == severity)
+    if unidade:
+        stmt = stmt.where(Alert.unit.ilike(f"%{unidade}%"))
+    if atendimento:
+        stmt = stmt.where(Alert.cd_atendimento.ilike(f"%{atendimento}%"))
+    if paciente:
+        stmt = stmt.where(Alert.cd_paciente.ilike(f"%{paciente}%"))
+    return list(db.scalars(stmt))
+
+
+@router.get("/actions/report", response_model=list[AlertActionReportRead])
+def alert_actions_report(
+    status: str | None = None,
+    severity: str | None = None,
+    atendimento: str | None = None,
+    paciente: str | None = None,
+    usuario: str | None = None,
+    action: str | None = None,
+    db: Session = Depends(get_db),
+    _: User = Depends(get_current_user),
+) -> list[dict]:
+    return _alert_actions_report_rows(db, status, severity, atendimento, paciente, usuario, action)
+
+
+@router.get("/actions/report.csv")
+def alert_actions_report_csv(
+    status: str | None = None,
+    severity: str | None = None,
+    atendimento: str | None = None,
+    paciente: str | None = None,
+    usuario: str | None = None,
+    action: str | None = None,
+    db: Session = Depends(get_db),
+    _: User = Depends(get_current_user),
+) -> Response:
+    rows = _alert_actions_report_rows(db, status, severity, atendimento, paciente, usuario, action)
+    output = io.StringIO()
+    fieldnames = [
+        "action_id",
+        "alert_id",
+        "created_at",
+        "user_name",
+        "user_email",
+        "action",
+        "comment",
+        "cd_paciente",
+        "cd_atendimento",
+        "unit",
+        "alert_title",
+        "severity",
+        "alert_status",
+    ]
+    writer = csv.DictWriter(output, fieldnames=fieldnames, extrasaction="ignore")
+    writer.writeheader()
+    writer.writerows(rows)
+    return Response(
+        content=output.getvalue(),
+        media_type="text/csv; charset=utf-8",
+        headers={"Content-Disposition": 'attachment; filename="sanatio-relatorio-acoes.csv"'},
+    )
+
+
 @router.get("/{alert_id}", response_model=AlertRead)
 def get_alert(alert_id: int, db: Session = Depends(get_db), _: User = Depends(get_current_user)) -> Alert:
     alert = db.scalar(select(Alert).options(selectinload(Alert.actions)).where(Alert.id == alert_id))
@@ -106,6 +159,8 @@ def patch_status(
 ) -> Alert:
     if payload.status not in {"ABERTO", "EM_ANALISE", "RESOLVIDO", "IGNORADO"}:
         raise HTTPException(status_code=422, detail="Status inválido")
+    if payload.status in {"RESOLVIDO", "IGNORADO"} and not (payload.comment or "").strip():
+        raise HTTPException(status_code=422, detail="Justificativa obrigatória para resolver ou ignorar alertas")
     alert = db.get(Alert, alert_id)
     if not alert:
         raise HTTPException(status_code=404, detail="Alerta não encontrado")

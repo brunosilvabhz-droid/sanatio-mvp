@@ -1,3 +1,4 @@
+import DownloadIcon from '@mui/icons-material/Download';
 import SearchIcon from '@mui/icons-material/Search';
 import {
   Box,
@@ -37,6 +38,19 @@ export default function AlertAudit() {
     setRows(data);
   }
 
+  async function exportCsv() {
+    const params = Object.fromEntries(Object.entries(filters).filter(([, value]) => value));
+    const { data } = await api.get('/alerts/actions/report.csv', { params, responseType: 'blob' });
+    const url = window.URL.createObjectURL(new Blob([data], { type: 'text/csv;charset=utf-8' }));
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `sanatio-relatorio-acoes-${new Date().toISOString().slice(0, 10)}.csv`;
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    window.URL.revokeObjectURL(url);
+  }
+
   useEffect(() => {
     load();
   }, []);
@@ -71,6 +85,9 @@ export default function AlertAudit() {
           <TextField size="small" label="ação" value={filters.action} onChange={(e) => setFilters({ ...filters, action: e.target.value })} />
           <Button startIcon={<SearchIcon />} variant="contained" onClick={load}>
             Filtrar
+          </Button>
+          <Button startIcon={<DownloadIcon />} variant="outlined" onClick={exportCsv}>
+            Exportar CSV
           </Button>
         </Stack>
       </Paper>

@@ -2,6 +2,7 @@ import DashboardIcon from '@mui/icons-material/Dashboard';
 import FactCheckIcon from '@mui/icons-material/FactCheck';
 import GroupIcon from '@mui/icons-material/Group';
 import LogoutIcon from '@mui/icons-material/Logout';
+import ManageHistoryIcon from '@mui/icons-material/ManageHistory';
 import NotificationsActiveIcon from '@mui/icons-material/NotificationsActive';
 import RuleIcon from '@mui/icons-material/Rule';
 import SettingsIcon from '@mui/icons-material/Settings';
@@ -26,6 +27,7 @@ const items = [
   { label: 'Pacientes', path: '/patients', icon: <SickIcon /> },
   { label: 'Alertas', path: '/alerts', icon: <NotificationsActiveIcon /> },
   { label: 'Config. Alertas', path: '/alert-rules', icon: <RuleIcon /> },
+  { label: 'Execuções', path: '/monitoring-runs', icon: <ManageHistoryIcon /> },
   { label: 'Relatório', path: '/alert-audit', icon: <FactCheckIcon /> },
   { label: 'Usuários', path: '/users', icon: <GroupIcon /> },
   { label: 'Configurações', path: '/settings', icon: <SettingsIcon /> }

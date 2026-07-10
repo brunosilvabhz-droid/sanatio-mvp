@@ -5,6 +5,7 @@ import AlertRules from '../pages/AlertRules/AlertRules';
 import Alerts from '../pages/Alerts/Alerts';
 import Dashboard from '../pages/Dashboard/Dashboard';
 import Login from '../pages/Login/Login';
+import MonitoringRuns from '../pages/MonitoringRuns/MonitoringRuns';
 import PatientDetail from '../pages/PatientDetail/PatientDetail';
 import Patients from '../pages/Patients/Patients';
 import Settings from '../pages/Settings/Settings';
@@ -33,6 +34,7 @@ export default function App() {
           <Route path="patients/:cdAtendimento" element={<PatientDetail />} />
           <Route path="alerts" element={<Alerts />} />
           <Route path="alert-rules" element={<AlertRules />} />
+          <Route path="monitoring-runs" element={<MonitoringRuns />} />
           <Route path="alert-audit" element={<AlertAudit />} />
           <Route path="users" element={<Users />} />
           <Route path="settings" element={<Settings />} />

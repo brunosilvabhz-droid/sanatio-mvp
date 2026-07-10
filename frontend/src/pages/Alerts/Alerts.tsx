@@ -30,6 +30,8 @@ export default function Alerts() {
   const [selected, setSelected] = useState<Alert | null>(null);
   const [status, setStatus] = useState('EM_ANALISE');
   const [comment, setComment] = useState('');
+  const [commentError, setCommentError] = useState('');
+  const requiresComment = ['RESOLVIDO', 'IGNORADO'].includes(status);
 
   async function load() {
     const params = Object.fromEntries(Object.entries(filters).filter(([, value]) => value));
@@ -39,9 +41,14 @@ export default function Alerts() {
 
   async function saveStatus() {
     if (!selected) return;
+    if (requiresComment && !comment.trim()) {
+      setCommentError('Informe a justificativa para resolver ou ignorar o alerta.');
+      return;
+    }
     await api.patch(`/alerts/${selected.id}/status`, { status, comment });
     setSelected(null);
     setComment('');
+    setCommentError('');
     await load();
   }
 
@@ -99,7 +106,7 @@ export default function Alerts() {
                 <TableCell><SeverityChip value={alert.severity} /></TableCell>
                 <TableCell>{alert.status}</TableCell>
                 <TableCell>
-                  <Button size="small" startIcon={<AddCommentIcon />} onClick={() => { setSelected(alert); setStatus(alert.status); }}>
+                  <Button size="small" startIcon={<AddCommentIcon />} onClick={() => { setSelected(alert); setStatus(alert.status); setComment(''); setCommentError(''); }}>
                     Abrir
                   </Button>
                 </TableCell>
@@ -108,20 +115,32 @@ export default function Alerts() {
           </TableBody>
         </Table>
       </Paper>
-      <Dialog open={Boolean(selected)} onClose={() => setSelected(null)} maxWidth="sm" fullWidth>
+      <Dialog open={Boolean(selected)} onClose={() => { setSelected(null); setCommentError(''); }} maxWidth="sm" fullWidth>
         <DialogTitle>{selected?.title}</DialogTitle>
         <DialogContent>
           <Stack spacing={2} sx={{ mt: 1 }}>
             <Typography>{selected?.description}</Typography>
             <Typography color="text.secondary">{selected?.recommendation}</Typography>
-            <TextField select label="Status" value={status} onChange={(e) => setStatus(e.target.value)}>
+            <TextField select label="Status" value={status} onChange={(e) => { setStatus(e.target.value); setCommentError(''); }}>
               {['ABERTO', 'EM_ANALISE', 'RESOLVIDO', 'IGNORADO'].map((item) => <MenuItem key={item} value={item}>{item}</MenuItem>)}
             </TextField>
-            <TextField label="Observação" multiline minRows={3} value={comment} onChange={(e) => setComment(e.target.value)} />
+            <TextField
+              label={requiresComment ? 'Justificativa' : 'Observação'}
+              required={requiresComment}
+              multiline
+              minRows={3}
+              value={comment}
+              error={Boolean(commentError)}
+              helperText={commentError || (requiresComment ? 'Obrigatória para resolver ou ignorar.' : '')}
+              onChange={(e) => {
+                setComment(e.target.value);
+                if (commentError) setCommentError('');
+              }}
+            />
           </Stack>
         </DialogContent>
         <DialogActions>
-          <Button onClick={() => setSelected(null)}>Cancelar</Button>
+          <Button onClick={() => { setSelected(null); setCommentError(''); }}>Cancelar</Button>
           <Button startIcon={<SaveIcon />} variant="contained" onClick={saveStatus}>Salvar</Button>
         </DialogActions>
       </Dialog>

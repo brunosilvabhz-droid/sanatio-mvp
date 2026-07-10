@@ -111,3 +111,17 @@ export type MonitoringRule = {
   created_at: string;
   updated_at: string;
 };
+
+export type MonitoringRun = {
+  id: number;
+  triggered_by_user_id?: number;
+  triggered_by_name?: string;
+  triggered_by_email?: string;
+  status: 'RUNNING' | 'SUCCESS' | 'FAILED' | string;
+  patients_processed: number;
+  alerts_created: number;
+  duration_ms?: number;
+  error_message?: string;
+  started_at: string;
+  finished_at?: string;
+};
