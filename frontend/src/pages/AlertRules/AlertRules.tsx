@@ -24,6 +24,26 @@ import { useEffect, useMemo, useState } from 'react';
 import { api } from '../../api/client';
 import { MonitoringRule } from '../../types';
 
+type Setting = { key: string; value?: string; description?: string };
+
+const thresholdKeys = [
+  {
+    key: 'alerts.threshold.antimicrobial_days',
+    label: 'Dias de antimicrobiano',
+    helper: 'Gera alerta quando o uso ativo atingir este limite.'
+  },
+  {
+    key: 'alerts.threshold.hospital_stay_days',
+    label: 'Dias de internacao',
+    helper: 'Gera alerta para paciente internado por longa permanencia.'
+  },
+  {
+    key: 'alerts.threshold.invasive_device_days',
+    label: 'Dias de procedimento invasivo',
+    helper: 'Gera alerta quando o dispositivo invasivo ativo atingir este limite.'
+  }
+];
+
 const signalOptions = [
   { key: 'positive_culture', label: 'Cultura positiva', field: 'has_positive_culture', description: 'Prioriza atendimento com cultura positiva.' },
   { key: 'antimicrobial_gt7', label: 'Antimicrobiano prolongado', field: 'max_antimicrobial_days', description: 'Prioriza uso de antimicrobiano acima do limite configurado.' },
@@ -44,6 +64,7 @@ const simpleRuleTypes: Record<string, { rule_type: string; parameter_key: string
 
 export default function AlertRules() {
   const [rules, setRules] = useState<MonitoringRule[]>([]);
+  const [thresholds, setThresholds] = useState<Setting[]>([]);
   const [message, setMessage] = useState('');
   const [form, setForm] = useState({
     name: '',
@@ -59,8 +80,9 @@ export default function AlertRules() {
   );
 
   async function load() {
-    const { data } = await api.get('/monitoring/rules');
-    setRules(data);
+    const [rulesResponse, settingsResponse] = await Promise.all([api.get('/monitoring/rules'), api.get('/settings')]);
+    setRules(rulesResponse.data);
+    setThresholds(settingsResponse.data.filter((setting: Setting) => thresholdKeys.some((item) => item.key === setting.key)));
   }
 
   useEffect(() => {
@@ -112,6 +134,12 @@ export default function AlertRules() {
     await load();
   }
 
+  async function saveThreshold(setting: Setting) {
+    await api.patch('/settings', setting);
+    setMessage('Parametro de alerta salvo.');
+    await load();
+  }
+
   return (
     <Stack spacing={2}>
       <Box>
@@ -120,6 +148,44 @@ export default function AlertRules() {
       </Box>
 
       {message && <Alert severity={message.includes('criada') ? 'success' : 'warning'}>{message}</Alert>}
+
+      <Paper sx={{ p: 2.5 }}>
+        <Stack spacing={2}>
+          <Box>
+            <Typography variant="h6" fontWeight={700}>Parametros de disparo</Typography>
+            <Typography color="text.secondary">Limites assistenciais usados para priorizar pacientes e gerar alertas recebidos do hospital.</Typography>
+          </Box>
+          <Grid container spacing={2}>
+            {thresholdKeys.map((threshold) => {
+              const setting = thresholds.find((item) => item.key === threshold.key) || { key: threshold.key, value: '', description: threshold.helper };
+              const index = thresholds.findIndex((item) => item.key === threshold.key);
+              return (
+                <Grid item xs={12} md={4} key={threshold.key}>
+                  <Stack spacing={1}>
+                    <TextField
+                      type="number"
+                      label={threshold.label}
+                      value={setting.value || ''}
+                      helperText={threshold.helper}
+                      inputProps={{ min: 1 }}
+                      onChange={(event) => {
+                        const next = [...thresholds];
+                        const nextSetting = { ...setting, value: event.target.value, description: setting.description || threshold.helper };
+                        if (index >= 0) next[index] = nextSetting;
+                        else next.push(nextSetting);
+                        setThresholds(next);
+                      }}
+                    />
+                    <Button startIcon={<SaveIcon />} onClick={() => saveThreshold({ ...setting, description: setting.description || threshold.helper })}>
+                      Salvar parametro
+                    </Button>
+                  </Stack>
+                </Grid>
+              );
+            })}
+          </Grid>
+        </Stack>
+      </Paper>
 
       <Grid container spacing={2}>
         <Grid item xs={12} lg={5}>

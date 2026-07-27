@@ -4,6 +4,7 @@ import GroupIcon from '@mui/icons-material/Group';
 import LogoutIcon from '@mui/icons-material/Logout';
 import ManageHistoryIcon from '@mui/icons-material/ManageHistory';
 import MedicationIcon from '@mui/icons-material/Medication';
+import QueryStatsIcon from '@mui/icons-material/QueryStats';
 import NotificationsActiveIcon from '@mui/icons-material/NotificationsActive';
 import ReplyIcon from '@mui/icons-material/Reply';
 import RuleIcon from '@mui/icons-material/Rule';
@@ -32,6 +33,7 @@ const items = [
   { label: 'Alertas', path: '/alerts', icon: <NotificationsActiveIcon /> },
   { label: 'Intervencoes', path: '/interventions', icon: <ReplyIcon /> },
   { label: 'Antimicrobianos', path: '/antimicrobial-audits', icon: <MedicationIcon /> },
+  { label: 'Epidemiologia', path: '/epidemiology-reports', icon: <QueryStatsIcon /> },
   { label: 'Config. Alertas', path: '/alert-rules', icon: <RuleIcon /> },
   { label: 'Execuções', path: '/monitoring-runs', icon: <ManageHistoryIcon /> },
   { label: 'Relatório', path: '/alert-audit', icon: <FactCheckIcon /> },

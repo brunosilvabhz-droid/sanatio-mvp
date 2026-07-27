@@ -10,7 +10,7 @@ class HospitalIntegrationCreate(BaseModel):
 class HospitalIntegrationRead(BaseModel):
     id: int
     hospital_name: str
-    token: str
+    token: str | None = None
     active: bool
     created_at: datetime
     updated_at: datetime

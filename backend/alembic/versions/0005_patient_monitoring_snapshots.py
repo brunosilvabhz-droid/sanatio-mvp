@@ -1,14 +1,14 @@
 """patient monitoring snapshots
 
-Revision ID: 0005_patient_monitoring_snapshots
+Revision ID: 0005
 Revises: 0004_monitoring_runs
 Create Date: 2026-07-10
 """
 from alembic import op
 import sqlalchemy as sa
 
-revision = "0005_patient_monitoring_snapshots"
-down_revision = "0004_monitoring_runs"
+revision = "0005"
+down_revision = "0004"
 branch_labels = None
 depends_on = None
 

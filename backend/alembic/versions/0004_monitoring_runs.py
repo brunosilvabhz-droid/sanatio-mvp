@@ -1,14 +1,14 @@
 """monitoring run history
 
-Revision ID: 0004_monitoring_runs
+Revision ID: 0004
 Revises: 0003_patient_name_privacy
 Create Date: 2026-07-10
 """
 from alembic import op
 import sqlalchemy as sa
 
-revision = "0004_monitoring_runs"
-down_revision = "0003_patient_name_privacy"
+revision = "0004"
+down_revision = "0003"
 branch_labels = None
 depends_on = None
 

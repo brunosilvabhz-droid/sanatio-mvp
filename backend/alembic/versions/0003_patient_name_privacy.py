@@ -1,14 +1,14 @@
 """patient name privacy
 
-Revision ID: 0003_patient_name_privacy
+Revision ID: 0003
 Revises: 0002_expand_monitoring_rule_parameter
 Create Date: 2026-07-09
 """
 from alembic import op
 import sqlalchemy as sa
 
-revision = "0003_patient_name_privacy"
-down_revision = "0002_expand_monitoring_rule_parameter"
+revision = "0003"
+down_revision = "0002"
 branch_labels = None
 depends_on = None
 

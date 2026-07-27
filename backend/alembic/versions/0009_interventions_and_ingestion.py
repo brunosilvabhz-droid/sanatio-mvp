@@ -1,6 +1,6 @@
 """interventions and hospital ingestion
 
-Revision ID: 0009_interventions_and_ingestion
+Revision ID: 0009
 Revises: 0008_user_patient_name_permission
 Create Date: 2026-07-27 00:00:00.000000
 """
@@ -10,8 +10,8 @@ from collections.abc import Sequence
 import sqlalchemy as sa
 from alembic import op
 
-revision: str = "0009_interventions_and_ingestion"
-down_revision: str | None = "0008_user_patient_name_permission"
+revision: str = "0009"
+down_revision: str | None = "0008"
 branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None
 

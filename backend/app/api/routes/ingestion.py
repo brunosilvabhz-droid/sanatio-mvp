@@ -9,6 +9,7 @@ from app.core.database import get_db
 from app.models.alert import Alert
 from app.models.hospital_integration import HospitalIntegration
 from app.models.patient_monitoring_snapshot import PatientMonitoringSnapshot
+from app.models.setting import Setting
 from app.schemas.hospital_integration import HospitalIntegrationCreate, HospitalIntegrationRead, IngestPayload
 
 router = APIRouter(tags=["Integracao hospitalar"])
@@ -21,11 +22,34 @@ def list_integrations(db: Session = Depends(get_db)) -> list[HospitalIntegration
 
 @router.post("/hospital-integrations", response_model=HospitalIntegrationRead, dependencies=[Depends(require_admin)])
 def create_integration(payload: HospitalIntegrationCreate, db: Session = Depends(get_db)) -> HospitalIntegration:
-    integration = HospitalIntegration(hospital_name=payload.hospital_name, token=secrets.token_urlsafe(32), active=True)
+    existing = db.scalar(select(HospitalIntegration).where(HospitalIntegration.hospital_name == payload.hospital_name))
+    if existing:
+        raise HTTPException(status_code=409, detail="Hospital ja cadastrado")
+    integration = HospitalIntegration(hospital_name=payload.hospital_name, token=None, active=True)
     db.add(integration)
     db.commit()
     db.refresh(integration)
     return integration
+
+
+@router.post("/hospital-integrations/{integration_id}/token", response_model=HospitalIntegrationRead, dependencies=[Depends(require_admin)])
+def generate_integration_token(integration_id: int, db: Session = Depends(get_db)) -> HospitalIntegration:
+    integration = db.get(HospitalIntegration, integration_id)
+    if not integration:
+        raise HTTPException(status_code=404, detail="Hospital nao encontrado")
+    integration.token = secrets.token_urlsafe(32)
+    integration.active = True
+    db.commit()
+    db.refresh(integration)
+    return integration
+
+
+def _threshold(db: Session, key: str, default: int) -> int:
+    setting = db.scalar(select(Setting).where(Setting.key == key))
+    try:
+        return int(setting.value) if setting and setting.value is not None else default
+    except ValueError:
+        return default
 
 
 @router.post("/ingest/snapshots")
@@ -38,6 +62,10 @@ def ingest_snapshots(
     if not integration:
         raise HTTPException(status_code=401, detail="Token hospitalar invalido")
 
+    antimicrobial_days = _threshold(db, "alerts.threshold.antimicrobial_days", 7)
+    invasive_device_days = _threshold(db, "alerts.threshold.invasive_device_days", 7)
+    hospital_stay_days = _threshold(db, "alerts.threshold.hospital_stay_days", 10)
+
     created_alerts = 0
     for item in payload.patients:
         db.add(PatientMonitoringSnapshot(**item.model_dump()))
@@ -46,11 +74,11 @@ def ingest_snapshots(
             reasons.append("risco alto")
         if item.has_positive_culture:
             reasons.append("cultura positiva")
-        if item.max_antimicrobial_days >= 7:
+        if item.max_antimicrobial_days >= antimicrobial_days:
             reasons.append(f"antimicrobiano por {item.max_antimicrobial_days} dias")
-        if item.max_invasive_device_days >= 7:
+        if item.max_invasive_device_days >= invasive_device_days:
             reasons.append(f"procedimento invasivo por {item.max_invasive_device_days} dias")
-        if item.days_in_hospital >= 10:
+        if item.days_in_hospital >= hospital_stay_days:
             reasons.append(f"{item.days_in_hospital} dias de internacao")
         if not reasons:
             continue

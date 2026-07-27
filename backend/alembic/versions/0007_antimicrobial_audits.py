@@ -1,14 +1,14 @@
 """antimicrobial audits
 
-Revision ID: 0007_antimicrobial_audits
+Revision ID: 0007
 Revises: 0006_internal_rule_fields
 Create Date: 2026-07-10
 """
 from alembic import op
 import sqlalchemy as sa
 
-revision = "0007_antimicrobial_audits"
-down_revision = "0006_internal_rule_fields"
+revision = "0007"
+down_revision = "0006"
 branch_labels = None
 depends_on = None
 

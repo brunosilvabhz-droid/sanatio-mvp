@@ -1,13 +1,13 @@
 """internal rule fields
 
-Revision ID: 0006_internal_rule_fields
+Revision ID: 0006
 Revises: 0005_patient_monitoring_snapshots
 Create Date: 2026-07-10
 """
 from alembic import op
 
-revision = "0006_internal_rule_fields"
-down_revision = "0005_patient_monitoring_snapshots"
+revision = "0006"
+down_revision = "0005"
 branch_labels = None
 depends_on = None
 
