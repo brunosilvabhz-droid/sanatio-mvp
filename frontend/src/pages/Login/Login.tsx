@@ -12,13 +12,24 @@ export default function Login() {
   async function submit(event: FormEvent) {
     event.preventDefault();
     setError('');
+
     try {
       const { data } = await api.post('/auth/login', { email, password });
       localStorage.setItem('sanatio_token', data.access_token);
-      navigate('/dashboard');
     } catch {
-      setError('E-mail ou senha inválidos');
+      setError('E-mail ou senha invalidos');
+      return;
     }
+
+    try {
+      const me = await api.get('/auth/me');
+      localStorage.setItem('sanatio_user', JSON.stringify(me.data));
+      localStorage.setItem('sanatio_can_view_patient_name', String(Boolean(me.data.can_view_patient_name)));
+    } catch {
+      localStorage.setItem('sanatio_can_view_patient_name', 'false');
+    }
+
+    navigate('/dashboard');
   }
 
   return (

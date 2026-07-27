@@ -51,6 +51,16 @@ export default function AlertAudit() {
     window.URL.revokeObjectURL(url);
   }
 
+  async function exportInterventionsCsv() {
+    const { data } = await api.get('/reports/interventions.csv', { responseType: 'blob' });
+    downloadBlob(data, 'text/csv;charset=utf-8', `sanatio-intervencoes-${new Date().toISOString().slice(0, 10)}.csv`);
+  }
+
+  async function exportInterventionsPdf() {
+    const { data } = await api.get('/reports/interventions.pdf', { responseType: 'blob' });
+    downloadBlob(data, 'application/pdf', `sanatio-intervencoes-${new Date().toISOString().slice(0, 10)}.pdf`);
+  }
+
   useEffect(() => {
     load();
   }, []);
@@ -87,7 +97,13 @@ export default function AlertAudit() {
             Filtrar
           </Button>
           <Button startIcon={<DownloadIcon />} variant="outlined" onClick={exportCsv}>
-            Exportar CSV
+            CSV acoes
+          </Button>
+          <Button startIcon={<DownloadIcon />} variant="outlined" onClick={exportInterventionsCsv}>
+            CSV intervencoes
+          </Button>
+          <Button startIcon={<DownloadIcon />} variant="outlined" onClick={exportInterventionsPdf}>
+            PDF sintetico
           </Button>
         </Stack>
       </Paper>
@@ -141,4 +157,15 @@ export default function AlertAudit() {
       </Paper>
     </Stack>
   );
+}
+
+function downloadBlob(data: BlobPart, type: string, filename: string) {
+  const url = window.URL.createObjectURL(new Blob([data], { type }));
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = filename;
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  window.URL.revokeObjectURL(url);
 }

@@ -106,6 +106,7 @@ export default function Patients() {
               <TableCell>Médico</TableCell>
               <TableCell>Convênio</TableCell>
               <TableCell>Risco</TableCell>
+              <TableCell>Motivo</TableCell>
             </TableRow>
           </TableHead>
           <TableBody>
@@ -125,6 +126,7 @@ export default function Patients() {
                 <TableCell>
                   <RiskChip value={p.status_risco} />
                 </TableCell>
+                <TableCell sx={{ maxWidth: 280 }}>{p.risk_reasons?.length ? p.risk_reasons.join(', ') : 'Sem criterio elevado'}</TableCell>
               </TableRow>
             ))}
           </TableBody>

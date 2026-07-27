@@ -37,6 +37,7 @@ def create_user(payload: UserCreate, db: Session = Depends(get_db)) -> User:
         hashed_password=get_password_hash(payload.password),
         role_id=role.id,
         active=payload.active,
+        can_view_patient_name=payload.can_view_patient_name,
     )
     db.add(user)
     db.commit()
@@ -55,6 +56,8 @@ def update_user(user_id: int, payload: UserUpdate, db: Session = Depends(get_db)
         user.hashed_password = get_password_hash(payload.password)
     if payload.active is not None:
         user.active = payload.active
+    if payload.can_view_patient_name is not None:
+        user.can_view_patient_name = payload.can_view_patient_name
     if payload.role_name:
         role = db.scalar(select(Role).where(Role.name == payload.role_name))
         if not role:

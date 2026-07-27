@@ -1,5 +1,4 @@
-import PlayArrowIcon from '@mui/icons-material/PlayArrow';
-import { Alert as MuiAlert, Box, Button, Grid, LinearProgress, Paper, Stack, Typography } from '@mui/material';
+import { Alert as MuiAlert, Box, Grid, LinearProgress, Paper, Stack, Typography } from '@mui/material';
 import { useEffect, useMemo, useState } from 'react';
 import { api } from '../../api/client';
 import { Alert, Patient } from '../../types';
@@ -23,7 +22,6 @@ export default function Dashboard() {
   const [summary, setSummary] = useState<Record<string, number>>({});
   const [patients, setPatients] = useState<Patient[]>([]);
   const [alerts, setAlerts] = useState<Alert[]>([]);
-  const [message, setMessage] = useState('');
   const [loadError, setLoadError] = useState('');
 
   async function load() {
@@ -46,12 +44,6 @@ export default function Dashboard() {
     if ([summaryResponse, patientsResponse, alertsResponse].some((response) => response.status === 'rejected')) {
       setLoadError('Alguns indicadores não foram carregados. Verifique se o backend está ativo e se o token de login ainda é válido.');
     }
-  }
-
-  async function runMonitoring() {
-    const { data } = await api.post('/monitoring/run');
-    setMessage(`${data.alerts_created} alertas gerados para ${data.patients_processed} pacientes processados.`);
-    await load();
   }
 
   useEffect(() => {
@@ -100,12 +92,8 @@ export default function Dashboard() {
           </Typography>
           <Typography color="text.secondary">Indicadores operacionais iniciais</Typography>
         </Box>
-        <Button startIcon={<PlayArrowIcon />} variant="contained" onClick={runMonitoring}>
-          Executar monitoramento
-        </Button>
       </Stack>
 
-      {message && <MuiAlert severity="success">{message}</MuiAlert>}
       {loadError && <MuiAlert severity="warning">{loadError}</MuiAlert>}
 
       <Grid container spacing={2}>

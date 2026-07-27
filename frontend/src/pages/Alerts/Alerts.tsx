@@ -1,5 +1,6 @@
 import AddCommentIcon from '@mui/icons-material/AddComment';
 import SaveIcon from '@mui/icons-material/Save';
+import SendIcon from '@mui/icons-material/Send';
 import {
   Box,
   Button,
@@ -22,6 +23,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { api } from '../../api/client';
 import { SeverityChip } from '../../components/StatusChip';
 import PatientName from '../../components/PatientName';
+import InterventionDialog from '../../components/InterventionDialog';
 import { Alert } from '../../types';
 
 export default function Alerts() {
@@ -29,6 +31,7 @@ export default function Alerts() {
   const [filters, setFilters] = useState({ status: '', severity: '', unidade: '', atendimento: '', paciente: '' });
   const [sortBy, setSortBy] = useState('risk_desc');
   const [selected, setSelected] = useState<Alert | null>(null);
+  const [interventionTarget, setInterventionTarget] = useState<Alert | null>(null);
   const [status, setStatus] = useState('EM_ANALISE');
   const [comment, setComment] = useState('');
   const [commentError, setCommentError] = useState('');
@@ -112,6 +115,7 @@ export default function Alerts() {
               <TableCell>Atendimento</TableCell>
               <TableCell>Unidade</TableCell>
               <TableCell>Alerta</TableCell>
+              <TableCell>Motivo/enviado</TableCell>
               <TableCell>Severidade</TableCell>
               <TableCell>Status</TableCell>
               <TableCell>Ação</TableCell>
@@ -126,12 +130,18 @@ export default function Alerts() {
                 <TableCell>{alert.cd_atendimento}</TableCell>
                 <TableCell>{alert.unit}</TableCell>
                 <TableCell>{alert.title}</TableCell>
+                <TableCell>{alert.description}</TableCell>
                 <TableCell><SeverityChip value={alert.severity} /></TableCell>
                 <TableCell>{alert.status}</TableCell>
                 <TableCell>
-                  <Button size="small" startIcon={<AddCommentIcon />} onClick={() => { setSelected(alert); setStatus(alert.status); setComment(''); setCommentError(''); }}>
-                    Abrir
-                  </Button>
+                  <Stack direction="row" spacing={0.5}>
+                    <Button size="small" startIcon={<AddCommentIcon />} onClick={() => { setSelected(alert); setStatus(alert.status); setComment(''); setCommentError(''); }}>
+                      Abrir
+                    </Button>
+                    <Button size="small" startIcon={<SendIcon />} onClick={() => setInterventionTarget(alert)}>
+                      Intervencao
+                    </Button>
+                  </Stack>
                 </TableCell>
               </TableRow>
             ))}
@@ -167,6 +177,18 @@ export default function Alerts() {
           <Button startIcon={<SaveIcon />} variant="contained" onClick={saveStatus}>Salvar</Button>
         </DialogActions>
       </Dialog>
+      {interventionTarget && (
+        <InterventionDialog
+          open={Boolean(interventionTarget)}
+          onClose={() => setInterventionTarget(null)}
+          cdAtendimento={interventionTarget.cd_atendimento}
+          cdPaciente={interventionTarget.cd_paciente}
+          sourceType="ALERT"
+          sourceId={interventionTarget.id}
+          defaultReason={interventionTarget.description}
+          onSaved={load}
+        />
+      )}
     </Stack>
   );
 }

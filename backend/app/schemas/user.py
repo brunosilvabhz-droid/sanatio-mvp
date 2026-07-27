@@ -9,6 +9,7 @@ class UserCreate(BaseModel):
     password: str
     role_name: str
     active: bool = True
+    can_view_patient_name: bool = False
 
 
 class UserUpdate(BaseModel):
@@ -16,6 +17,7 @@ class UserUpdate(BaseModel):
     password: str | None = None
     role_name: str | None = None
     active: bool | None = None
+    can_view_patient_name: bool | None = None
 
 
 class UserRead(BaseModel):
@@ -23,6 +25,7 @@ class UserRead(BaseModel):
     email: str
     full_name: str
     active: bool
+    can_view_patient_name: bool
     role: RoleRead
 
     model_config = {"from_attributes": True}

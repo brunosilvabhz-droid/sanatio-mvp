@@ -1,19 +1,37 @@
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy import select
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, selectinload
 
 from app.api.deps import get_current_user
+from app.core.config import settings
 from app.core.database import get_db
-from app.models.alert import Alert
+from app.models.alert import Alert, AlertAction
+from app.models.antimicrobial_audit import AntimicrobialAudit, AntimicrobialAuditAction
+from app.models.intervention import InterventionRecipient, InterventionRequest
+from app.models.patient_monitoring_snapshot import PatientMonitoringSnapshot
+from app.models.patient_timeline_note import PatientTimelineNote
+from app.models.user import User
 from app.schemas.alert import AlertRead
+from app.schemas.intervention import PatientTimelineNoteCreate, TimelineEventRead
 from app.schemas.patient import Antimicrobial, Culture, InvasiveProcedure, Isolation, Patient, PatientDetail
 from app.services import monitoring_service, soulmv_adapter
 
-router = APIRouter(prefix="/patients", tags=["Pacientes"], dependencies=[Depends(get_current_user)])
+router = APIRouter(prefix="/patients", tags=["Pacientes"])
 
 
 def _contains(value: str, needle: str | None) -> bool:
     return not needle or needle.lower() in str(value).lower()
+
+
+def _can_return_patient_name(user: User) -> bool:
+    return settings.expose_patient_names_in_api and user.can_view_patient_name
+
+
+def _patients_for_user(user: User) -> list[dict]:
+    patients = soulmv_adapter.get_patients_internal()
+    if _can_return_patient_name(user):
+        return patients
+    return [{**patient, "nm_paciente": None} for patient in patients]
 
 
 @router.get("", response_model=list[Patient])
@@ -25,8 +43,9 @@ def list_patients(
     medico: str | None = None,
     convenio: str | None = None,
     status_risco: str | None = Query(default=None),
+    current_user: User = Depends(get_current_user),
 ) -> list[dict]:
-    patients = [monitoring_service.patient_with_risk(p) for p in soulmv_adapter.get_patients()]
+    patients = [monitoring_service.patient_with_risk(p) for p in _patients_for_user(current_user)]
     return [
         p
         for p in patients
@@ -41,8 +60,8 @@ def list_patients(
 
 
 @router.get("/{cd_atendimento}", response_model=PatientDetail)
-def get_patient(cd_atendimento: str) -> dict:
-    patient = soulmv_adapter.get_patient(cd_atendimento)
+def get_patient(cd_atendimento: str, current_user: User = Depends(get_current_user)) -> dict:
+    patient = next((p for p in _patients_for_user(current_user) if str(p["cd_atendimento"]) == str(cd_atendimento)), None)
     if not patient:
         raise HTTPException(status_code=404, detail="Paciente não encontrado")
     enriched = monitoring_service.patient_with_risk(patient)
@@ -56,25 +75,148 @@ def get_patient(cd_atendimento: str) -> dict:
 
 
 @router.get("/{cd_atendimento}/antimicrobials", response_model=list[Antimicrobial])
-def antimicrobials(cd_atendimento: str) -> list[dict]:
+def antimicrobials(cd_atendimento: str, _: User = Depends(get_current_user)) -> list[dict]:
     return soulmv_adapter.get_antimicrobials(cd_atendimento)
 
 
 @router.get("/{cd_atendimento}/cultures", response_model=list[Culture])
-def cultures(cd_atendimento: str) -> list[dict]:
+def cultures(cd_atendimento: str, _: User = Depends(get_current_user)) -> list[dict]:
     return soulmv_adapter.get_cultures(cd_atendimento)
 
 
 @router.get("/{cd_atendimento}/invasive-procedures", response_model=list[InvasiveProcedure])
-def invasive_procedures(cd_atendimento: str) -> list[dict]:
+def invasive_procedures(cd_atendimento: str, _: User = Depends(get_current_user)) -> list[dict]:
     return soulmv_adapter.get_invasive_procedures(cd_atendimento)
 
 
 @router.get("/{cd_atendimento}/isolations", response_model=list[Isolation])
-def isolations(cd_atendimento: str) -> list[dict]:
+def isolations(cd_atendimento: str, _: User = Depends(get_current_user)) -> list[dict]:
     return soulmv_adapter.get_isolations(cd_atendimento)
 
 
 @router.get("/{cd_atendimento}/alerts", response_model=list[AlertRead])
-def patient_alerts(cd_atendimento: str, db: Session = Depends(get_db)) -> list[Alert]:
+def patient_alerts(cd_atendimento: str, db: Session = Depends(get_db), _: User = Depends(get_current_user)) -> list[Alert]:
     return list(db.scalars(select(Alert).where(Alert.cd_atendimento == cd_atendimento).order_by(Alert.created_at.desc())))
+
+
+@router.post("/{cd_atendimento}/timeline-notes", response_model=TimelineEventRead)
+def add_timeline_note(
+    cd_atendimento: str,
+    payload: PatientTimelineNoteCreate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> dict:
+    if not payload.note.strip():
+        raise HTTPException(status_code=422, detail="Evolucao obrigatoria")
+    note = PatientTimelineNote(
+        cd_atendimento=cd_atendimento,
+        cd_paciente=payload.cd_paciente,
+        note_type=payload.note_type,
+        note=payload.note,
+        user_id=current_user.id,
+    )
+    db.add(note)
+    db.commit()
+    db.refresh(note)
+    return {
+        "id": f"note-{note.id}",
+        "type": note.note_type,
+        "title": "Evolucao SCIH",
+        "description": note.note,
+        "status": None,
+        "actor": current_user.full_name,
+        "created_at": note.created_at,
+    }
+
+
+@router.get("/{cd_atendimento}/timeline", response_model=list[TimelineEventRead])
+def patient_timeline(cd_atendimento: str, db: Session = Depends(get_db), _: User = Depends(get_current_user)) -> list[dict]:
+    events: list[dict] = []
+    snapshots = db.scalars(select(PatientMonitoringSnapshot).where(PatientMonitoringSnapshot.cd_atendimento == cd_atendimento).order_by(PatientMonitoringSnapshot.collected_at.desc()).limit(20)).all()
+    for snapshot in snapshots:
+        events.append(
+            {
+                "id": f"snapshot-{snapshot.id}",
+                "type": "SNAPSHOT",
+                "title": f"Snapshot de risco {snapshot.risk_status}",
+                "description": (
+                    f"{snapshot.days_in_hospital} dias internado; antimicrobiano max. {snapshot.max_antimicrobial_days} dias; "
+                    f"procedimento invasivo max. {snapshot.max_invasive_device_days} dias"
+                ),
+                "status": snapshot.risk_status,
+                "actor": "SANATIO",
+                "created_at": snapshot.collected_at,
+            }
+        )
+
+    notes = db.scalars(select(PatientTimelineNote).options(selectinload(PatientTimelineNote.user)).where(PatientTimelineNote.cd_atendimento == cd_atendimento)).all()
+    for note in notes:
+        events.append({"id": f"note-{note.id}", "type": note.note_type, "title": "Evolucao SCIH", "description": note.note, "status": None, "actor": note.user.full_name if note.user else "Sistema", "created_at": note.created_at})
+
+    alerts = db.scalars(select(Alert).options(selectinload(Alert.actions).selectinload(AlertAction.user)).where(Alert.cd_atendimento == cd_atendimento)).all()
+    for alert in alerts:
+        events.append({"id": f"alert-{alert.id}", "type": "ALERTA", "title": alert.title, "description": alert.description, "status": alert.status, "actor": "SANATIO", "created_at": alert.created_at})
+        for action in alert.actions:
+            events.append(
+                {
+                    "id": f"alert-action-{action.id}",
+                    "type": "ACAO_ALERTA",
+                    "title": action.action,
+                    "description": action.comment,
+                    "status": alert.status,
+                    "actor": action.user.full_name if action.user else "Sistema",
+                    "created_at": action.created_at,
+                }
+            )
+
+    audits = db.scalars(select(AntimicrobialAudit).options(selectinload(AntimicrobialAudit.actions).selectinload(AntimicrobialAuditAction.user)).where(AntimicrobialAudit.cd_atendimento == cd_atendimento)).all()
+    for audit in audits:
+        events.append(
+            {
+                "id": f"audit-{audit.id}",
+                "type": "ANTIMICROBIANO",
+                "title": audit.antimicrobial_name,
+                "description": f"{audit.days_in_use} dias de uso; {audit.dose or '-'} | {audit.route or '-'} | {audit.frequency or '-'}",
+                "status": audit.status,
+                "actor": "SANATIO",
+                "created_at": audit.created_at,
+            }
+        )
+        for action in audit.actions:
+            events.append({"id": f"audit-action-{action.id}", "type": "ACAO_ANTIMICROBIANO", "title": action.action, "description": action.comment, "status": action.status, "actor": action.user.full_name if action.user else "Sistema", "created_at": action.created_at})
+
+    interventions = db.scalars(
+        select(InterventionRequest)
+        .options(
+            selectinload(InterventionRequest.requested_by),
+            selectinload(InterventionRequest.responded_by),
+            selectinload(InterventionRequest.recipients).selectinload(InterventionRecipient.user),
+        )
+        .where(InterventionRequest.cd_atendimento == cd_atendimento)
+    ).all()
+    for intervention in interventions:
+        recipients = ", ".join(recipient.user.full_name for recipient in intervention.recipients if recipient.user)
+        events.append(
+            {
+                "id": f"intervention-{intervention.id}",
+                "type": "INTERVENCAO",
+                "title": f"Intervencao {intervention.status}",
+                "description": f"{intervention.reason}. Destinatarios: {recipients or '-'}",
+                "status": intervention.status,
+                "actor": intervention.requested_by.full_name if intervention.requested_by else "Sistema",
+                "created_at": intervention.created_at,
+            }
+        )
+        if intervention.responded_at:
+            events.append(
+                {
+                    "id": f"intervention-response-{intervention.id}",
+                    "type": "RESPOSTA_INTERVENCAO",
+                    "title": intervention.response or "Resposta",
+                    "description": intervention.response_justification,
+                    "status": intervention.status,
+                    "actor": intervention.responded_by.full_name if intervention.responded_by else "Destinatario",
+                    "created_at": intervention.responded_at,
+                }
+            )
+    return sorted(events, key=lambda item: item["created_at"], reverse=True)

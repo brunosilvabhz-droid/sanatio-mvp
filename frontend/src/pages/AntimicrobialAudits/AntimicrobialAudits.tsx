@@ -1,4 +1,5 @@
 import AssignmentTurnedInIcon from '@mui/icons-material/AssignmentTurnedIn';
+import SendIcon from '@mui/icons-material/Send';
 import SearchIcon from '@mui/icons-material/Search';
 import {
   Box,
@@ -23,6 +24,7 @@ import {
 } from '@mui/material';
 import { useEffect, useMemo, useState } from 'react';
 import { api } from '../../api/client';
+import InterventionDialog from '../../components/InterventionDialog';
 import PatientName from '../../components/PatientName';
 import { AntimicrobialAudit } from '../../types';
 
@@ -32,6 +34,7 @@ const decisions = ['MANTER', 'DESCALONAR', 'SUSPENDER', 'TROCAR', 'AJUSTAR_DOSE'
 export default function AntimicrobialAudits() {
   const [rows, setRows] = useState<AntimicrobialAudit[]>([]);
   const [selected, setSelected] = useState<AntimicrobialAudit | null>(null);
+  const [interventionTarget, setInterventionTarget] = useState<AntimicrobialAudit | null>(null);
   const [form, setForm] = useState({ status: 'EM_ANALISE', decision: '', comment: '' });
   const [error, setError] = useState('');
   const [filters, setFilters] = useState({
@@ -187,9 +190,14 @@ export default function AntimicrobialAudits() {
                 <TableCell><Chip size="small" color={priorityColor(row.priority)} label={row.priority} /></TableCell>
                 <TableCell>{row.reviewed_at ? `${new Date(row.reviewed_at).toLocaleString()} por ${row.reviewed_by_name || 'usuario'}` : '-'}</TableCell>
                 <TableCell>
-                  <Button size="small" startIcon={<AssignmentTurnedInIcon />} onClick={() => openAudit(row)}>
-                    Auditar
-                  </Button>
+                  <Stack direction="row" spacing={0.5}>
+                    <Button size="small" startIcon={<AssignmentTurnedInIcon />} onClick={() => openAudit(row)}>
+                      Auditar
+                    </Button>
+                    <Button size="small" startIcon={<SendIcon />} onClick={() => setInterventionTarget(row)}>
+                      Intervencao
+                    </Button>
+                  </Stack>
                 </TableCell>
               </TableRow>
             ))}
@@ -266,6 +274,18 @@ export default function AntimicrobialAudits() {
           <Button variant="contained" onClick={saveAudit}>Salvar auditoria</Button>
         </DialogActions>
       </Dialog>
+      {interventionTarget && (
+        <InterventionDialog
+          open={Boolean(interventionTarget)}
+          onClose={() => setInterventionTarget(null)}
+          cdAtendimento={interventionTarget.cd_atendimento}
+          cdPaciente={interventionTarget.cd_paciente}
+          sourceType="ANTIMICROBIAL_AUDIT"
+          sourceId={interventionTarget.id}
+          defaultReason={`${interventionTarget.antimicrobial_name} em uso por ${interventionTarget.days_in_use} dias`}
+          onSaved={load}
+        />
+      )}
     </Stack>
   );
 }

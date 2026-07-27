@@ -24,6 +24,7 @@ class UserRead(BaseModel):
     email: str
     full_name: str
     active: bool
+    can_view_patient_name: bool
     role: RoleRead
 
     model_config = {"from_attributes": True}

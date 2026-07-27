@@ -1,5 +1,5 @@
 import PersonAddIcon from '@mui/icons-material/PersonAdd';
-import { Box, Button, MenuItem, Paper, Stack, Switch, Table, TableBody, TableCell, TableHead, TableRow, TextField, Typography } from '@mui/material';
+import { Box, Button, FormControlLabel, MenuItem, Paper, Stack, Switch, Table, TableBody, TableCell, TableHead, TableRow, TextField, Typography } from '@mui/material';
 import { useEffect, useState } from 'react';
 import { api } from '../../api/client';
 import { Role, User } from '../../types';
@@ -7,7 +7,7 @@ import { Role, User } from '../../types';
 export default function Users() {
   const [users, setUsers] = useState<User[]>([]);
   const [roles, setRoles] = useState<Role[]>([]);
-  const [form, setForm] = useState({ email: '', full_name: '', password: '123456', role_name: 'SCIH' });
+  const [form, setForm] = useState({ email: '', full_name: '', password: '123456', role_name: 'SCIH', can_view_patient_name: false });
 
   async function load() {
     const [usersResponse, rolesResponse] = await Promise.all([api.get('/users'), api.get('/roles')]);
@@ -17,12 +17,17 @@ export default function Users() {
 
   async function create() {
     await api.post('/users', form);
-    setForm({ email: '', full_name: '', password: '123456', role_name: 'SCIH' });
+    setForm({ email: '', full_name: '', password: '123456', role_name: 'SCIH', can_view_patient_name: false });
     await load();
   }
 
   async function toggle(user: User) {
     await api.patch(`/users/${user.id}`, { active: !user.active });
+    await load();
+  }
+
+  async function togglePatientNamePermission(user: User) {
+    await api.patch(`/users/${user.id}`, { can_view_patient_name: !user.can_view_patient_name });
     await load();
   }
 
@@ -34,7 +39,7 @@ export default function Users() {
     <Stack spacing={2}>
       <Box>
         <Typography variant="h4" fontWeight={700}>Usuários</Typography>
-        <Typography color="text.secondary">Perfis ADMIN, SCIH, FARMACIA e DIRETORIA</Typography>
+        <Typography color="text.secondary">Perfis ADMIN, SCIH, FARMACIA, DIRETORIA, MEDICO e INFECTO</Typography>
       </Box>
       <Paper sx={{ p: 2 }}>
         <Stack direction="row" gap={1.5} flexWrap="wrap">
@@ -44,6 +49,10 @@ export default function Users() {
           <TextField select size="small" label="perfil" value={form.role_name} sx={{ minWidth: 150 }} onChange={(e) => setForm({ ...form, role_name: e.target.value })}>
             {roles.map((role) => <MenuItem key={role.id} value={role.name}>{role.name}</MenuItem>)}
           </TextField>
+          <FormControlLabel
+            control={<Switch checked={form.can_view_patient_name} onChange={(e) => setForm({ ...form, can_view_patient_name: e.target.checked })} />}
+            label="Pode ver nome do paciente"
+          />
           <Button startIcon={<PersonAddIcon />} variant="contained" onClick={create}>Criar</Button>
         </Stack>
       </Paper>
@@ -54,6 +63,7 @@ export default function Users() {
               <TableCell>E-mail</TableCell>
               <TableCell>Nome</TableCell>
               <TableCell>Perfil</TableCell>
+              <TableCell>Vê nome do paciente</TableCell>
               <TableCell>Ativo</TableCell>
             </TableRow>
           </TableHead>
@@ -63,6 +73,7 @@ export default function Users() {
                 <TableCell>{user.email}</TableCell>
                 <TableCell>{user.full_name}</TableCell>
                 <TableCell>{user.role.name}</TableCell>
+                <TableCell><Switch checked={user.can_view_patient_name} onChange={() => togglePatientNamePermission(user)} /></TableCell>
                 <TableCell><Switch checked={user.active} onChange={() => toggle(user)} /></TableCell>
               </TableRow>
             ))}

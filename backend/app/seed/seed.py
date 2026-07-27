@@ -11,12 +11,14 @@ ROLES = [
     ("SCIH", "Serviço de Controle de Infecção Hospitalar"),
     ("FARMACIA", "Farmácia clínica"),
     ("DIRETORIA", "Diretoria"),
+    ("MEDICO", "Medico assistente"),
+    ("INFECTO", "Infectologista"),
 ]
 
 USERS = [
-    ("admin@sanatio.local", "Administrador SANATIO", "ADMIN"),
-    ("scih@sanatio.local", "Equipe SCIH", "SCIH"),
-    ("farmacia@sanatio.local", "Farmácia", "FARMACIA"),
+    ("admin@sanatio.local", "Administrador SANATIO", "ADMIN", True),
+    ("scih@sanatio.local", "Equipe SCIH", "SCIH", True),
+    ("farmacia@sanatio.local", "Farmácia", "FARMACIA", False),
 ]
 
 RULES = [
@@ -55,7 +57,7 @@ def main() -> None:
                 db.flush()
             role_by_name[name] = role
 
-        for email, full_name, role_name in USERS:
+        for email, full_name, role_name, can_view_patient_name in USERS:
             if not db.scalar(select(User).where(User.email == email)):
                 db.add(
                     User(
@@ -64,6 +66,7 @@ def main() -> None:
                         hashed_password=get_password_hash("123456"),
                         role_id=role_by_name[role_name].id,
                         active=True,
+                        can_view_patient_name=can_view_patient_name,
                     )
                 )
 

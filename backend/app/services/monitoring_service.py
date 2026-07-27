@@ -76,7 +76,17 @@ def patient_monitoring_indicators(patient: dict) -> tuple[dict, dict, list[dict]
 
 def patient_with_risk(patient: dict) -> dict:
     _, risk, _ = patient_monitoring_indicators(patient)
-    return {**patient, "status_risco": risk["status"], "_risk": risk}
+    labels = {
+        "positive_culture": "cultura positiva",
+        "antimicrobial_gt7": "antimicrobiano por mais de 7 dias",
+        "antimicrobial_gt10": "antimicrobiano por mais de 10 dias",
+        "invasive_gt7": "procedimento invasivo por mais de 7 dias",
+        "invasive_gt14": "procedimento invasivo por mais de 14 dias",
+        "long_stay": "internacao por 10 dias ou mais",
+        "active_isolation": "isolamento ativo",
+    }
+    reasons = [label for key, label in labels.items() if risk["criteria"].get(key)]
+    return {**patient, "status_risco": risk["status"], "risk_reasons": reasons, "_risk": risk}
 
 
 def run_monitoring(db: Session, monitoring_run_id: int | None = None) -> dict:

@@ -21,6 +21,7 @@ class Patient(BaseModel):
     idade: int
     dias_internacao: int
     status_risco: str
+    risk_reasons: list[str] = []
 
 
 class Antimicrobial(BaseModel):

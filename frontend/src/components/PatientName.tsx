@@ -10,26 +10,30 @@ type Props = {
 };
 
 export default function PatientName({ cdPaciente, cdAtendimento, fallbackName, dense = false }: Props) {
-  const [resolvedName, setResolvedName] = useState<string | null>(fallbackName || null);
-  const [checked, setChecked] = useState(Boolean(fallbackName));
+  const canViewPatientName = localStorage.getItem('sanatio_can_view_patient_name') === 'true';
+  const [resolvedName, setResolvedName] = useState<string | null>(canViewPatientName ? fallbackName || null : null);
+  const [checked, setChecked] = useState(Boolean(canViewPatientName && fallbackName));
 
   useEffect(() => {
     let active = true;
-    setResolvedName(fallbackName || null);
-    setChecked(Boolean(fallbackName));
+    const allowedFallback = canViewPatientName ? fallbackName || null : null;
+    setResolvedName(allowedFallback);
+    setChecked(Boolean(allowedFallback));
 
-    if (!fallbackName) {
+    if (canViewPatientName && !fallbackName) {
       resolvePatientName(cdPaciente, cdAtendimento).then((name) => {
         if (!active) return;
         setResolvedName(name);
         setChecked(true);
       });
+    } else if (!canViewPatientName) {
+      setChecked(true);
     }
 
     return () => {
       active = false;
     };
-  }, [cdPaciente, cdAtendimento, fallbackName]);
+  }, [cdPaciente, cdAtendimento, fallbackName, canViewPatientName]);
 
   if (resolvedName) {
     return (
@@ -46,7 +50,7 @@ export default function PatientName({ cdPaciente, cdAtendimento, fallbackName, d
     <Stack spacing={0.25}>
       <Typography variant={dense ? 'body2' : 'body1'}>Paciente #{cdPaciente}</Typography>
       <Typography variant="caption" color="text.secondary">
-        {checked ? 'Nome indisponível fora da rede autorizada' : 'Resolvendo nome...'}
+        {canViewPatientName ? (checked ? 'Nome indisponivel fora da rede autorizada' : 'Resolvendo nome...') : 'Usuario sem permissao para ver nome'}
       </Typography>
     </Stack>
   );

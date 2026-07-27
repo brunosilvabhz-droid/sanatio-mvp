@@ -1,5 +1,5 @@
 export type Role = { id: number; name: string; description?: string };
-export type User = { id: number; email: string; full_name: string; active: boolean; role: Role };
+export type User = { id: number; email: string; full_name: string; active: boolean; can_view_patient_name: boolean; role: Role };
 
 export type Patient = {
   cd_atendimento: string;
@@ -19,6 +19,7 @@ export type Patient = {
   idade: number;
   dias_internacao: number;
   status_risco: 'baixo' | 'medio' | 'alto';
+  risk_reasons: string[];
 };
 
 export type Antimicrobial = {
@@ -96,6 +97,36 @@ export type AlertActionReport = {
   user_email?: string;
   action: string;
   comment?: string;
+  created_at: string;
+};
+
+export type Recipient = { id: number; email: string; full_name: string; role_name: string };
+
+export type Intervention = {
+  id: number;
+  cd_atendimento: string;
+  cd_paciente: string;
+  source_type: string;
+  source_id?: number;
+  reason: string;
+  message: string;
+  status: string;
+  requested_by_name?: string;
+  responded_by_name?: string;
+  response?: string;
+  response_justification?: string;
+  created_at: string;
+  responded_at?: string;
+  recipients: { id: number; user_id: number; email: string; user_name?: string; status: string; created_at: string }[];
+};
+
+export type TimelineEvent = {
+  id: string;
+  type: string;
+  title: string;
+  description?: string;
+  status?: string;
+  actor?: string;
   created_at: string;
 };
 
