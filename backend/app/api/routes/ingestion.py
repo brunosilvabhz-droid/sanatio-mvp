@@ -1,4 +1,5 @@
 import secrets
+from datetime import datetime, timezone
 
 from fastapi import APIRouter, Depends, Header, HTTPException
 from sqlalchemy import select
@@ -8,6 +9,8 @@ from app.api.deps import require_admin
 from app.core.database import get_db
 from app.models.alert import Alert
 from app.models.hospital_integration import HospitalIntegration
+from app.models.monitoring_run import MonitoringRun
+from app.models.patient_bed_movement import PatientBedMovement
 from app.models.patient_monitoring_snapshot import PatientMonitoringSnapshot
 from app.models.setting import Setting
 from app.schemas.hospital_integration import HospitalIntegrationCreate, HospitalIntegrationRead, IngestPayload
@@ -66,9 +69,14 @@ def ingest_snapshots(
     invasive_device_days = _threshold(db, "alerts.threshold.invasive_device_days", 7)
     hospital_stay_days = _threshold(db, "alerts.threshold.hospital_stay_days", 10)
 
+    started_at = datetime.now(timezone.utc)
+    monitoring_run = MonitoringRun(status="RUNNING", started_at=started_at)
+    db.add(monitoring_run)
+    db.flush()
+
     created_alerts = 0
     for item in payload.patients:
-        db.add(PatientMonitoringSnapshot(**item.model_dump()))
+        db.add(PatientMonitoringSnapshot(**item.model_dump(), monitoring_run_id=monitoring_run.id))
         reasons = []
         if item.risk_status == "alto":
             reasons.append("risco alto")
@@ -108,5 +116,32 @@ def ingest_snapshots(
             )
         )
         created_alerts += 1
+
+    created_movements = 0
+    for movement in payload.bed_movements:
+        exists = db.scalar(
+            select(PatientBedMovement).where(
+                PatientBedMovement.cd_atendimento == movement.cd_atendimento,
+                PatientBedMovement.moved_at == movement.moved_at,
+                PatientBedMovement.to_bed == movement.to_bed,
+            )
+        )
+        if exists:
+            continue
+        db.add(PatientBedMovement(**movement.model_dump()))
+        created_movements += 1
+
+    finished_at = datetime.now(timezone.utc)
+    monitoring_run.status = "SUCCESS"
+    monitoring_run.patients_processed = len(payload.patients)
+    monitoring_run.alerts_created = created_alerts
+    monitoring_run.finished_at = finished_at
+    monitoring_run.duration_ms = int((finished_at - started_at).total_seconds() * 1000)
     db.commit()
-    return {"hospital": integration.hospital_name, "snapshots_received": len(payload.patients), "alerts_created": created_alerts}
+    return {
+        "hospital": integration.hospital_name,
+        "run_id": monitoring_run.id,
+        "snapshots_received": len(payload.patients),
+        "bed_movements_received": created_movements,
+        "alerts_created": created_alerts,
+    }

@@ -14,6 +14,8 @@ class Patient(BaseModel):
     ds_unidade: str
     cd_leito: str
     ds_leito: str
+    active: bool = True
+    discharged_at: datetime | None = None
     cd_prestador: str
     nm_prestador: str
     cd_convenio: str

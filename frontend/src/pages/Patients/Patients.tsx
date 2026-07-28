@@ -98,6 +98,7 @@ export default function Patients() {
             <TableRow>
               <TableCell>Paciente</TableCell>
               <TableCell>Atendimento</TableCell>
+              <TableCell>Status</TableCell>
               <TableCell>Idade</TableCell>
               <TableCell>Sexo</TableCell>
               <TableCell>Dias</TableCell>
@@ -111,11 +112,12 @@ export default function Patients() {
           </TableHead>
           <TableBody>
             {sortedPatients.map((p) => (
-              <TableRow key={p.cd_atendimento} hover onClick={() => navigate(`/patients/${p.cd_atendimento}`)} sx={{ cursor: 'pointer' }}>
+              <TableRow key={p.cd_atendimento} hover onClick={() => navigate(`/patients/${p.cd_paciente}`)} sx={{ cursor: 'pointer' }}>
                 <TableCell>
                   <PatientName cdPaciente={p.cd_paciente} cdAtendimento={p.cd_atendimento} fallbackName={p.nm_paciente} dense />
                 </TableCell>
                 <TableCell>{p.cd_atendimento}</TableCell>
+                <TableCell>{p.active === false ? 'Inativo' : 'Ativo'}</TableCell>
                 <TableCell>{p.idade}</TableCell>
                 <TableCell>{p.tp_sexo}</TableCell>
                 <TableCell>{p.dias_internacao}</TableCell>

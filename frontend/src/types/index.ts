@@ -12,6 +12,8 @@ export type Patient = {
   ds_unidade: string;
   cd_leito: string;
   ds_leito: string;
+  active?: boolean;
+  discharged_at?: string;
   cd_prestador: string;
   nm_prestador: string;
   cd_convenio: string;
