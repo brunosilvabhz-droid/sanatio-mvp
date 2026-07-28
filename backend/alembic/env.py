@@ -5,7 +5,7 @@ from sqlalchemy import engine_from_config, pool
 
 from app.core.config import settings
 from app.models.base import Base
-from app.models import antimicrobial_audit, alert, monitoring_run, monitoring_rule, patient_bed_movement, patient_monitoring_snapshot, setting, user
+from app.models import antimicrobial_audit, alert, clinical, monitoring_run, monitoring_rule, patient_bed_movement, patient_monitoring_snapshot, setting, user
 
 config = context.config
 config.set_main_option("sqlalchemy.url", settings.database_url)

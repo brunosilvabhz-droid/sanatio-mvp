@@ -8,6 +8,7 @@ from sqlalchemy.orm import Session
 from app.api.deps import require_admin
 from app.core.database import get_db
 from app.models.alert import Alert
+from app.models.clinical import Atendimento, ExecucaoIntegracao, MovimentacaoLeito, Paciente, SnapshotAtendimento
 from app.models.hospital_integration import HospitalIntegration
 from app.models.monitoring_run import MonitoringRun
 from app.models.patient_bed_movement import PatientBedMovement
@@ -55,6 +56,34 @@ def _threshold(db: Session, key: str, default: int) -> int:
         return default
 
 
+def _get_or_create_patient(db: Session, cd_paciente: str) -> Paciente:
+    patient = db.scalar(select(Paciente).where(Paciente.id_origem_paciente == cd_paciente))
+    if patient:
+        return patient
+    patient = Paciente(id_origem_paciente=cd_paciente)
+    db.add(patient)
+    db.flush()
+    return patient
+
+
+def _upsert_attendance(db: Session, item) -> Atendimento:
+    patient = _get_or_create_patient(db, item.cd_paciente)
+    attendance = db.scalar(select(Atendimento).where(Atendimento.id_origem_atendimento == item.cd_atendimento))
+    if not attendance:
+        attendance = Atendimento(
+            paciente_id=patient.id,
+            id_origem_atendimento=item.cd_atendimento,
+        )
+        db.add(attendance)
+    attendance.ativo = item.active
+    attendance.unidade_atual = item.unit
+    attendance.leito_atual = item.bed
+    attendance.data_hora_entrada = item.admitted_at
+    attendance.data_hora_saida = item.discharged_at
+    db.flush()
+    return attendance
+
+
 @router.post("/ingest/snapshots")
 def ingest_snapshots(
     payload: IngestPayload,
@@ -72,10 +101,30 @@ def ingest_snapshots(
     started_at = datetime.now(timezone.utc)
     monitoring_run = MonitoringRun(status="RUNNING", started_at=started_at)
     db.add(monitoring_run)
+    integration_run = ExecucaoIntegracao(
+        hospital_integracao_id=integration.id,
+        status="EM_EXECUCAO",
+        data_hora_inicio=started_at,
+    )
+    db.add(integration_run)
     db.flush()
 
     created_alerts = 0
     for item in payload.patients:
+        attendance = _upsert_attendance(db, item)
+        db.add(
+            SnapshotAtendimento(
+                atendimento_id=attendance.id,
+                execucao_integracao_id=integration_run.id,
+                status_risco=item.risk_status,
+                dias_internacao=item.days_in_hospital,
+                possui_cultura_positiva=item.has_positive_culture,
+                maior_dias_antimicrobiano=item.max_antimicrobial_days,
+                maior_dias_dispositivo_invasivo=item.max_invasive_device_days,
+                possui_isolamento_ativo=item.has_active_isolation,
+                data_hora_coleta=started_at,
+            )
+        )
         db.add(PatientMonitoringSnapshot(**item.model_dump(), monitoring_run_id=monitoring_run.id))
         reasons = []
         if item.risk_status == "alto":
@@ -119,6 +168,30 @@ def ingest_snapshots(
 
     created_movements = 0
     for movement in payload.bed_movements:
+        attendance = db.scalar(select(Atendimento).where(Atendimento.id_origem_atendimento == movement.cd_atendimento))
+        if not attendance:
+            patient = _get_or_create_patient(db, movement.cd_paciente)
+            attendance = Atendimento(paciente_id=patient.id, id_origem_atendimento=movement.cd_atendimento, ativo=True)
+            db.add(attendance)
+            db.flush()
+        new_movement_exists = db.scalar(
+            select(MovimentacaoLeito).where(
+                MovimentacaoLeito.atendimento_id == attendance.id,
+                MovimentacaoLeito.data_hora_movimentacao == movement.moved_at,
+                MovimentacaoLeito.leito_destino == movement.to_bed,
+            )
+        )
+        if not new_movement_exists:
+            db.add(
+                MovimentacaoLeito(
+                    atendimento_id=attendance.id,
+                    unidade_origem=movement.from_unit,
+                    leito_origem=movement.from_bed,
+                    unidade_destino=movement.to_unit,
+                    leito_destino=movement.to_bed,
+                    data_hora_movimentacao=movement.moved_at,
+                )
+            )
         exists = db.scalar(
             select(PatientBedMovement).where(
                 PatientBedMovement.cd_atendimento == movement.cd_atendimento,
@@ -137,10 +210,17 @@ def ingest_snapshots(
     monitoring_run.alerts_created = created_alerts
     monitoring_run.finished_at = finished_at
     monitoring_run.duration_ms = int((finished_at - started_at).total_seconds() * 1000)
+    integration_run.status = "SUCESSO"
+    integration_run.total_pacientes_recebidos = len({item.cd_paciente for item in payload.patients})
+    integration_run.total_snapshots_recebidos = len(payload.patients)
+    integration_run.total_movimentacoes_recebidas = created_movements
+    integration_run.total_alertas_gerados = created_alerts
+    integration_run.data_hora_fim = finished_at
     db.commit()
     return {
         "hospital": integration.hospital_name,
         "run_id": monitoring_run.id,
+        "integration_run_id": integration_run.id,
         "snapshots_received": len(payload.patients),
         "bed_movements_received": created_movements,
         "alerts_created": created_alerts,

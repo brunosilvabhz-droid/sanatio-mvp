@@ -9,6 +9,7 @@ from app.core.config import settings
 from app.core.database import get_db
 from app.models.alert import Alert, AlertAction
 from app.models.antimicrobial_audit import AntimicrobialAudit, AntimicrobialAuditAction
+from app.models.clinical import Atendimento, MovimentacaoLeito, SnapshotAtendimento
 from app.models.intervention import InterventionRecipient, InterventionRequest
 from app.models.patient_bed_movement import PatientBedMovement
 from app.models.patient_monitoring_snapshot import PatientMonitoringSnapshot
@@ -43,6 +44,63 @@ def _latest_snapshots(db: Session) -> list[PatientMonitoringSnapshot]:
     for snapshot in snapshots:
         latest.setdefault(snapshot.cd_atendimento, snapshot)
     return list(latest.values())
+
+
+def _latest_clinical_snapshots(db: Session) -> list[SnapshotAtendimento]:
+    snapshots = db.scalars(
+        select(SnapshotAtendimento)
+        .join(SnapshotAtendimento.atendimento)
+        .order_by(SnapshotAtendimento.data_hora_coleta.desc())
+    ).all()
+    latest: dict[str, SnapshotAtendimento] = {}
+    for snapshot in snapshots:
+        latest.setdefault(snapshot.atendimento.id_origem_atendimento, snapshot)
+    return list(latest.values())
+
+
+def _clinical_snapshot_to_patient(snapshot: SnapshotAtendimento) -> dict:
+    attendance = snapshot.atendimento
+    today = date.today()
+    admitted_at = attendance.data_hora_entrada or datetime.now(timezone.utc)
+    return {
+        "cd_atendimento": attendance.id_origem_atendimento,
+        "cd_paciente": attendance.paciente.id_origem_paciente,
+        "nm_paciente": None,
+        "dt_nascimento": today,
+        "tp_sexo": "-",
+        "dt_atendimento": admitted_at,
+        "cd_unidade": attendance.unidade_atual or "-",
+        "ds_unidade": attendance.unidade_atual or "-",
+        "cd_leito": attendance.leito_atual or "-",
+        "ds_leito": attendance.leito_atual or "-",
+        "active": attendance.ativo,
+        "discharged_at": attendance.data_hora_saida,
+        "cd_prestador": "-",
+        "nm_prestador": "-",
+        "cd_convenio": "-",
+        "nm_convenio": "-",
+        "idade": 0,
+        "dias_internacao": snapshot.dias_internacao,
+        "status_risco": snapshot.status_risco,
+        "risk_reasons": _clinical_snapshot_reasons(snapshot),
+    }
+
+
+def _clinical_snapshot_reasons(snapshot: SnapshotAtendimento) -> list[str]:
+    reasons = []
+    if snapshot.status_risco == "alto":
+        reasons.append("Risco alto recebido do hospital")
+    if snapshot.possui_cultura_positiva:
+        reasons.append("Cultura positiva")
+    if snapshot.maior_dias_antimicrobiano:
+        reasons.append(f"Antimicrobiano por {snapshot.maior_dias_antimicrobiano} dias")
+    if snapshot.maior_dias_dispositivo_invasivo:
+        reasons.append(f"Procedimento invasivo por {snapshot.maior_dias_dispositivo_invasivo} dias")
+    if snapshot.possui_isolamento_ativo:
+        reasons.append("Isolamento ativo")
+    if snapshot.dias_internacao:
+        reasons.append(f"{snapshot.dias_internacao} dias de internacao")
+    return reasons
 
 
 def _snapshot_to_patient(snapshot: PatientMonitoringSnapshot) -> dict:
@@ -101,8 +159,12 @@ def list_patients(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ) -> list[dict]:
-    snapshots = _latest_snapshots(db)
-    patients = [_snapshot_to_patient(snapshot) for snapshot in snapshots] if snapshots else [monitoring_service.patient_with_risk(p) for p in _patients_for_user(current_user)]
+    clinical_snapshots = _latest_clinical_snapshots(db)
+    if clinical_snapshots:
+        patients = [_clinical_snapshot_to_patient(snapshot) for snapshot in clinical_snapshots]
+    else:
+        snapshots = _latest_snapshots(db)
+        patients = [_snapshot_to_patient(snapshot) for snapshot in snapshots] if snapshots else [monitoring_service.patient_with_risk(p) for p in _patients_for_user(current_user)]
     return [
         p
         for p in patients
@@ -118,6 +180,21 @@ def list_patients(
 
 @router.get("/{cd_atendimento}", response_model=PatientDetail)
 def get_patient(cd_atendimento: str, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)) -> dict:
+    clinical_snapshot = db.scalar(
+        select(SnapshotAtendimento)
+        .join(SnapshotAtendimento.atendimento)
+        .where(Atendimento.id_origem_atendimento == cd_atendimento)
+        .order_by(SnapshotAtendimento.data_hora_coleta.desc())
+    )
+    if clinical_snapshot:
+        return {
+            "patient": _clinical_snapshot_to_patient(clinical_snapshot),
+            "antimicrobials": [],
+            "cultures": [],
+            "invasive_procedures": [],
+            "isolations": [],
+        }
+
     snapshot = db.scalar(
         select(PatientMonitoringSnapshot)
         .where(PatientMonitoringSnapshot.cd_atendimento == cd_atendimento)
@@ -147,6 +224,41 @@ def get_patient(cd_atendimento: str, db: Session = Depends(get_db), current_user
 
 @router.get("/{cd_paciente}/history")
 def patient_history(cd_paciente: str, db: Session = Depends(get_db), _: User = Depends(get_current_user)) -> dict:
+    clinical_snapshots = db.scalars(
+        select(SnapshotAtendimento)
+        .join(SnapshotAtendimento.atendimento)
+        .join(Atendimento.paciente)
+        .where(Atendimento.paciente.has(id_origem_paciente=cd_paciente))
+        .order_by(SnapshotAtendimento.data_hora_coleta.desc())
+    ).all()
+    latest_clinical: dict[str, SnapshotAtendimento] = {}
+    for snapshot in clinical_snapshots:
+        latest_clinical.setdefault(snapshot.atendimento.id_origem_atendimento, snapshot)
+    if latest_clinical:
+        attendances = []
+        for snapshot in sorted(latest_clinical.values(), key=lambda item: item.atendimento.data_hora_entrada or item.data_hora_coleta, reverse=True):
+            cd_atendimento = snapshot.atendimento.id_origem_atendimento
+            alerts_count = db.scalar(select(func.count(Alert.id)).where(Alert.cd_atendimento == cd_atendimento)) or 0
+            open_alerts = db.scalar(select(func.count(Alert.id)).where(Alert.cd_atendimento == cd_atendimento, Alert.status.in_(["ABERTO", "EM_ANALISE"]))) or 0
+            interventions_count = db.scalar(select(func.count(InterventionRequest.id)).where(InterventionRequest.cd_atendimento == cd_atendimento)) or 0
+            antimicrobial_audits_count = db.scalar(select(func.count(AntimicrobialAudit.id)).where(AntimicrobialAudit.cd_atendimento == cd_atendimento)) or 0
+            bed_movements_count = db.scalar(select(func.count(MovimentacaoLeito.id)).where(MovimentacaoLeito.atendimento_id == snapshot.atendimento_id)) or 0
+            attendances.append(
+                {
+                    "patient": _clinical_snapshot_to_patient(snapshot),
+                    "summary": {
+                        "alerts": alerts_count,
+                        "open_alerts": open_alerts,
+                        "interventions": interventions_count,
+                        "antimicrobial_audits": antimicrobial_audits_count,
+                        "invasive_procedures": 1 if snapshot.maior_dias_dispositivo_invasivo > 0 else 0,
+                        "antimicrobials": 1 if snapshot.maior_dias_antimicrobiano > 0 else 0,
+                        "bed_movements": bed_movements_count,
+                    },
+                }
+            )
+        return {"cd_paciente": cd_paciente, "attendances": attendances}
+
     snapshots = db.scalars(
         select(PatientMonitoringSnapshot)
         .where(PatientMonitoringSnapshot.cd_paciente == cd_paciente)
@@ -271,6 +383,22 @@ def patient_timeline(cd_atendimento: str, db: Session = Depends(get_db), _: User
                 "created_at": movement.moved_at,
             }
         )
+
+    attendance = db.scalar(select(Atendimento).where(Atendimento.id_origem_atendimento == cd_atendimento))
+    if attendance:
+        clinical_movements = db.scalars(select(MovimentacaoLeito).where(MovimentacaoLeito.atendimento_id == attendance.id)).all()
+        for movement in clinical_movements:
+            events.append(
+                {
+                    "id": f"movimentacao-leito-{movement.id}",
+                    "type": "MOVIMENTACAO_LEITO",
+                    "title": "Movimentacao de leito",
+                    "description": f"{movement.unidade_origem or '-'} / {movement.leito_origem or '-'} -> {movement.unidade_destino or '-'} / {movement.leito_destino or '-'}",
+                    "status": None,
+                    "actor": "MV Soul",
+                    "created_at": movement.data_hora_movimentacao,
+                }
+            )
 
     notes = db.scalars(select(PatientTimelineNote).options(selectinload(PatientTimelineNote.user)).where(PatientTimelineNote.cd_atendimento == cd_atendimento)).all()
     for note in notes:
