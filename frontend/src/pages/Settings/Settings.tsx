@@ -25,7 +25,7 @@ export default function Settings() {
     if (!hospitalName.trim()) return;
     await api.post('/hospital-integrations', { hospital_name: hospitalName });
     setHospitalName('');
-    setMessage('Hospital cadastrado. Gere o token somente quando a integracao for liberada.');
+    setMessage('Hospital cadastrado. Gere o token somente quando a integração for liberada.');
     await load();
   }
 
@@ -42,8 +42,8 @@ export default function Settings() {
   return (
       <Stack spacing={2}>
         <Box>
-          <Typography variant="h4" fontWeight={700}>Configuracoes</Typography>
-        <Typography color="text.secondary">Administracao geral do sistema, cadastro do hospital e credenciais de integracao.</Typography>
+          <Typography variant="h4" fontWeight={700}>Configurações</Typography>
+        <Typography color="text.secondary">Administração geral do sistema, cadastro do hospital e credenciais de integração.</Typography>
       </Box>
       {message && <Alert severity="success">{message}</Alert>}
 
@@ -52,7 +52,7 @@ export default function Settings() {
           <Box>
             <Typography variant="h6" fontWeight={700}>Hospitais integrados</Typography>
             <Typography color="text.secondary">
-              Cadastre primeiro o hospital. O token permanente so deve ser gerado para um hospital previamente cadastrado e liberado para enviar dados ao SANATIO.
+              Cadastre primeiro o hospital. O token permanente só deve ser gerado para um hospital previamente cadastrado e liberado para enviar dados ao SANATIO.
             </Typography>
           </Box>
           <Stack direction={{ xs: 'column', md: 'row' }} spacing={1.5}>
@@ -82,7 +82,7 @@ export default function Settings() {
                         <Button size="small" startIcon={<ContentCopyIcon />} onClick={() => navigator.clipboard.writeText(item.token || '')}>Copiar</Button>
                       </Stack>
                     ) : (
-                      <Chip size="small" label="Token nao gerado" />
+                      <Chip size="small" label="Token não gerado" />
                     )}
                   </TableCell>
                   <TableCell>{item.active ? 'Ativo' : 'Inativo'}</TableCell>

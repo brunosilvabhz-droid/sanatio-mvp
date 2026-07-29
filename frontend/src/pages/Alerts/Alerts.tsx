@@ -2,8 +2,8 @@ import AddCommentIcon from '@mui/icons-material/AddComment';
 import SaveIcon from '@mui/icons-material/Save';
 import SendIcon from '@mui/icons-material/Send';
 import {
-  Box,
   Button,
+  Chip,
   Dialog,
   DialogActions,
   DialogContent,
@@ -14,6 +14,7 @@ import {
   Table,
   TableBody,
   TableCell,
+  TableContainer,
   TableHead,
   TableRow,
   TextField,
@@ -21,9 +22,10 @@ import {
 } from '@mui/material';
 import { useEffect, useMemo, useState } from 'react';
 import { api } from '../../api/client';
-import { SeverityChip } from '../../components/StatusChip';
-import PatientName from '../../components/PatientName';
 import InterventionDialog from '../../components/InterventionDialog';
+import PageHeader from '../../components/PageHeader';
+import PatientName from '../../components/PatientName';
+import { SeverityChip } from '../../components/StatusChip';
 import { Alert } from '../../types';
 
 export default function Alerts() {
@@ -75,29 +77,43 @@ export default function Alerts() {
     });
   }, [alerts, sortBy]);
 
+  const openCount = alerts.filter((alert) => ['ABERTO', 'EM_ANALISE'].includes(alert.status)).length;
+  const highCount = alerts.filter((alert) => alert.severity === 'ALTA').length;
+
   return (
-    <Stack spacing={2}>
-      <Box>
-        <Typography variant="h4" fontWeight={700}>
-          Alertas
-        </Typography>
-        <Typography color="text.secondary">Fila de acompanhamento gerada pelo motor inicial de regras</Typography>
-      </Box>
+    <Stack spacing={2.5}>
+      <PageHeader
+        eyebrow="Fila assistencial"
+        title="Alertas"
+        subtitle="Alertas gerados para SCIH, farmácia e demais equipes, com status atual e trilha de auditoria."
+        chips={
+          <>
+            <Chip label={`${alerts.length} alertas`} />
+            <Chip color={openCount ? 'warning' : 'success'} label={`${openCount} em aberto`} />
+            <Chip color={highCount ? 'error' : 'default'} label={`${highCount} alta severidade`} />
+          </>
+        }
+      />
+
       <Paper sx={{ p: 2 }}>
-        <Stack direction="row" gap={1.5} flexWrap="wrap">
-          <TextField select size="small" label="status" value={filters.status} sx={{ minWidth: 150 }} onChange={(e) => setFilters({ ...filters, status: e.target.value })}>
+        <Stack direction="row" gap={1.25} flexWrap="wrap">
+          <TextField select size="small" label="Status" value={filters.status} sx={{ minWidth: 150 }} onChange={(e) => setFilters({ ...filters, status: e.target.value })}>
             <MenuItem value="">Todos</MenuItem>
             {['ABERTO', 'EM_ANALISE', 'RESOLVIDO', 'IGNORADO'].map((item) => <MenuItem key={item} value={item}>{item}</MenuItem>)}
           </TextField>
-          <TextField select size="small" label="severidade" value={filters.severity} sx={{ minWidth: 150 }} onChange={(e) => setFilters({ ...filters, severity: e.target.value })}>
+          <TextField select size="small" label="Severidade" value={filters.severity} sx={{ minWidth: 150 }} onChange={(e) => setFilters({ ...filters, severity: e.target.value })}>
             <MenuItem value="">Todas</MenuItem>
             <MenuItem value="ALTA">ALTA</MenuItem>
-            <MenuItem value="MEDIA">MEDIA</MenuItem>
+            <MenuItem value="MEDIA">MÉDIA</MenuItem>
           </TextField>
-          {(['unidade', 'atendimento', 'paciente'] as const).map((key) => (
-            <TextField key={key} size="small" label={key} value={filters[key]} onChange={(e) => setFilters({ ...filters, [key]: e.target.value })} />
+          {[
+            ['unidade', 'Unidade'],
+            ['atendimento', 'Atendimento'],
+            ['paciente', 'Paciente']
+          ].map(([key, label]) => (
+            <TextField key={key} size="small" label={label} value={filters[key as keyof typeof filters]} onChange={(e) => setFilters({ ...filters, [key]: e.target.value })} />
           ))}
-          <TextField select size="small" label="ordenar" value={sortBy} sx={{ minWidth: 210 }} onChange={(e) => setSortBy(e.target.value)}>
+          <TextField select size="small" label="Ordenar" value={sortBy} sx={{ minWidth: 220 }} onChange={(e) => setSortBy(e.target.value)}>
             <MenuItem value="risk_desc">Maior risco primeiro</MenuItem>
             <MenuItem value="newest">Mais recentes</MenuItem>
             <MenuItem value="oldest">Mais antigos</MenuItem>
@@ -107,7 +123,8 @@ export default function Alerts() {
           <Button variant="contained" onClick={load}>Filtrar</Button>
         </Stack>
       </Paper>
-      <Paper>
+
+      <TableContainer component={Paper} className="clinical-table">
         <Table size="small">
           <TableHead>
             <TableRow>
@@ -129,25 +146,35 @@ export default function Alerts() {
                 </TableCell>
                 <TableCell>{alert.cd_atendimento}</TableCell>
                 <TableCell>{alert.unit}</TableCell>
-                <TableCell>{alert.title}</TableCell>
-                <TableCell>{alert.description}</TableCell>
+                <TableCell>
+                  <Typography fontWeight={800}>{alert.title}</Typography>
+                </TableCell>
+                <TableCell sx={{ minWidth: 280 }}>{alert.description}</TableCell>
                 <TableCell><SeverityChip value={alert.severity} /></TableCell>
-                <TableCell>{alert.status}</TableCell>
+                <TableCell><Chip size="small" label={alert.status} /></TableCell>
                 <TableCell>
                   <Stack direction="row" spacing={0.5}>
                     <Button size="small" startIcon={<AddCommentIcon />} onClick={() => { setSelected(alert); setStatus(alert.status); setComment(''); setCommentError(''); }}>
                       Abrir
                     </Button>
                     <Button size="small" startIcon={<SendIcon />} onClick={() => setInterventionTarget(alert)}>
-                      Intervencao
+                      Intervenção
                     </Button>
                   </Stack>
                 </TableCell>
               </TableRow>
             ))}
+            {!sortedAlerts.length && (
+              <TableRow>
+                <TableCell colSpan={8} align="center" sx={{ py: 3, color: 'text.secondary' }}>
+                  Nenhum alerta encontrado.
+                </TableCell>
+              </TableRow>
+            )}
           </TableBody>
         </Table>
-      </Paper>
+      </TableContainer>
+
       <Dialog open={Boolean(selected)} onClose={() => { setSelected(null); setCommentError(''); }} maxWidth="sm" fullWidth>
         <DialogTitle>{selected?.title}</DialogTitle>
         <DialogContent>
@@ -177,6 +204,7 @@ export default function Alerts() {
           <Button startIcon={<SaveIcon />} variant="contained" onClick={saveStatus}>Salvar</Button>
         </DialogActions>
       </Dialog>
+
       {interventionTarget && (
         <InterventionDialog
           open={Boolean(interventionTarget)}

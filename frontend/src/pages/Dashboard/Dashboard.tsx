@@ -1,16 +1,24 @@
+import AirlineSeatFlatIcon from '@mui/icons-material/AirlineSeatFlat';
+import BiotechIcon from '@mui/icons-material/Biotech';
+import MedicationIcon from '@mui/icons-material/Medication';
+import NotificationsActiveIcon from '@mui/icons-material/NotificationsActive';
+import PriorityHighIcon from '@mui/icons-material/PriorityHigh';
+import SickIcon from '@mui/icons-material/Sick';
 import { Alert as MuiAlert, Box, Grid, LinearProgress, Paper, Stack, Typography } from '@mui/material';
 import { useEffect, useMemo, useState } from 'react';
 import { api } from '../../api/client';
+import MetricCard from '../../components/MetricCard';
+import PageHeader from '../../components/PageHeader';
 import { Alert, Patient } from '../../types';
 
-const labels: Record<string, string> = {
-  monitored_patients: 'Pacientes internados monitorados',
-  open_alerts: 'Alertas abertos',
-  critical_alerts: 'Alertas críticos',
-  high_risk_patients: 'Pacientes em risco alto',
-  positive_cultures: 'Culturas positivas',
-  prolonged_antimicrobials: 'Antimicrobianos prolongados'
-};
+const metrics = [
+  { key: 'monitored_patients', label: 'Pacientes monitorados', color: '#007f89', icon: <SickIcon /> },
+  { key: 'open_alerts', label: 'Alertas abertos', color: '#0b79a4', icon: <NotificationsActiveIcon /> },
+  { key: 'critical_alerts', label: 'Alertas críticos', color: '#b42318', icon: <PriorityHighIcon /> },
+  { key: 'high_risk_patients', label: 'Pacientes alto risco', color: '#c2410c', icon: <AirlineSeatFlatIcon /> },
+  { key: 'positive_cultures', label: 'Culturas positivas', color: '#6f42c1', icon: <BiotechIcon /> },
+  { key: 'prolonged_antimicrobials', label: 'Antimicrobianos prolongados', color: '#027a48', icon: <MedicationIcon /> }
+];
 
 const riskColors = {
   baixo: '#027a48',
@@ -32,15 +40,9 @@ export default function Dashboard() {
       api.get('/alerts')
     ]);
 
-    if (summaryResponse.status === 'fulfilled') {
-      setSummary(summaryResponse.value.data);
-    }
-    if (patientsResponse.status === 'fulfilled') {
-      setPatients(patientsResponse.value.data);
-    }
-    if (alertsResponse.status === 'fulfilled') {
-      setAlerts(alertsResponse.value.data);
-    }
+    if (summaryResponse.status === 'fulfilled') setSummary(summaryResponse.value.data);
+    if (patientsResponse.status === 'fulfilled') setPatients(patientsResponse.value.data);
+    if (alertsResponse.status === 'fulfilled') setAlerts(alertsResponse.value.data);
     if ([summaryResponse, patientsResponse, alertsResponse].some((response) => response.status === 'rejected')) {
       setLoadError('Alguns indicadores não foram carregados. Verifique se o backend está ativo e se o token de login ainda é válido.');
     }
@@ -52,7 +54,7 @@ export default function Dashboard() {
 
   const riskData = useMemo(() => {
     const total = patients.length || 1;
-    return (['baixo', 'medio', 'alto'] as const).map((risk) => {
+    return (['alto', 'medio', 'baixo'] as const).map((risk) => {
       const value = patients.filter((patient) => patient.status_risco === risk).length;
       return { label: risk, value, percent: Math.round((value / total) * 100), color: riskColors[risk] };
     });
@@ -68,7 +70,7 @@ export default function Dashboard() {
     const medium = alerts.filter((alert) => alert.severity === 'MEDIA').length;
     return [
       { label: 'ALTA', value: high, color: '#b42318' },
-      { label: 'MEDIA', value: medium, color: '#b54708' }
+      { label: 'MÉDIA', value: medium, color: '#b54708' }
     ];
   }, [alerts]);
 
@@ -85,26 +87,18 @@ export default function Dashboard() {
 
   return (
     <Stack spacing={3}>
-      <Stack direction={{ xs: 'column', md: 'row' }} justifyContent="space-between" alignItems={{ xs: 'flex-start', md: 'center' }} gap={2}>
-        <Box>
-          <Typography variant="h4" fontWeight={700}>
-            Dashboard
-          </Typography>
-          <Typography color="text.secondary">Indicadores operacionais iniciais</Typography>
-        </Box>
-      </Stack>
+      <PageHeader
+        eyebrow="Visão operacional"
+        title="Dashboard"
+        subtitle="Indicadores assistenciais atualizados a partir dos dados enviados pelo servidor do hospital ao SANATIO."
+      />
 
       {loadError && <MuiAlert severity="warning">{loadError}</MuiAlert>}
 
       <Grid container spacing={2}>
-        {Object.entries(labels).map(([key, label]) => (
-          <Grid item xs={12} sm={6} md={4} key={key}>
-            <Paper sx={{ p: 2.5, minHeight: 118 }}>
-              <Typography color="text.secondary">{label}</Typography>
-              <Typography variant="h3" fontWeight={700} sx={{ mt: 1 }}>
-                {summary[key] ?? 0}
-              </Typography>
-            </Paper>
+        {metrics.map((metric) => (
+          <Grid item xs={12} sm={6} lg={4} key={metric.key}>
+            <MetricCard label={metric.label} value={summary[metric.key] ?? 0} color={metric.color} icon={metric.icon} />
           </Grid>
         ))}
       </Grid>
@@ -112,14 +106,17 @@ export default function Dashboard() {
       <Grid container spacing={2}>
         <Grid item xs={12} lg={5}>
           <Paper sx={{ p: 2.5, height: '100%' }}>
-            <Typography variant="h6" fontWeight={700}>
+            <Typography variant="h6" fontWeight={800}>
               Distribuição de risco
             </Typography>
-            <Stack spacing={2.25} sx={{ mt: 2 }}>
+            <Typography variant="body2" color="text.secondary">
+              Priorização clínica dos pacientes recebidos na integração.
+            </Typography>
+            <Stack spacing={2.25} sx={{ mt: 2.5 }}>
               {riskData.map((item) => (
                 <Box key={item.label}>
                   <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 0.75 }}>
-                    <Typography sx={{ textTransform: 'capitalize' }}>{item.label}</Typography>
+                    <Typography sx={{ textTransform: 'capitalize', fontWeight: 700 }}>{item.label}</Typography>
                     <Typography color="text.secondary">
                       {item.value} pacientes · {item.percent}%
                     </Typography>
@@ -142,7 +139,7 @@ export default function Dashboard() {
 
         <Grid item xs={12} md={6} lg={3.5}>
           <Paper sx={{ p: 2.5, height: '100%' }}>
-            <Typography variant="h6" fontWeight={700}>
+            <Typography variant="h6" fontWeight={800}>
               Severidade dos alertas
             </Typography>
             <DonutChart data={alertSeverityData} totalLabel={`${alerts.length} alertas`} />
@@ -151,7 +148,7 @@ export default function Dashboard() {
 
         <Grid item xs={12} md={6} lg={3.5}>
           <Paper sx={{ p: 2.5, height: '100%' }}>
-            <Typography variant="h6" fontWeight={700}>
+            <Typography variant="h6" fontWeight={800}>
               Status dos alertas
             </Typography>
             <Stack spacing={1.5} sx={{ mt: 2 }}>
@@ -164,13 +161,15 @@ export default function Dashboard() {
 
         <Grid item xs={12}>
           <Paper sx={{ p: 2.5 }}>
-            <Typography variant="h6" fontWeight={700}>
+            <Typography variant="h6" fontWeight={800}>
               Pacientes por unidade
             </Typography>
             <Stack spacing={1.5} sx={{ mt: 2 }}>
-              {unitData.map((item) => (
-                <MetricBar key={item.label} label={item.label} value={item.value} max={Math.max(...unitData.map((unit) => unit.value), 1)} />
-              ))}
+              {unitData.length ? (
+                unitData.map((item) => <MetricBar key={item.label} label={item.label} value={item.value} max={Math.max(...unitData.map((unit) => unit.value), 1)} />)
+              ) : (
+                <Typography color="text.secondary">Nenhum paciente recebido na integração até o momento.</Typography>
+              )}
             </Stack>
           </Paper>
         </Grid>
@@ -185,11 +184,11 @@ function MetricBar({ label, value, max }: { label: string; value: number; max: n
   return (
     <Box>
       <Stack direction="row" justifyContent="space-between" sx={{ mb: 0.75 }}>
-        <Typography>{label}</Typography>
+        <Typography fontWeight={700}>{label}</Typography>
         <Typography color="text.secondary">{value}</Typography>
       </Stack>
-      <Box sx={{ height: 12, bgcolor: '#e7ecef', borderRadius: 6, overflow: 'hidden' }}>
-        <Box sx={{ width: `${percent}%`, height: '100%', bgcolor: 'primary.main', borderRadius: 6 }} />
+      <Box sx={{ height: 10, bgcolor: '#e7ecef', borderRadius: 5, overflow: 'hidden' }}>
+        <Box sx={{ width: `${percent}%`, height: '100%', bgcolor: 'primary.main', borderRadius: 5 }} />
       </Box>
     </Box>
   );
@@ -201,8 +200,8 @@ function DonutChart({ data, totalLabel }: { data: { label: string; value: number
 
   return (
     <Stack direction="row" alignItems="center" spacing={2} sx={{ mt: 2 }}>
-      <Box sx={{ position: 'relative', width: 150, height: 150, flex: '0 0 auto' }}>
-        <svg viewBox="0 0 42 42" width="150" height="150" aria-label="Severidade dos alertas">
+      <Box sx={{ position: 'relative', width: 144, height: 144, flex: '0 0 auto' }}>
+        <svg viewBox="0 0 42 42" width="144" height="144" aria-label="Severidade dos alertas">
           <circle cx="21" cy="21" r="15.915" fill="transparent" stroke="#e7ecef" strokeWidth="7" />
           {total > 0 &&
             data.map((item) => {
@@ -226,7 +225,7 @@ function DonutChart({ data, totalLabel }: { data: { label: string; value: number
             })}
         </svg>
         <Box sx={{ position: 'absolute', inset: 0, display: 'grid', placeItems: 'center', textAlign: 'center' }}>
-          <Typography fontWeight={700}>{total}</Typography>
+          <Typography fontWeight={800}>{total}</Typography>
         </Box>
       </Box>
       <Stack spacing={1}>

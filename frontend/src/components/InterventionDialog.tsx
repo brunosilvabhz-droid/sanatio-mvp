@@ -38,7 +38,7 @@ export default function InterventionDialog({ open, onClose, cdAtendimento, cdPac
   useEffect(() => {
     if (!open) return;
     setReason(defaultReason);
-    setMessage(`Solicito avaliacao da intervencao para o paciente ID ${cdPaciente}, atendimento ${cdAtendimento}. Motivo do alerta: ${defaultReason}.`);
+    setMessage(`Solicito avaliação da intervenção para o paciente ID ${cdPaciente}, atendimento ${cdAtendimento}. Motivo do alerta: ${defaultReason}.`);
     api.get('/recipients').then(({ data }) => setRecipients(data));
   }, [open, defaultReason, cdPaciente, cdAtendimento]);
 
@@ -72,13 +72,13 @@ export default function InterventionDialog({ open, onClose, cdAtendimento, cdPac
 
   return (
     <Dialog open={open} onClose={onClose} maxWidth="md" fullWidth>
-      <DialogTitle>Solicitar intervencao</DialogTitle>
+      <DialogTitle>Solicitar intervenção</DialogTitle>
       <DialogContent>
         <Stack spacing={2} sx={{ mt: 1 }}>
           {error && <Alert severity="warning">{error}</Alert>}
           <Paper variant="outlined" sx={{ p: 1.5, bgcolor: '#f8fbfc' }}>
             <Typography variant="body2" color="text.secondary">
-              A mensagem enviada nao inclui nome do paciente. O destinatario recebe apenas ID do paciente, atendimento, motivo do alerta e link de resposta.
+              A mensagem enviada não inclui nome do paciente. O destinatário recebe apenas ID do paciente, atendimento, motivo do alerta e link de resposta.
             </Typography>
           </Paper>
           <TextField label="Motivo do alerta" value={reason} onChange={(event) => setReason(event.target.value)} fullWidth />

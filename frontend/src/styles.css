@@ -1,10 +1,29 @@
 body {
   margin: 0;
+  background: #f4f7f8;
+  color: #18252d;
+  font-feature-settings: 'tnum' 1, 'cv10' 1;
 }
 
 a {
   color: inherit;
   text-decoration: none;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html {
+  scrollbar-color: #a9bdc5 #edf3f5;
+}
+
+.clinical-table {
+  overflow: hidden;
+}
+
+.clinical-table .MuiTableRow-root:hover {
+  background-color: #f3faf9;
 }
 
 .risk-baixo {

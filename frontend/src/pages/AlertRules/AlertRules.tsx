@@ -34,8 +34,8 @@ const thresholdKeys = [
   },
   {
     key: 'alerts.threshold.hospital_stay_days',
-    label: 'Dias de internacao',
-    helper: 'Gera alerta para paciente internado por longa permanencia.'
+    label: 'Dias de internação',
+    helper: 'Gera alerta para paciente internado por longa permanência.'
   },
   {
     key: 'alerts.threshold.invasive_device_days',
@@ -47,8 +47,8 @@ const thresholdKeys = [
 const signalOptions = [
   { key: 'positive_culture', label: 'Cultura positiva', field: 'has_positive_culture', description: 'Prioriza atendimento com cultura positiva.' },
   { key: 'antimicrobial_gt7', label: 'Antimicrobiano prolongado', field: 'max_antimicrobial_days', description: 'Prioriza uso de antimicrobiano acima do limite configurado.' },
-  { key: 'long_stay', label: 'Internacao prolongada', field: 'days_in_hospital', description: 'Prioriza pacientes com longa permanencia.' },
-  { key: 'invasive_gt7', label: 'Procedimento invasivo prolongado', field: 'max_invasive_device_days', description: 'Prioriza dispositivo invasivo por periodo prolongado.' },
+  { key: 'long_stay', label: 'Internação prolongada', field: 'days_in_hospital', description: 'Prioriza pacientes com longa permanência.' },
+  { key: 'invasive_gt7', label: 'Procedimento invasivo prolongado', field: 'max_invasive_device_days', description: 'Prioriza dispositivo invasivo por período prolongado.' },
   { key: 'active_isolation', label: 'Isolamento ativo', field: 'has_active_isolation', description: 'Prioriza pacientes em isolamento.' },
   { key: 'high_risk', label: 'Risco alto calculado', field: 'risk_status', description: 'Prioriza pacientes ja classificados como alto risco.' }
 ];
@@ -98,7 +98,7 @@ export default function AlertRules() {
 
   async function createRule() {
     if (!form.name.trim() || !form.selectedSignals.length) {
-      setMessage('Informe um nome e selecione ao menos um criterio.');
+      setMessage('Informe um nome e selecione ao menos um critério.');
       return;
     }
 
@@ -115,7 +115,7 @@ export default function AlertRules() {
         }
       : {
           name: form.name,
-          description: form.description || `Combina criterios para priorizacao SCIH: ${selectedFields.join(', ')}.`,
+          description: form.description || `Combina critérios para priorização SCIH: ${selectedFields.join(', ')}.`,
           rule_type: 'COMPOSITE',
           parameter_key: form.matchMode,
           parameter_value: JSON.stringify(form.selectedSignals),
@@ -124,7 +124,7 @@ export default function AlertRules() {
         };
 
     await api.post('/monitoring/rules', payload);
-    setMessage('Regra de priorizacao criada.');
+    setMessage('Regra de priorização criada.');
     setForm({ name: '', description: '', severity: 'MEDIA', matchMode: 'all', selectedSignals: ['positive_culture', 'antimicrobial_gt7'] });
     await load();
   }
@@ -143,7 +143,7 @@ export default function AlertRules() {
   return (
     <Stack spacing={2}>
       <Box>
-        <Typography variant="h4" fontWeight={700}>Configuracao de alertas</Typography>
+        <Typography variant="h4" fontWeight={700}>Configuração de alertas</Typography>
         <Typography color="text.secondary">Uso do SCIH para criar regras que priorizam pacientes nas filas de monitoramento.</Typography>
       </Box>
 
@@ -152,7 +152,7 @@ export default function AlertRules() {
       <Paper sx={{ p: 2.5 }}>
         <Stack spacing={2}>
           <Box>
-            <Typography variant="h6" fontWeight={700}>Parametros de disparo</Typography>
+            <Typography variant="h6" fontWeight={700}>Parâmetros de disparo</Typography>
             <Typography color="text.secondary">Limites assistenciais usados para priorizar pacientes e gerar alertas recebidos do hospital.</Typography>
           </Box>
           <Grid container spacing={2}>
@@ -191,7 +191,7 @@ export default function AlertRules() {
         <Grid item xs={12} lg={5}>
           <Paper sx={{ p: 2.5 }}>
             <Stack spacing={2}>
-              <Typography variant="h6" fontWeight={700}>Nova regra de priorizacao</Typography>
+              <Typography variant="h6" fontWeight={700}>Nova regra de priorização</Typography>
               <TextField label="Nome da regra" value={form.name} onChange={(event) => setForm({ ...form, name: event.target.value })} fullWidth />
               <TextField label="Descricao" value={form.description} onChange={(event) => setForm({ ...form, description: event.target.value })} multiline minRows={2} fullWidth />
               <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1.5}>
@@ -200,8 +200,8 @@ export default function AlertRules() {
                   <MenuItem value="ALTA">ALTA</MenuItem>
                 </TextField>
                 <TextField select label="Combinacao" value={form.matchMode} onChange={(event) => setForm({ ...form, matchMode: event.target.value })} fullWidth disabled={form.selectedSignals.length <= 1}>
-                  <MenuItem value="all">Todos os criterios</MenuItem>
-                  <MenuItem value="any">Qualquer criterio</MenuItem>
+                  <MenuItem value="all">Todos os critérios</MenuItem>
+                  <MenuItem value="any">Qualquer critério</MenuItem>
                 </TextField>
               </Stack>
               <Stack spacing={1}>

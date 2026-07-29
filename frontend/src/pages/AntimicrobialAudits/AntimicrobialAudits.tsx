@@ -144,7 +144,7 @@ export default function AntimicrobialAudits() {
             <MenuItem value="status">Status mais pendente</MenuItem>
             <MenuItem value="antimicrobial">Antimicrobiano</MenuItem>
             <MenuItem value="unit">Unidade</MenuItem>
-            <MenuItem value="reviewed_desc">Ultima revisao</MenuItem>
+            <MenuItem value="reviewed_desc">Última revisão</MenuItem>
           </TextField>
           <Button startIcon={<SearchIcon />} variant="contained" onClick={load}>
             Filtrar
@@ -161,11 +161,11 @@ export default function AntimicrobialAudits() {
               <TableCell>Antimicrobiano</TableCell>
               <TableCell>Inicio</TableCell>
               <TableCell align="right">Dias</TableCell>
-              <TableCell>Prescricao</TableCell>
+              <TableCell>Prescrição</TableCell>
               <TableCell>Status</TableCell>
               <TableCell>Prioridade</TableCell>
-              <TableCell>Ultima revisao</TableCell>
-              <TableCell>Acao</TableCell>
+              <TableCell>Última revisão</TableCell>
+              <TableCell>Ação</TableCell>
             </TableRow>
           </TableHead>
           <TableBody>
@@ -254,7 +254,7 @@ export default function AntimicrobialAudits() {
 
             {selected?.actions?.length ? (
               <Box>
-                <Typography fontWeight={700} sx={{ mb: 1 }}>Historico</Typography>
+                <Typography fontWeight={700} sx={{ mb: 1 }}>Histórico</Typography>
                 <Stack spacing={1}>
                   {selected.actions.map((action) => (
                     <Paper key={action.id} variant="outlined" sx={{ p: 1.25 }}>

@@ -93,7 +93,7 @@ export default function EpidemiologyReports() {
         <Stack direction={{ xs: 'column', md: 'row' }} alignItems={{ xs: 'flex-start', md: 'center' }} spacing={2.5}>
           <Box sx={{ flex: 1 }}>
             <Typography variant="h5" fontStyle="italic" color="#23245f">
-              Relatorios de consumo de <Box component="span" sx={{ color: '#00a6c8', fontWeight: 800 }}>antimicrobianos</Box>
+              Relatórios de consumo de <Box component="span" sx={{ color: '#00a6c8', fontWeight: 800 }}>antimicrobianos</Box>
               <InfoOutlinedIcon sx={{ ml: 1, color: '#00a6c8', verticalAlign: 'middle' }} />
             </Typography>
           </Box>

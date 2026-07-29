@@ -39,8 +39,8 @@ export default function Interventions() {
   return (
     <Stack spacing={2}>
       <Box>
-        <Typography variant="h4" fontWeight={700}>Intervencoes</Typography>
-        <Typography color="text.secondary">Fila enviada ao medico/infecto sem exibicao de nome do paciente.</Typography>
+        <Typography variant="h4" fontWeight={700}>Intervenções</Typography>
+        <Typography color="text.secondary">Fila enviada ao médico/infecto sem exibição de nome do paciente.</Typography>
       </Box>
 
       <Paper sx={{ p: 2 }}>
@@ -66,7 +66,7 @@ export default function Interventions() {
               <TableCell>Mensagem</TableCell>
               <TableCell>Destinatarios</TableCell>
               <TableCell>Status</TableCell>
-              <TableCell>Acao</TableCell>
+              <TableCell>Ação</TableCell>
             </TableRow>
           </TableHead>
           <TableBody>
@@ -91,13 +91,13 @@ export default function Interventions() {
       </Paper>
 
       <Dialog open={Boolean(selected)} onClose={() => setSelected(null)} maxWidth="sm" fullWidth>
-        <DialogTitle>Responder intervencao</DialogTitle>
+        <DialogTitle>Responder intervenção</DialogTitle>
         <DialogContent>
           <Stack spacing={2} sx={{ mt: 1 }}>
             <Typography>{selected?.reason}</Typography>
             <TextField select label="Resposta" value={response} onChange={(event) => setResponse(event.target.value)}>
-              <MenuItem value="ACEITA">Aceitar intervencao</MenuItem>
-              <MenuItem value="RECUSADA">Recusar intervencao</MenuItem>
+              <MenuItem value="ACEITA">Aceitar intervenção</MenuItem>
+              <MenuItem value="RECUSADA">Recusar intervenção</MenuItem>
             </TextField>
             <TextField
               label="Justificativa"
