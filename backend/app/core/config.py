@@ -22,6 +22,14 @@ class Settings(BaseSettings):
     soulmv_oracle_user: str = ""
     soulmv_oracle_password: str = Field(default="", repr=False)
 
+    smtp_host: str = "smtp-relay.brevo.com"
+    smtp_port: int = 587
+    smtp_username: str = ""
+    smtp_password: str = Field(default="", repr=False)
+    smtp_from_email: str = "sanatio@impactocg.com"
+    smtp_from_name: str = "SANATIO"
+    support_contact_email: str = "contato@impactocg.com"
+
     @property
     def cors_origin_list(self) -> list[str]:
         return [origin.strip() for origin in self.cors_origins.split(",") if origin.strip()]

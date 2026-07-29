@@ -19,6 +19,7 @@ from app.models.patient_monitoring_snapshot import PatientMonitoringSnapshot
 from app.models.patient_bed_movement import PatientBedMovement
 from app.models.patient_timeline_note import PatientTimelineNote
 from app.models.setting import Setting
+from app.models.support_ticket import SupportTicket
 from app.models.user import Role, User
 
 __all__ = [
@@ -45,5 +46,6 @@ __all__ = [
     "Role",
     "Setting",
     "SnapshotAtendimento",
+    "SupportTicket",
     "User",
 ]

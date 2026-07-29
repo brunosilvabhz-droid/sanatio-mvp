@@ -70,6 +70,24 @@ A aplicação apenas executa `SELECT` nas views esperadas:
 
 Nenhuma escrita é feita no banco Oracle.
 
+## Configuração de e-mail com Brevo
+
+O fluxo de chamados usa SMTP do Brevo. O remetente padrão é `sanatio@impactocg.com`.
+
+Configure no backend:
+
+```env
+SMTP_HOST=smtp-relay.brevo.com
+SMTP_PORT=587
+SMTP_USERNAME=USUARIO_SMTP_BREVO
+SMTP_PASSWORD=CHAVE_SMTP_BREVO
+SMTP_FROM_EMAIL=sanatio@impactocg.com
+SMTP_FROM_NAME=SANATIO
+SUPPORT_CONTACT_EMAIL=contato@impactocg.com
+```
+
+Quando um chamado é criado, o SANATIO envia e-mail para o solicitante e para `contato@impactocg.com`. Quando o admin altera o chamado, envia e-mail para o solicitante.
+
 ## Migrations
 
 Dentro do container ou em ambiente local com dependências instaladas:
@@ -106,6 +124,9 @@ python -m app.seed.seed
 - `GET /roles`
 - `GET /settings`
 - `PATCH /settings`
+- `GET /support/tickets`
+- `POST /support/tickets`
+- `PATCH /support/tickets/{id}`
 
 ## Funcionalidades da Etapa 1
 

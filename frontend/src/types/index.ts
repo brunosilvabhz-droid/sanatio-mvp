@@ -205,3 +205,20 @@ export type AntimicrobialAudit = {
   updated_at: string;
   actions: AntimicrobialAuditAction[];
 };
+
+export type SupportTicket = {
+  id: number;
+  category: 'ERRO' | 'DUVIDA' | 'SOLICITACAO' | string;
+  title: string;
+  description: string;
+  status: 'ABERTO' | 'EM_ANALISE' | 'RESPONDIDO' | 'RESOLVIDO' | 'CANCELADO' | string;
+  requester_user_id: number;
+  requester_name?: string;
+  requester_email?: string;
+  responder_user_id?: number;
+  responder_name?: string;
+  admin_response?: string;
+  created_at: string;
+  updated_at: string;
+  responded_at?: string;
+};

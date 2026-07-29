@@ -28,6 +28,13 @@ services:
       SOULMV_ORACLE_SERVICE: ""
       SOULMV_ORACLE_USER: ""
       SOULMV_ORACLE_PASSWORD: ""
+      SMTP_HOST: ${SMTP_HOST:-smtp-relay.brevo.com}
+      SMTP_PORT: ${SMTP_PORT:-587}
+      SMTP_USERNAME: ${SMTP_USERNAME:-}
+      SMTP_PASSWORD: ${SMTP_PASSWORD:-}
+      SMTP_FROM_EMAIL: ${SMTP_FROM_EMAIL:-sanatio@impactocg.com}
+      SMTP_FROM_NAME: ${SMTP_FROM_NAME:-SANATIO}
+      SUPPORT_CONTACT_EMAIL: ${SUPPORT_CONTACT_EMAIL:-contato@impactocg.com}
       CORS_ORIGINS: http://localhost:5173,http://127.0.0.1:5173
     ports:
       - "8000:8000"

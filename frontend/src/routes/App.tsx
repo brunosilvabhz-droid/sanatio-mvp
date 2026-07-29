@@ -12,6 +12,7 @@ import MonitoringRuns from '../pages/MonitoringRuns/MonitoringRuns';
 import PatientDetail from '../pages/PatientDetail/PatientDetail';
 import Patients from '../pages/Patients/Patients';
 import Settings from '../pages/Settings/Settings';
+import SupportTickets from '../pages/SupportTickets/SupportTickets';
 import Users from '../pages/Users/Users';
 
 function Protected({ children }: { children: JSX.Element }) {
@@ -42,6 +43,7 @@ export default function App() {
           <Route path="alert-rules" element={<AlertRules />} />
           <Route path="monitoring-runs" element={<MonitoringRuns />} />
           <Route path="alert-audit" element={<AlertAudit />} />
+          <Route path="support" element={<SupportTickets />} />
           <Route path="users" element={<Users />} />
           <Route path="settings" element={<Settings />} />
         </Route>

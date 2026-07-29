@@ -11,6 +11,7 @@ import ReplyIcon from '@mui/icons-material/Reply';
 import RuleIcon from '@mui/icons-material/Rule';
 import SettingsIcon from '@mui/icons-material/Settings';
 import SickIcon from '@mui/icons-material/Sick';
+import SupportAgentIcon from '@mui/icons-material/SupportAgent';
 import {
   AppBar,
   Box,
@@ -52,6 +53,12 @@ const groups = [
       { label: 'Config. alertas', path: '/alert-rules', icon: <RuleIcon /> },
       { label: 'Execuções', path: '/monitoring-runs', icon: <ManageHistoryIcon /> },
       { label: 'Relatórios', path: '/alert-audit', icon: <FactCheckIcon /> }
+    ]
+  },
+  {
+    title: 'Suporte',
+    items: [
+      { label: 'Chamados', path: '/support', icon: <SupportAgentIcon /> }
     ]
   },
   {
