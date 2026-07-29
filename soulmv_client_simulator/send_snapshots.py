@@ -63,7 +63,6 @@ LEFT JOIN antimicrobial a ON a.cd_atendimento = p.cd_atendimento
 LEFT JOIN culture c ON c.cd_atendimento = p.cd_atendimento
 LEFT JOIN invasive i ON i.cd_atendimento = p.cd_atendimento
 LEFT JOIN isolation s ON s.cd_atendimento = p.cd_atendimento
-WHERE p.dt_alta IS NULL
 ORDER BY p.cd_atendimento;
 """
 
@@ -78,6 +77,70 @@ SELECT
     ds_leito_destino AS to_bed
 FROM soulmv_mock.mv_movimentacoes_leito
 ORDER BY cd_atendimento, dt_movimentacao;
+"""
+
+ANTIMICROBIALS_SQL = """
+SELECT
+    cd_atendimento,
+    cd_paciente,
+    cd_prescricao,
+    cd_item_prescricao,
+    cd_produto,
+    ds_antimicrobiano,
+    dt_inicio,
+    dt_fim,
+    sn_ativo,
+    ds_frequencia,
+    ds_via,
+    ds_dose,
+    GREATEST((COALESCE(dt_fim::date, CURRENT_DATE) - dt_inicio::date)::int, 0) AS dias_uso
+FROM soulmv_mock.mv_antimicrobianos
+ORDER BY cd_atendimento, ds_antimicrobiano;
+"""
+
+CULTURES_SQL = """
+SELECT
+    cd_atendimento,
+    cd_paciente,
+    cd_pedido,
+    cd_exame,
+    ds_exame,
+    dt_coleta,
+    dt_resultado,
+    ds_material,
+    ds_microorganismo,
+    ds_resultado,
+    sn_positivo
+FROM soulmv_mock.mv_culturas
+ORDER BY cd_atendimento, dt_coleta;
+"""
+
+INVASIVE_PROCEDURES_SQL = """
+SELECT
+    cd_atendimento,
+    cd_paciente,
+    cd_procedimento,
+    ds_procedimento,
+    dt_inicio,
+    dt_fim,
+    sn_ativo,
+    ds_local_instalacao,
+    GREATEST((COALESCE(dt_fim::date, CURRENT_DATE) - dt_inicio::date)::int, 0) AS dias_permanencia
+FROM soulmv_mock.mv_procedimentos_invasivos
+ORDER BY cd_atendimento, dt_inicio;
+"""
+
+ISOLATIONS_SQL = """
+SELECT
+    cd_atendimento,
+    cd_paciente,
+    cd_isolamento,
+    ds_isolamento,
+    dt_inicio,
+    dt_fim,
+    sn_ativo
+FROM soulmv_mock.mv_isolamentos
+ORDER BY cd_atendimento, dt_inicio;
 """
 
 
@@ -138,6 +201,86 @@ def load_bed_movements(dsn: str) -> list[dict]:
     ]
 
 
+def load_antimicrobials(dsn: str) -> list[dict]:
+    with psycopg.connect(dsn, row_factory=dict_row) as conn:
+        rows = conn.execute(ANTIMICROBIALS_SQL).fetchall()
+    return [
+        {
+            "cd_atendimento": str(row["cd_atendimento"]),
+            "cd_paciente": str(row["cd_paciente"]),
+            "cd_prescricao": str(row["cd_prescricao"]),
+            "cd_item_prescricao": str(row["cd_item_prescricao"]),
+            "cd_produto": str(row["cd_produto"]) if row["cd_produto"] is not None else None,
+            "ds_antimicrobiano": row["ds_antimicrobiano"],
+            "dt_inicio": row["dt_inicio"].isoformat(),
+            "dt_fim": row["dt_fim"].isoformat() if row["dt_fim"] else None,
+            "sn_ativo": row["sn_ativo"],
+            "ds_frequencia": row["ds_frequencia"],
+            "ds_via": row["ds_via"],
+            "ds_dose": row["ds_dose"],
+            "dias_uso": int(row["dias_uso"] or 0),
+        }
+        for row in rows
+    ]
+
+
+def load_cultures(dsn: str) -> list[dict]:
+    with psycopg.connect(dsn, row_factory=dict_row) as conn:
+        rows = conn.execute(CULTURES_SQL).fetchall()
+    return [
+        {
+            "cd_atendimento": str(row["cd_atendimento"]),
+            "cd_paciente": str(row["cd_paciente"]),
+            "cd_pedido": str(row["cd_pedido"]),
+            "cd_exame": str(row["cd_exame"]),
+            "ds_exame": row["ds_exame"],
+            "dt_coleta": row["dt_coleta"].isoformat(),
+            "dt_resultado": row["dt_resultado"].isoformat() if row["dt_resultado"] else None,
+            "ds_material": row["ds_material"],
+            "ds_microorganismo": row["ds_microorganismo"],
+            "ds_resultado": row["ds_resultado"],
+            "sn_positivo": row["sn_positivo"],
+        }
+        for row in rows
+    ]
+
+
+def load_invasive_procedures(dsn: str) -> list[dict]:
+    with psycopg.connect(dsn, row_factory=dict_row) as conn:
+        rows = conn.execute(INVASIVE_PROCEDURES_SQL).fetchall()
+    return [
+        {
+            "cd_atendimento": str(row["cd_atendimento"]),
+            "cd_paciente": str(row["cd_paciente"]),
+            "cd_procedimento": str(row["cd_procedimento"]),
+            "ds_procedimento": row["ds_procedimento"],
+            "dt_inicio": row["dt_inicio"].isoformat(),
+            "dt_fim": row["dt_fim"].isoformat() if row["dt_fim"] else None,
+            "sn_ativo": row["sn_ativo"],
+            "ds_local_instalacao": row["ds_local_instalacao"],
+            "dias_permanencia": int(row["dias_permanencia"] or 0),
+        }
+        for row in rows
+    ]
+
+
+def load_isolations(dsn: str) -> list[dict]:
+    with psycopg.connect(dsn, row_factory=dict_row) as conn:
+        rows = conn.execute(ISOLATIONS_SQL).fetchall()
+    return [
+        {
+            "cd_atendimento": str(row["cd_atendimento"]),
+            "cd_paciente": str(row["cd_paciente"]),
+            "cd_isolamento": str(row["cd_isolamento"]),
+            "ds_isolamento": row["ds_isolamento"],
+            "dt_inicio": row["dt_inicio"].isoformat(),
+            "dt_fim": row["dt_fim"].isoformat() if row["dt_fim"] else None,
+            "sn_ativo": row["sn_ativo"],
+        }
+        for row in rows
+    ]
+
+
 def post_snapshots(ingest_url: str, token: str, payload_body: dict) -> dict:
     payload = json.dumps(payload_body).encode("utf-8")
     req = request.Request(
@@ -167,11 +310,26 @@ def main() -> int:
     parser.add_argument("--token", default=os.getenv("SANATIO_TOKEN"), help="Token hospitalar do SANATIO.")
     args = parser.parse_args()
 
-    payload_body = {"patients": load_snapshots(args.dsn), "bed_movements": load_bed_movements(args.dsn)}
+    payload_body = {
+        "patients": load_snapshots(args.dsn),
+        "bed_movements": load_bed_movements(args.dsn),
+        "antimicrobials": load_antimicrobials(args.dsn),
+        "cultures": load_cultures(args.dsn),
+        "invasive_procedures": load_invasive_procedures(args.dsn),
+        "isolations": load_isolations(args.dsn),
+    }
     print(json.dumps(payload_body, ensure_ascii=False, indent=2))
 
     if args.dry_run:
-        print(f"\nDRY RUN: {len(payload_body['patients'])} snapshots e {len(payload_body['bed_movements'])} movimentacoes montados. Nenhum dado enviado.")
+        print(
+            "\nDRY RUN: "
+            f"{len(payload_body['patients'])} snapshots, "
+            f"{len(payload_body['bed_movements'])} movimentacoes, "
+            f"{len(payload_body['antimicrobials'])} antimicrobianos, "
+            f"{len(payload_body['cultures'])} culturas, "
+            f"{len(payload_body['invasive_procedures'])} procedimentos invasivos e "
+            f"{len(payload_body['isolations'])} isolamentos montados. Nenhum dado enviado."
+        )
         return 0
 
     if not args.token:

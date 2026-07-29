@@ -3,7 +3,8 @@ import MedicationIcon from '@mui/icons-material/Medication';
 import PeopleIcon from '@mui/icons-material/People';
 import TodayIcon from '@mui/icons-material/Today';
 import { Box, Chip, Grid, Paper, Stack, Table, TableBody, TableCell, TableHead, TableRow, Typography } from '@mui/material';
-import { Fragment, ReactNode } from 'react';
+import { Fragment, ReactNode, useEffect, useState } from 'react';
+import { api } from '../../api/client';
 
 type ConsumptionRow = {
   className: string;
@@ -15,7 +16,7 @@ type ConsumptionRow = {
   dot: number;
 };
 
-const consumptionRows: ConsumptionRow[] = [
+const fallbackConsumptionRows: ConsumptionRow[] = [
   { className: 'Aminoglicosideos', antimicrobial: 'Amicacina', patients: 1, days: 4, totalDose: 4, ddd: 0.34, dot: 0.34 },
   { className: 'Aminoglicosideos', antimicrobial: 'Gentamicina', patients: 1, days: 8, totalDose: 12, ddd: 4.19, dot: 0.67 },
   { className: 'Anfotericina B', antimicrobial: 'Anfotericina B - Desoxicolato', patients: 2, days: 20, totalDose: 57, ddd: 0.16, dot: 0.27 },
@@ -41,7 +42,7 @@ const trendRows = [
   { month: 'FEV2022', cefepime: 3.24, imipenem: 2.98, meropenem: 1.14, polimixina: 0.76, vancomicina: 3.56 }
 ];
 
-const pathogenCards = [
+const fallbackPathogenCards = [
   { label: 'Enterobacterias produtoras de ESBL (%)', value: '31,2% (78)', rate: '2,98 /1.000 pts-dia' },
   { label: 'Enterobacterias produtoras de Carbapenemase (%)', value: '11,6% (29)', rate: '1,11 /1.000 pts-dia' },
   { label: 'Gram-negativos resistentes a polimixina/colistina (%)', value: '31,2% (78)', rate: '2,98 /1.000 pts-dia' },
@@ -62,9 +63,29 @@ const chartItems = [
 ];
 
 export default function EpidemiologyReports() {
+  const [consumptionRows, setConsumptionRows] = useState<ConsumptionRow[]>(fallbackConsumptionRows);
+  const [pathogenCards, setPathogenCards] = useState(fallbackPathogenCards);
+  const [summary, setSummary] = useState({ totalDays: 0, patientDays: 0, therapyDuration: 0 });
+
+  useEffect(() => {
+    api.get('/epidemiology/summary').then(({ data }) => {
+      if (data.consumptionRows?.length) {
+        setConsumptionRows(data.consumptionRows);
+      }
+      if (data.pathogenCards?.length) {
+        setPathogenCards(data.pathogenCards);
+      }
+      setSummary({
+        totalDays: Number(data.totalDays || 0),
+        patientDays: Number(data.patientDays || 0),
+        therapyDuration: Number(data.therapyDuration || 0)
+      });
+    });
+  }, []);
+
   const totalDays = consumptionRows.reduce((sum, row) => sum + row.days, 0);
-  const patientDays = 11929;
-  const therapyDuration = 33.95;
+  const patientDays = summary.patientDays;
+  const therapyDuration = summary.therapyDuration || (consumptionRows.length ? totalDays / consumptionRows.length : 0);
 
   return (
     <Stack spacing={3}>

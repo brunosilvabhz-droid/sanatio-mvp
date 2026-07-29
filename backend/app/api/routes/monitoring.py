@@ -1,5 +1,3 @@
-from datetime import datetime, timezone
-
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy import select
 from sqlalchemy.orm import Session, selectinload
@@ -12,10 +10,9 @@ from app.models.monitoring_run import MonitoringRun
 from app.models.monitoring_rule import MonitoringRule
 from app.models.setting import Setting
 from app.models.user import User
-from app.schemas.monitoring_run import MonitoringRunRead, MonitoringRunResult
+from app.schemas.monitoring_run import MonitoringRunRead
 from app.schemas.monitoring_rule import MonitoringRuleCreate, MonitoringRuleRead, MonitoringRuleUpdate
 from app.schemas.monitoring_schedule import MonitoringScheduleRead, MonitoringScheduleUpdate
-from app.services.monitoring_service import run_monitoring
 
 router = APIRouter(prefix="/monitoring", tags=["Monitoramento"])
 
@@ -171,39 +168,3 @@ def list_runs(db: Session = Depends(get_db), _: User = Depends(get_current_user)
     runs = [_run_to_read(run) for run in monitoring_runs]
     runs.extend(_integration_run_to_read(run, hospitals.get(run.hospital_integracao_id)) for run in integration_runs)
     return sorted(runs, key=lambda run: run.started_at, reverse=True)[:100]
-
-
-@router.post("/run", response_model=MonitoringRunResult)
-def run(db: Session = Depends(get_db), current_user: User = Depends(get_current_user)) -> MonitoringRunResult:
-    started_at = datetime.now(timezone.utc)
-    monitoring_run = MonitoringRun(triggered_by_user_id=current_user.id, status="RUNNING", started_at=started_at)
-    db.add(monitoring_run)
-    db.commit()
-    db.refresh(monitoring_run)
-    run_id = monitoring_run.id
-
-    try:
-        result = run_monitoring(db, monitoring_run_id=run_id)
-    except Exception as exc:
-        db.rollback()
-        finished_at = datetime.now(timezone.utc)
-        monitoring_run = db.get(MonitoringRun, run_id)
-        if monitoring_run:
-            monitoring_run.status = "FAILED"
-            monitoring_run.finished_at = finished_at
-            monitoring_run.duration_ms = int((finished_at - started_at).total_seconds() * 1000)
-            monitoring_run.error_message = str(exc)[:4000]
-            db.commit()
-        raise HTTPException(status_code=500, detail="Falha ao executar monitoramento") from exc
-
-    finished_at = datetime.now(timezone.utc)
-    monitoring_run = db.get(MonitoringRun, run_id)
-    if monitoring_run:
-        monitoring_run.status = "SUCCESS"
-        monitoring_run.patients_processed = int(result.get("patients_processed", 0))
-        monitoring_run.alerts_created = int(result.get("alerts_created", 0))
-        monitoring_run.finished_at = finished_at
-        monitoring_run.duration_ms = int((finished_at - started_at).total_seconds() * 1000)
-        db.commit()
-
-    return MonitoringRunResult(run_id=run_id, status="SUCCESS", **result)

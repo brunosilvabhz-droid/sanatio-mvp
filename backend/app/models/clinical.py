@@ -84,3 +84,76 @@ class MovimentacaoLeito(Base):
     leito_destino: Mapped[str | None] = mapped_column(String(120), nullable=True)
     data_hora_movimentacao: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, index=True)
     criado_em: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+
+
+class AntimicrobianoAtendimento(Base):
+    __tablename__ = "antimicrobianos_atendimento"
+    __table_args__ = (
+        UniqueConstraint("atendimento_id", "id_origem_prescricao", "id_origem_item_prescricao", name="uq_antimicrobiano_atendimento_prescricao_item"),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    atendimento_id: Mapped[int] = mapped_column(ForeignKey("atendimentos.id"), index=True, nullable=False)
+    id_origem_prescricao: Mapped[str] = mapped_column(String(60), nullable=False)
+    id_origem_item_prescricao: Mapped[str] = mapped_column(String(60), nullable=False)
+    id_origem_produto: Mapped[str | None] = mapped_column(String(60), nullable=True)
+    nome_antimicrobiano: Mapped[str] = mapped_column(String(255), index=True, nullable=False)
+    data_hora_inicio: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    data_hora_fim: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    ativo: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False, index=True)
+    dose: Mapped[str | None] = mapped_column(String(120), nullable=True)
+    via: Mapped[str | None] = mapped_column(String(80), nullable=True)
+    frequencia: Mapped[str | None] = mapped_column(String(120), nullable=True)
+    dias_uso: Mapped[int] = mapped_column(Integer, default=0, nullable=False, index=True)
+    atualizado_em: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False)
+
+
+class CulturaAtendimento(Base):
+    __tablename__ = "culturas_atendimento"
+    __table_args__ = (
+        UniqueConstraint("atendimento_id", "id_origem_pedido", "id_origem_exame", name="uq_cultura_atendimento_pedido_exame"),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    atendimento_id: Mapped[int] = mapped_column(ForeignKey("atendimentos.id"), index=True, nullable=False)
+    id_origem_pedido: Mapped[str] = mapped_column(String(60), nullable=False)
+    id_origem_exame: Mapped[str] = mapped_column(String(60), nullable=False)
+    exame: Mapped[str] = mapped_column(String(255), nullable=False)
+    material: Mapped[str | None] = mapped_column(String(160), nullable=True)
+    microorganismo: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    resultado: Mapped[str | None] = mapped_column(Text, nullable=True)
+    positivo: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False, index=True)
+    data_hora_coleta: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, index=True)
+    data_hora_resultado: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+
+
+class ProcedimentoInvasivoAtendimento(Base):
+    __tablename__ = "procedimentos_invasivos_atendimento"
+    __table_args__ = (
+        UniqueConstraint("atendimento_id", "id_origem_procedimento", "data_hora_inicio", name="uq_procedimento_invasivo_atendimento_origem_inicio"),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    atendimento_id: Mapped[int] = mapped_column(ForeignKey("atendimentos.id"), index=True, nullable=False)
+    id_origem_procedimento: Mapped[str] = mapped_column(String(60), nullable=False)
+    procedimento: Mapped[str] = mapped_column(String(255), nullable=False)
+    local_instalacao: Mapped[str | None] = mapped_column(String(160), nullable=True)
+    data_hora_inicio: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    data_hora_fim: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    ativo: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False, index=True)
+    dias_permanencia: Mapped[int] = mapped_column(Integer, default=0, nullable=False, index=True)
+
+
+class IsolamentoAtendimento(Base):
+    __tablename__ = "isolamentos_atendimento"
+    __table_args__ = (
+        UniqueConstraint("atendimento_id", "id_origem_isolamento", "data_hora_inicio", name="uq_isolamento_atendimento_origem_inicio"),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    atendimento_id: Mapped[int] = mapped_column(ForeignKey("atendimentos.id"), index=True, nullable=False)
+    id_origem_isolamento: Mapped[str] = mapped_column(String(60), nullable=False)
+    isolamento: Mapped[str] = mapped_column(String(255), nullable=False)
+    data_hora_inicio: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    data_hora_fim: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    ativo: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False, index=True)

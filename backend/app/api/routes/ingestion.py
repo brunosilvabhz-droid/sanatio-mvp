@@ -8,13 +8,24 @@ from sqlalchemy.orm import Session
 from app.api.deps import require_admin
 from app.core.database import get_db
 from app.models.alert import Alert
-from app.models.clinical import Atendimento, ExecucaoIntegracao, MovimentacaoLeito, Paciente, SnapshotAtendimento
+from app.models.clinical import (
+    AntimicrobianoAtendimento,
+    Atendimento,
+    CulturaAtendimento,
+    ExecucaoIntegracao,
+    IsolamentoAtendimento,
+    MovimentacaoLeito,
+    Paciente,
+    ProcedimentoInvasivoAtendimento,
+    SnapshotAtendimento,
+)
 from app.models.hospital_integration import HospitalIntegration
 from app.models.monitoring_run import MonitoringRun
 from app.models.patient_bed_movement import PatientBedMovement
 from app.models.patient_monitoring_snapshot import PatientMonitoringSnapshot
 from app.models.setting import Setting
 from app.schemas.hospital_integration import HospitalIntegrationCreate, HospitalIntegrationRead, IngestPayload
+from app.services import antimicrobial_audit_service
 
 router = APIRouter(tags=["Integracao hospitalar"])
 
@@ -82,6 +93,21 @@ def _upsert_attendance(db: Session, item) -> Atendimento:
     attendance.data_hora_saida = item.discharged_at
     db.flush()
     return attendance
+
+
+def _attendance_for_detail(db: Session, cd_paciente: str, cd_atendimento: str) -> Atendimento:
+    attendance = db.scalar(select(Atendimento).where(Atendimento.id_origem_atendimento == cd_atendimento))
+    if attendance:
+        return attendance
+    patient = _get_or_create_patient(db, cd_paciente)
+    attendance = Atendimento(paciente_id=patient.id, id_origem_atendimento=cd_atendimento, ativo=True)
+    db.add(attendance)
+    db.flush()
+    return attendance
+
+
+def _is_active(value: str | None) -> bool:
+    return str(value or "").upper() == "S"
 
 
 @router.post("/ingest/snapshots")
@@ -203,6 +229,114 @@ def ingest_snapshots(
         db.add(PatientBedMovement(**movement.model_dump()))
         created_movements += 1
 
+    antimicrobials_by_patient: dict[str, list[dict]] = {}
+    for item in payload.antimicrobials:
+        attendance = _attendance_for_detail(db, item.cd_paciente, item.cd_atendimento)
+        antimicrobial = db.scalar(
+            select(AntimicrobianoAtendimento).where(
+                AntimicrobianoAtendimento.atendimento_id == attendance.id,
+                AntimicrobianoAtendimento.id_origem_prescricao == item.cd_prescricao,
+                AntimicrobianoAtendimento.id_origem_item_prescricao == item.cd_item_prescricao,
+            )
+        )
+        if not antimicrobial:
+            antimicrobial = AntimicrobianoAtendimento(
+                atendimento_id=attendance.id,
+                id_origem_prescricao=item.cd_prescricao,
+                id_origem_item_prescricao=item.cd_item_prescricao,
+            )
+            db.add(antimicrobial)
+        antimicrobial.id_origem_produto = item.cd_produto
+        antimicrobial.nome_antimicrobiano = item.ds_antimicrobiano
+        antimicrobial.data_hora_inicio = item.dt_inicio
+        antimicrobial.data_hora_fim = item.dt_fim
+        antimicrobial.ativo = _is_active(item.sn_ativo)
+        antimicrobial.dose = item.ds_dose
+        antimicrobial.via = item.ds_via
+        antimicrobial.frequencia = item.ds_frequencia
+        antimicrobial.dias_uso = item.dias_uso
+        antimicrobials_by_patient.setdefault(item.cd_atendimento, []).append(
+            {
+                "cd_prescricao": item.cd_prescricao,
+                "cd_item_prescricao": item.cd_item_prescricao,
+                "cd_produto": item.cd_produto,
+                "ds_antimicrobiano": item.ds_antimicrobiano,
+                "dt_inicio": item.dt_inicio,
+                "dt_fim": item.dt_fim,
+                "sn_ativo": item.sn_ativo,
+                "ds_dose": item.ds_dose,
+                "ds_via": item.ds_via,
+                "ds_frequencia": item.ds_frequencia,
+                "dias_uso": item.dias_uso,
+            }
+        )
+
+    for item in payload.cultures:
+        attendance = _attendance_for_detail(db, item.cd_paciente, item.cd_atendimento)
+        culture = db.scalar(
+            select(CulturaAtendimento).where(
+                CulturaAtendimento.atendimento_id == attendance.id,
+                CulturaAtendimento.id_origem_pedido == item.cd_pedido,
+                CulturaAtendimento.id_origem_exame == item.cd_exame,
+            )
+        )
+        if not culture:
+            culture = CulturaAtendimento(atendimento_id=attendance.id, id_origem_pedido=item.cd_pedido, id_origem_exame=item.cd_exame)
+            db.add(culture)
+        culture.exame = item.ds_exame
+        culture.material = item.ds_material
+        culture.microorganismo = item.ds_microorganismo
+        culture.resultado = item.ds_resultado
+        culture.positivo = _is_active(item.sn_positivo)
+        culture.data_hora_coleta = item.dt_coleta
+        culture.data_hora_resultado = item.dt_resultado
+
+    for item in payload.invasive_procedures:
+        attendance = _attendance_for_detail(db, item.cd_paciente, item.cd_atendimento)
+        procedure = db.scalar(
+            select(ProcedimentoInvasivoAtendimento).where(
+                ProcedimentoInvasivoAtendimento.atendimento_id == attendance.id,
+                ProcedimentoInvasivoAtendimento.id_origem_procedimento == item.cd_procedimento,
+                ProcedimentoInvasivoAtendimento.data_hora_inicio == item.dt_inicio,
+            )
+        )
+        if not procedure:
+            procedure = ProcedimentoInvasivoAtendimento(
+                atendimento_id=attendance.id,
+                id_origem_procedimento=item.cd_procedimento,
+                data_hora_inicio=item.dt_inicio,
+            )
+            db.add(procedure)
+        procedure.procedimento = item.ds_procedimento
+        procedure.local_instalacao = item.ds_local_instalacao
+        procedure.data_hora_fim = item.dt_fim
+        procedure.ativo = _is_active(item.sn_ativo)
+        procedure.dias_permanencia = item.dias_permanencia
+
+    for item in payload.isolations:
+        attendance = _attendance_for_detail(db, item.cd_paciente, item.cd_atendimento)
+        isolation = db.scalar(
+            select(IsolamentoAtendimento).where(
+                IsolamentoAtendimento.atendimento_id == attendance.id,
+                IsolamentoAtendimento.id_origem_isolamento == item.cd_isolamento,
+                IsolamentoAtendimento.data_hora_inicio == item.dt_inicio,
+            )
+        )
+        if not isolation:
+            isolation = IsolamentoAtendimento(
+                atendimento_id=attendance.id,
+                id_origem_isolamento=item.cd_isolamento,
+                data_hora_inicio=item.dt_inicio,
+            )
+            db.add(isolation)
+        isolation.isolamento = item.ds_isolamento
+        isolation.data_hora_fim = item.dt_fim
+        isolation.ativo = _is_active(item.sn_ativo)
+
+    for item in payload.patients:
+        patient_payload = {"cd_atendimento": item.cd_atendimento, "cd_paciente": item.cd_paciente, "ds_unidade": item.unit}
+        antimicrobial_audit_service.sync_for_patient(db, patient_payload, antimicrobials_by_patient.get(item.cd_atendimento, []), monitoring_run.id)
+
     finished_at = datetime.now(timezone.utc)
     monitoring_run.status = "SUCCESS"
     monitoring_run.patients_processed = len(payload.patients)
@@ -222,5 +356,9 @@ def ingest_snapshots(
         "integration_run_id": integration_run.id,
         "snapshots_received": len(payload.patients),
         "bed_movements_received": created_movements,
+        "antimicrobials_received": len(payload.antimicrobials),
+        "cultures_received": len(payload.cultures),
+        "invasive_procedures_received": len(payload.invasive_procedures),
+        "isolations_received": len(payload.isolations),
         "alerts_created": created_alerts,
     }

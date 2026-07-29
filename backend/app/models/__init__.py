@@ -1,6 +1,16 @@
 from app.models.antimicrobial_audit import AntimicrobialAudit, AntimicrobialAuditAction
 from app.models.alert import Alert, AlertAction
-from app.models.clinical import Atendimento, ExecucaoIntegracao, MovimentacaoLeito, Paciente, SnapshotAtendimento
+from app.models.clinical import (
+    AntimicrobianoAtendimento,
+    Atendimento,
+    CulturaAtendimento,
+    ExecucaoIntegracao,
+    IsolamentoAtendimento,
+    MovimentacaoLeito,
+    Paciente,
+    ProcedimentoInvasivoAtendimento,
+    SnapshotAtendimento,
+)
 from app.models.hospital_integration import HospitalIntegration
 from app.models.intervention import InterventionRecipient, InterventionRequest
 from app.models.monitoring_run import MonitoringRun
@@ -16,18 +26,22 @@ __all__ = [
     "AlertAction",
     "AntimicrobialAudit",
     "AntimicrobialAuditAction",
+    "AntimicrobianoAtendimento",
     "Atendimento",
+    "CulturaAtendimento",
     "ExecucaoIntegracao",
     "HospitalIntegration",
     "InterventionRecipient",
     "InterventionRequest",
     "MonitoringRun",
     "MonitoringRule",
+    "IsolamentoAtendimento",
     "MovimentacaoLeito",
     "Paciente",
     "PatientMonitoringSnapshot",
     "PatientBedMovement",
     "PatientTimelineNote",
+    "ProcedimentoInvasivoAtendimento",
     "Role",
     "Setting",
     "SnapshotAtendimento",
