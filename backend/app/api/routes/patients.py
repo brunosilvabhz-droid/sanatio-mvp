@@ -5,7 +5,6 @@ from sqlalchemy import func, select
 from sqlalchemy.orm import Session, selectinload
 
 from app.api.deps import get_current_user
-from app.core.config import settings
 from app.core.database import get_db
 from app.models.alert import Alert, AlertAction
 from app.models.antimicrobial_audit import AntimicrobialAudit, AntimicrobialAuditAction
@@ -18,24 +17,12 @@ from app.models.user import User
 from app.schemas.alert import AlertRead
 from app.schemas.intervention import PatientTimelineNoteCreate, TimelineEventRead
 from app.schemas.patient import Antimicrobial, Culture, InvasiveProcedure, Isolation, Patient, PatientDetail
-from app.services import monitoring_service, soulmv_adapter
 
 router = APIRouter(prefix="/patients", tags=["Pacientes"])
 
 
 def _contains(value: str, needle: str | None) -> bool:
     return not needle or needle.lower() in str(value).lower()
-
-
-def _can_return_patient_name(user: User) -> bool:
-    return settings.expose_patient_names_in_api and user.can_view_patient_name
-
-
-def _patients_for_user(user: User) -> list[dict]:
-    patients = soulmv_adapter.get_patients_internal()
-    if _can_return_patient_name(user):
-        return patients
-    return [{**patient, "nm_paciente": None} for patient in patients]
 
 
 def _latest_snapshots(db: Session) -> list[PatientMonitoringSnapshot]:
@@ -157,14 +144,14 @@ def list_patients(
     convenio: str | None = None,
     status_risco: str | None = Query(default=None),
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    _: User = Depends(get_current_user),
 ) -> list[dict]:
     clinical_snapshots = _latest_clinical_snapshots(db)
     if clinical_snapshots:
         patients = [_clinical_snapshot_to_patient(snapshot) for snapshot in clinical_snapshots]
     else:
         snapshots = _latest_snapshots(db)
-        patients = [_snapshot_to_patient(snapshot) for snapshot in snapshots] if snapshots else [monitoring_service.patient_with_risk(p) for p in _patients_for_user(current_user)]
+        patients = [_snapshot_to_patient(snapshot) for snapshot in snapshots] if snapshots else []
     return [
         p
         for p in patients
@@ -179,7 +166,7 @@ def list_patients(
 
 
 @router.get("/{cd_atendimento}", response_model=PatientDetail)
-def get_patient(cd_atendimento: str, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)) -> dict:
+def get_patient(cd_atendimento: str, db: Session = Depends(get_db), _: User = Depends(get_current_user)) -> dict:
     clinical_snapshot = db.scalar(
         select(SnapshotAtendimento)
         .join(SnapshotAtendimento.atendimento)
@@ -209,17 +196,7 @@ def get_patient(cd_atendimento: str, db: Session = Depends(get_db), current_user
             "isolations": [],
         }
 
-    patient = next((p for p in _patients_for_user(current_user) if str(p["cd_atendimento"]) == str(cd_atendimento)), None)
-    if not patient:
-        raise HTTPException(status_code=404, detail="Paciente não encontrado")
-    enriched = monitoring_service.patient_with_risk(patient)
-    return {
-        "patient": enriched,
-        "antimicrobials": soulmv_adapter.get_antimicrobials(cd_atendimento),
-        "cultures": soulmv_adapter.get_cultures(cd_atendimento),
-        "invasive_procedures": soulmv_adapter.get_invasive_procedures(cd_atendimento),
-        "isolations": soulmv_adapter.get_isolations(cd_atendimento),
-    }
+    raise HTTPException(status_code=404, detail="Paciente nao encontrado")
 
 
 @router.get("/{cd_paciente}/history")
@@ -297,22 +274,22 @@ def patient_history(cd_paciente: str, db: Session = Depends(get_db), _: User = D
 
 @router.get("/{cd_atendimento}/antimicrobials", response_model=list[Antimicrobial])
 def antimicrobials(cd_atendimento: str, _: User = Depends(get_current_user)) -> list[dict]:
-    return soulmv_adapter.get_antimicrobials(cd_atendimento)
+    return []
 
 
 @router.get("/{cd_atendimento}/cultures", response_model=list[Culture])
 def cultures(cd_atendimento: str, _: User = Depends(get_current_user)) -> list[dict]:
-    return soulmv_adapter.get_cultures(cd_atendimento)
+    return []
 
 
 @router.get("/{cd_atendimento}/invasive-procedures", response_model=list[InvasiveProcedure])
 def invasive_procedures(cd_atendimento: str, _: User = Depends(get_current_user)) -> list[dict]:
-    return soulmv_adapter.get_invasive_procedures(cd_atendimento)
+    return []
 
 
 @router.get("/{cd_atendimento}/isolations", response_model=list[Isolation])
 def isolations(cd_atendimento: str, _: User = Depends(get_current_user)) -> list[dict]:
-    return soulmv_adapter.get_isolations(cd_atendimento)
+    return []
 
 
 @router.get("/{cd_atendimento}/alerts", response_model=list[AlertRead])

@@ -31,12 +31,6 @@ RULES = [
 ]
 
 SETTINGS = [
-    ("oracle.connection.mode", "env", "Conexão Oracle configurada por variáveis de ambiente"),
-    ("soulmv.view.patients", "VW_SANATIO_PACIENTES_INTERNADOS", "View de pacientes internados"),
-    ("soulmv.view.antimicrobials", "VW_SANATIO_ANTIMICROBIANOS", "View de antimicrobianos"),
-    ("soulmv.view.cultures", "VW_SANATIO_CULTURAS", "View de culturas"),
-    ("soulmv.view.invasive_procedures", "VW_SANATIO_PROCEDIMENTOS_INVASIVOS", "View de procedimentos invasivos"),
-    ("soulmv.view.isolations", "VW_SANATIO_ISOLAMENTOS", "View de isolamentos"),
     ("general.institution_name", "Hospital Demonstração", "Nome da instituição"),
     ("monitoring.schedule.enabled", "false", "Ativa a execucao automatica do monitoramento"),
     ("monitoring.schedule.interval_minutes", "60", "Intervalo entre execucoes automaticas em minutos"),
