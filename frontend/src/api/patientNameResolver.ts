@@ -3,7 +3,6 @@ const resolverUrl = import.meta.env.VITE_PATIENT_NAME_RESOLVER_URL as string | u
 type ResolverResponse = {
   name?: string;
   nm_paciente?: string;
-  patient_name?: string;
 };
 
 export async function resolvePatientName(cdPaciente: string, cdAtendimento?: string): Promise<string | null> {
@@ -19,7 +18,7 @@ export async function resolvePatientName(cdPaciente: string, cdAtendimento?: str
     const response = await fetch(url.toString(), { method: 'GET', mode: 'cors' });
     if (!response.ok) return null;
     const data = (await response.json()) as ResolverResponse;
-    return data.name || data.nm_paciente || data.patient_name || null;
+    return data.name || data.nm_paciente || null;
   } catch {
     return null;
   }

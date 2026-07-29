@@ -125,7 +125,7 @@ export default function Alerts() {
             {sortedAlerts.map((alert) => (
               <TableRow key={alert.id} hover>
                 <TableCell>
-                  <PatientName cdPaciente={alert.cd_paciente} cdAtendimento={alert.cd_atendimento} fallbackName={alert.patient_name} dense />
+                  <PatientName cdPaciente={alert.cd_paciente} cdAtendimento={alert.cd_atendimento} dense />
                 </TableCell>
                 <TableCell>{alert.cd_atendimento}</TableCell>
                 <TableCell>{alert.unit}</TableCell>

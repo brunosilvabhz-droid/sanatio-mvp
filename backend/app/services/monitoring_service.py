@@ -131,7 +131,6 @@ def run_monitoring(db: Session, monitoring_run_id: int | None = None) -> dict:
                 {
                     "cd_atendimento": str(patient["cd_atendimento"]),
                     "cd_paciente": str(patient["cd_paciente"]),
-                    "patient_name": None,
                     "unit": patient["ds_unidade"],
                     "rule_id": rule.id,
                     "alert_type": rule.rule_type,

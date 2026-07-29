@@ -141,7 +141,7 @@ export default function AlertAudit() {
                   <Chip size="small" label={row.action} />
                 </TableCell>
                 <TableCell>
-                  <PatientName cdPaciente={row.cd_paciente} cdAtendimento={row.cd_atendimento} fallbackName={row.patient_name} dense />
+                  <PatientName cdPaciente={row.cd_paciente} cdAtendimento={row.cd_atendimento} dense />
                 </TableCell>
                 <TableCell>{row.cd_atendimento}</TableCell>
                 <TableCell>{row.alert_title}</TableCell>

@@ -72,7 +72,6 @@ export type Alert = {
   id: number;
   cd_atendimento: string;
   cd_paciente: string;
-  patient_name?: string;
   unit?: string;
   alert_type: string;
   severity: string;
@@ -89,7 +88,6 @@ export type AlertActionReport = {
   alert_id: number;
   cd_atendimento: string;
   cd_paciente: string;
-  patient_name?: string;
   unit?: string;
   alert_title: string;
   alert_status: string;

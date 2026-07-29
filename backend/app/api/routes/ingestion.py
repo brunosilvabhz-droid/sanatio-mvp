@@ -152,7 +152,6 @@ def ingest_snapshots(
             Alert(
                 cd_atendimento=item.cd_atendimento,
                 cd_paciente=item.cd_paciente,
-                patient_name=None,
                 unit=item.unit,
                 rule_id=None,
                 alert_type="INGESTED_RISK",

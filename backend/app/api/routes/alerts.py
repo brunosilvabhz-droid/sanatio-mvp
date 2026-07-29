@@ -50,7 +50,6 @@ def _alert_actions_report_rows(
             "alert_id": alert.id,
             "cd_atendimento": alert.cd_atendimento,
             "cd_paciente": alert.cd_paciente,
-            "patient_name": alert.patient_name,
             "unit": alert.unit,
             "alert_title": alert.title,
             "alert_status": alert.status,
