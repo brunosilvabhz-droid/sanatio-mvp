@@ -40,7 +40,7 @@ def upgrade() -> None:
         op.execute(
             f"""
             INSERT INTO monitoring_rules (name, description, rule_type, parameter_key, parameter_value, severity, active)
-            SELECT '{name}', '{name}', '{rule_type}', '{parameter_key}', '{parameter_value}', '{severity}', 1
+            SELECT '{name}', '{name}', '{rule_type}', '{parameter_key}', '{parameter_value}', '{severity}', true
             WHERE NOT EXISTS (SELECT 1 FROM monitoring_rules WHERE rule_type = '{rule_type}')
             """
         )
