@@ -6,6 +6,8 @@ from sqlalchemy.orm import Session, selectinload
 
 from app.api.deps import get_current_user
 from app.core.database import get_db
+from app.models.clinical import ExecucaoIntegracao
+from app.models.hospital_integration import HospitalIntegration
 from app.models.monitoring_run import MonitoringRun
 from app.models.monitoring_rule import MonitoringRule
 from app.models.setting import Setting
@@ -28,6 +30,8 @@ SCHEDULE_SETTINGS = {
 def _run_to_read(run: MonitoringRun) -> MonitoringRunRead:
     user = run.triggered_by
     return MonitoringRunRead(
+        source_key=f"monitoring-{run.id}",
+        source_type="Monitoramento manual",
         id=run.id,
         triggered_by_user_id=run.triggered_by_user_id,
         triggered_by_name=user.full_name if user else None,
@@ -39,6 +43,27 @@ def _run_to_read(run: MonitoringRun) -> MonitoringRunRead:
         error_message=run.error_message,
         started_at=run.started_at,
         finished_at=run.finished_at,
+    )
+
+
+def _integration_run_to_read(run: ExecucaoIntegracao, hospital_name: str | None) -> MonitoringRunRead:
+    duration_ms = None
+    if run.data_hora_fim:
+        duration_ms = int((run.data_hora_fim - run.data_hora_inicio).total_seconds() * 1000)
+    return MonitoringRunRead(
+        source_key=f"integration-{run.id}",
+        source_type="Integracao hospitalar",
+        id=run.id,
+        triggered_by_user_id=None,
+        triggered_by_name=hospital_name or "Hospital",
+        triggered_by_email=None,
+        status=run.status,
+        patients_processed=run.total_snapshots_recebidos,
+        alerts_created=run.total_alertas_gerados,
+        duration_ms=duration_ms,
+        error_message=run.mensagem_erro,
+        started_at=run.data_hora_inicio,
+        finished_at=run.data_hora_fim,
     )
 
 
@@ -129,13 +154,23 @@ def update_schedule(
 
 @router.get("/runs", response_model=list[MonitoringRunRead])
 def list_runs(db: Session = Depends(get_db), _: User = Depends(get_current_user)) -> list[MonitoringRunRead]:
-    runs = db.scalars(
+    monitoring_runs = db.scalars(
         select(MonitoringRun)
         .options(selectinload(MonitoringRun.triggered_by))
         .order_by(MonitoringRun.started_at.desc())
         .limit(100)
-    )
-    return [_run_to_read(run) for run in runs]
+    ).all()
+    integration_runs = db.scalars(select(ExecucaoIntegracao).order_by(ExecucaoIntegracao.data_hora_inicio.desc()).limit(100)).all()
+    hospital_ids = {run.hospital_integracao_id for run in integration_runs if run.hospital_integracao_id}
+    hospitals = {}
+    if hospital_ids:
+        hospitals = {
+            hospital.id: hospital.hospital_name
+            for hospital in db.scalars(select(HospitalIntegration).where(HospitalIntegration.id.in_(hospital_ids))).all()
+        }
+    runs = [_run_to_read(run) for run in monitoring_runs]
+    runs.extend(_integration_run_to_read(run, hospitals.get(run.hospital_integracao_id)) for run in integration_runs)
+    return sorted(runs, key=lambda run: run.started_at, reverse=True)[:100]
 
 
 @router.post("/run", response_model=MonitoringRunResult)

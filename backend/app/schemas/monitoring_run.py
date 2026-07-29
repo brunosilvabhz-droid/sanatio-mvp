@@ -4,6 +4,8 @@ from pydantic import BaseModel
 
 
 class MonitoringRunRead(BaseModel):
+    source_key: str | None = None
+    source_type: str | None = None
     id: int
     triggered_by_user_id: int | None
     triggered_by_name: str | None

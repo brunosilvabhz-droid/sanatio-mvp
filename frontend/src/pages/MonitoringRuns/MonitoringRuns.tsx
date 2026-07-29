@@ -18,8 +18,11 @@ import { MonitoringRun } from '../../types';
 
 const statusColor = {
   SUCCESS: 'success',
+  SUCESSO: 'success',
   FAILED: 'error',
-  RUNNING: 'warning'
+  ERRO: 'error',
+  RUNNING: 'warning',
+  EM_EXECUCAO: 'warning'
 } as const;
 
 export default function MonitoringRuns() {
@@ -55,7 +58,8 @@ export default function MonitoringRuns() {
               <TableCell>Início</TableCell>
               <TableCell>Fim</TableCell>
               <TableCell>Status</TableCell>
-              <TableCell>Usuário</TableCell>
+              <TableCell>Origem</TableCell>
+              <TableCell>Responsável</TableCell>
               <TableCell align="right">Pacientes</TableCell>
               <TableCell align="right">Alertas</TableCell>
               <TableCell align="right">Duração</TableCell>
@@ -64,12 +68,13 @@ export default function MonitoringRuns() {
           </TableHead>
           <TableBody>
             {runs.map((run) => (
-              <TableRow key={run.id} hover>
+              <TableRow key={run.source_key || run.id} hover>
                 <TableCell>{new Date(run.started_at).toLocaleString()}</TableCell>
                 <TableCell>{run.finished_at ? new Date(run.finished_at).toLocaleString() : '-'}</TableCell>
                 <TableCell>
                   <Chip size="small" label={run.status} color={statusColor[run.status as keyof typeof statusColor] || 'default'} />
                 </TableCell>
+                <TableCell>{run.source_type || 'Monitoramento'}</TableCell>
                 <TableCell>
                   <Stack spacing={0.25}>
                     <Typography variant="body2">{run.triggered_by_name || 'Sistema'}</Typography>

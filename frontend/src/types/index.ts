@@ -146,6 +146,8 @@ export type MonitoringRule = {
 };
 
 export type MonitoringRun = {
+  source_key?: string;
+  source_type?: string;
   id: number;
   triggered_by_user_id?: number;
   triggered_by_name?: string;
