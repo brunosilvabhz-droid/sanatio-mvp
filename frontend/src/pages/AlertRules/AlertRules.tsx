@@ -28,14 +28,29 @@ type Setting = { key: string; value?: string; description?: string };
 
 const thresholdKeys = [
   {
-    key: 'alerts.threshold.antimicrobial_days',
-    label: 'Dias de antimicrobiano',
-    helper: 'Gera alerta quando o uso ativo atingir este limite.'
+    key: 'alerts.threshold.same_antimicrobial_days',
+    label: 'Mesmo antimicrobiano',
+    helper: 'Alerta 1: dias de uso continuo do mesmo antimicrobiano/principio ativo.'
+  },
+  {
+    key: 'alerts.threshold.antimicrobial_exposure_days',
+    label: 'Exposicao antimicrobiana',
+    helper: 'Alerta 2: dias consecutivos recebendo qualquer antimicrobiano, mesmo com troca de esquema.'
+  },
+  {
+    key: 'alerts.threshold.antimicrobial_scheme_changes_count',
+    label: 'Qtd. trocas de esquema',
+    helper: 'Alerta 3: quantidade minima de alteracoes de esquema dentro da janela configurada.'
+  },
+  {
+    key: 'alerts.threshold.antimicrobial_scheme_changes_window_days',
+    label: 'Janela para trocas',
+    helper: 'Alerta 3: numero de dias avaliados para identificar trocas frequentes de esquema.'
   },
   {
     key: 'alerts.threshold.hospital_stay_days',
-    label: 'Dias de internação',
-    helper: 'Gera alerta para paciente internado por longa permanência.'
+    label: 'Dias de internacao',
+    helper: 'Gera alerta para paciente internado por longa permanencia.'
   },
   {
     key: 'alerts.threshold.invasive_device_days',
@@ -46,16 +61,20 @@ const thresholdKeys = [
 
 const signalOptions = [
   { key: 'positive_culture', label: 'Cultura positiva', field: 'has_positive_culture', description: 'Prioriza atendimento com cultura positiva.' },
-  { key: 'antimicrobial_gt7', label: 'Antimicrobiano prolongado', field: 'max_antimicrobial_days', description: 'Prioriza uso de antimicrobiano acima do limite configurado.' },
-  { key: 'long_stay', label: 'Internação prolongada', field: 'days_in_hospital', description: 'Prioriza pacientes com longa permanência.' },
-  { key: 'invasive_gt7', label: 'Procedimento invasivo prolongado', field: 'max_invasive_device_days', description: 'Prioriza dispositivo invasivo por período prolongado.' },
+  { key: 'same_antimicrobial_prolonged', label: 'Mesmo antimicrobiano prolongado', field: 'max_antimicrobial_days', description: 'Alerta 1: mesmo antimicrobiano/principio ativo em uso continuo acima do limite.' },
+  { key: 'antimicrobial_exposure_prolonged', label: 'Exposicao antimicrobiana prolongada', field: 'antimicrobial_exposure_days', description: 'Alerta 2: algum antimicrobiano por dias consecutivos, mesmo com troca de esquema.' },
+  { key: 'frequent_antimicrobial_changes', label: 'Trocas frequentes de esquema', field: 'antimicrobial_scheme_changes', description: 'Alerta 3: alteracoes frequentes de esquema antimicrobiano na janela configurada.' },
+  { key: 'long_stay', label: 'Internacao prolongada', field: 'days_in_hospital', description: 'Prioriza pacientes com longa permanencia.' },
+  { key: 'invasive_gt7', label: 'Procedimento invasivo prolongado', field: 'max_invasive_device_days', description: 'Prioriza dispositivo invasivo por periodo prolongado.' },
   { key: 'active_isolation', label: 'Isolamento ativo', field: 'has_active_isolation', description: 'Prioriza pacientes em isolamento.' },
   { key: 'high_risk', label: 'Risco alto calculado', field: 'risk_status', description: 'Prioriza pacientes ja classificados como alto risco.' }
 ];
 
 const simpleRuleTypes: Record<string, { rule_type: string; parameter_key: string; parameter_value: string }> = {
   positive_culture: { rule_type: 'POSITIVE_CULTURE', parameter_key: 'has_positive_culture', parameter_value: 'true' },
-  antimicrobial_gt7: { rule_type: 'ANTIMICROBIAL_DAYS', parameter_key: 'max_antimicrobial_days', parameter_value: '7' },
+  same_antimicrobial_prolonged: { rule_type: 'ANTIMICROBIAL_SAME_PROLONGED', parameter_key: 'same_antimicrobial_days', parameter_value: '7' },
+  antimicrobial_exposure_prolonged: { rule_type: 'ANTIMICROBIAL_EXPOSURE_PROLONGED', parameter_key: 'antimicrobial_exposure_days', parameter_value: '14' },
+  frequent_antimicrobial_changes: { rule_type: 'ANTIMICROBIAL_FREQUENT_SCHEME_CHANGES', parameter_key: 'scheme_changes_in_window', parameter_value: '3/7' },
   long_stay: { rule_type: 'LONG_STAY', parameter_key: 'days_in_hospital', parameter_value: '10' },
   invasive_gt7: { rule_type: 'INVASIVE_DEVICE_DAYS', parameter_key: 'max_invasive_device_days', parameter_value: '7' },
   active_isolation: { rule_type: 'ACTIVE_ISOLATION', parameter_key: 'has_active_isolation', parameter_value: 'true' },
@@ -71,7 +90,7 @@ export default function AlertRules() {
     description: '',
     severity: 'MEDIA',
     matchMode: 'all',
-    selectedSignals: ['positive_culture', 'antimicrobial_gt7']
+    selectedSignals: ['positive_culture', 'same_antimicrobial_prolonged']
   });
 
   const selectedFields = useMemo(
@@ -98,7 +117,7 @@ export default function AlertRules() {
 
   async function createRule() {
     if (!form.name.trim() || !form.selectedSignals.length) {
-      setMessage('Informe um nome e selecione ao menos um critério.');
+      setMessage('Informe um nome e selecione ao menos um criterio.');
       return;
     }
 
@@ -115,7 +134,7 @@ export default function AlertRules() {
         }
       : {
           name: form.name,
-          description: form.description || `Combina critérios para priorização SCIH: ${selectedFields.join(', ')}.`,
+          description: form.description || `Combina criterios para priorizacao SCIH: ${selectedFields.join(', ')}.`,
           rule_type: 'COMPOSITE',
           parameter_key: form.matchMode,
           parameter_value: JSON.stringify(form.selectedSignals),
@@ -124,8 +143,8 @@ export default function AlertRules() {
         };
 
     await api.post('/monitoring/rules', payload);
-    setMessage('Regra de priorização criada.');
-    setForm({ name: '', description: '', severity: 'MEDIA', matchMode: 'all', selectedSignals: ['positive_culture', 'antimicrobial_gt7'] });
+    setMessage('Regra de priorizacao criada.');
+    setForm({ name: '', description: '', severity: 'MEDIA', matchMode: 'all', selectedSignals: ['positive_culture', 'same_antimicrobial_prolonged'] });
     await load();
   }
 
@@ -143,7 +162,7 @@ export default function AlertRules() {
   return (
     <Stack spacing={2}>
       <Box>
-        <Typography variant="h4" fontWeight={700}>Configuração de alertas</Typography>
+        <Typography variant="h4" fontWeight={700}>Configuracao de alertas</Typography>
         <Typography color="text.secondary">Uso do SCIH para criar regras que priorizam pacientes nas filas de monitoramento.</Typography>
       </Box>
 
@@ -152,8 +171,8 @@ export default function AlertRules() {
       <Paper sx={{ p: 2.5 }}>
         <Stack spacing={2}>
           <Box>
-            <Typography variant="h6" fontWeight={700}>Parâmetros de disparo</Typography>
-            <Typography color="text.secondary">Limites assistenciais usados para priorizar pacientes e gerar alertas recebidos do hospital.</Typography>
+            <Typography variant="h6" fontWeight={700}>Parametros de disparo</Typography>
+            <Typography color="text.secondary">Limites assistenciais usados para subdividir alertas de antimicrobianos e priorizar pacientes.</Typography>
           </Box>
           <Grid container spacing={2}>
             {thresholdKeys.map((threshold) => {
@@ -191,7 +210,7 @@ export default function AlertRules() {
         <Grid item xs={12} lg={5}>
           <Paper sx={{ p: 2.5 }}>
             <Stack spacing={2}>
-              <Typography variant="h6" fontWeight={700}>Nova regra de priorização</Typography>
+              <Typography variant="h6" fontWeight={700}>Nova regra de priorizacao</Typography>
               <TextField label="Nome da regra" value={form.name} onChange={(event) => setForm({ ...form, name: event.target.value })} fullWidth />
               <TextField label="Descricao" value={form.description} onChange={(event) => setForm({ ...form, description: event.target.value })} multiline minRows={2} fullWidth />
               <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1.5}>
@@ -200,8 +219,8 @@ export default function AlertRules() {
                   <MenuItem value="ALTA">ALTA</MenuItem>
                 </TextField>
                 <TextField select label="Combinacao" value={form.matchMode} onChange={(event) => setForm({ ...form, matchMode: event.target.value })} fullWidth disabled={form.selectedSignals.length <= 1}>
-                  <MenuItem value="all">Todos os critérios</MenuItem>
-                  <MenuItem value="any">Qualquer critério</MenuItem>
+                  <MenuItem value="all">Todos os criterios</MenuItem>
+                  <MenuItem value="any">Qualquer criterio</MenuItem>
                 </TextField>
               </Stack>
               <Stack spacing={1}>

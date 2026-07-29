@@ -7,9 +7,9 @@ from app.models.setting import Setting
 from app.models.user import Role, User
 
 ROLES = [
-    ("ADMIN", "Administração do sistema"),
-    ("SCIH", "Serviço de Controle de Infecção Hospitalar"),
-    ("FARMACIA", "Farmácia clínica"),
+    ("ADMIN", "Administracao do sistema"),
+    ("SCIH", "Servico de Controle de Infeccao Hospitalar"),
+    ("FARMACIA", "Farmacia clinica"),
     ("DIRETORIA", "Diretoria"),
     ("MEDICO", "Medico assistente"),
     ("INFECTO", "Infectologista"),
@@ -18,20 +18,28 @@ ROLES = [
 USERS = [
     ("admin@sanatio.local", "Administrador SANATIO", "ADMIN", True),
     ("scih@sanatio.local", "Equipe SCIH", "SCIH", True),
-    ("farmacia@sanatio.local", "Farmácia", "FARMACIA", False),
+    ("farmacia@sanatio.local", "Farmacia", "FARMACIA", False),
 ]
 
 RULES = [
-    ("Antimicrobiano ativo por mais de 7 dias", "ANTIMICROBIAL_DAYS", "max_antimicrobial_days", "7", "MEDIA"),
+    ("Mesmo antimicrobiano prolongado", "ANTIMICROBIAL_SAME_PROLONGED", "same_antimicrobial_days", "7", "MEDIA"),
+    ("Exposicao antimicrobiana prolongada", "ANTIMICROBIAL_EXPOSURE_PROLONGED", "antimicrobial_exposure_days", "14", "ALTA"),
+    ("Trocas frequentes de esquema antimicrobiano", "ANTIMICROBIAL_FREQUENT_SCHEME_CHANGES", "scheme_changes_in_window", "3/7", "ALTA"),
     ("Cultura positiva", "POSITIVE_CULTURE", "has_positive_culture", "true", "ALTA"),
     ("Procedimento invasivo ativo por mais de 7 dias", "INVASIVE_DEVICE_DAYS", "max_invasive_device_days", "7", "MEDIA"),
-    ("Paciente internado há mais de 10 dias", "LONG_STAY", "days_in_hospital", "10", "MEDIA"),
+    ("Paciente internado ha mais de 10 dias", "LONG_STAY", "days_in_hospital", "10", "MEDIA"),
     ("Isolamento ativo", "ACTIVE_ISOLATION", "has_active_isolation", "true", "ALTA"),
-    ("Cultura positiva com antimicrobiano prolongado", "COMPOSITE", "all", '["positive_culture","antimicrobial_gt7"]', "ALTA"),
+    ("Cultura positiva com mesmo antimicrobiano prolongado", "COMPOSITE", "all", '["positive_culture","same_antimicrobial_prolonged"]', "ALTA"),
 ]
 
 SETTINGS = [
-    ("general.institution_name", "Hospital Demonstração", "Nome da instituição"),
+    ("general.institution_name", "Hospital Demonstracao", "Nome da instituicao"),
+    ("alerts.threshold.same_antimicrobial_days", "7", "Dias de uso continuo do mesmo antimicrobiano/principio ativo para gerar alerta"),
+    ("alerts.threshold.antimicrobial_exposure_days", "14", "Dias consecutivos com algum antimicrobiano para gerar alerta"),
+    ("alerts.threshold.antimicrobial_scheme_changes_count", "3", "Quantidade de alteracoes de esquema antimicrobiano para gerar alerta"),
+    ("alerts.threshold.antimicrobial_scheme_changes_window_days", "7", "Janela em dias para avaliar trocas frequentes de esquema"),
+    ("alerts.threshold.invasive_device_days", "7", "Dias de procedimento invasivo ativo para gerar alerta"),
+    ("alerts.threshold.hospital_stay_days", "10", "Dias de internacao para gerar alerta"),
     ("monitoring.schedule.enabled", "false", "Ativa a execucao automatica do monitoramento"),
     ("monitoring.schedule.interval_minutes", "60", "Intervalo entre execucoes automaticas em minutos"),
     ("monitoring.schedule.daily_time", "07:00", "Horario preferencial de execucao diaria"),

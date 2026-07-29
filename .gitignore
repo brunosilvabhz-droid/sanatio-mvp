@@ -1,6 +1,8 @@
 .env
 .venv/
+**/.venv/
 __pycache__/
+**/__pycache__/
 *.py[cod]
 node_modules/
 dist/
@@ -9,3 +11,6 @@ backend/*.db
 backend/.tmp/
 .pytest_cache/
 .mypy_cache/
+outputs/
+work/
+soulmv_integrator/config.hml.json

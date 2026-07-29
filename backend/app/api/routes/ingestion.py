@@ -1,5 +1,6 @@
 import secrets
-from datetime import datetime, timezone
+from collections import defaultdict
+from datetime import date, datetime, timedelta, timezone
 
 from fastapi import APIRouter, Depends, Header, HTTPException
 from sqlalchemy import select
@@ -110,6 +111,159 @@ def _is_active(value: str | None) -> bool:
     return str(value or "").upper() == "S"
 
 
+def _antimicrobial_key(item) -> str:
+    return str(item.ds_principio_ativo or item.ds_antimicrobiano or "Antimicrobiano nao identificado").strip()
+
+
+def _days_between(start: datetime | None, end: datetime | None = None) -> int:
+    if not start:
+        return 0
+    final = end or datetime.now(timezone.utc)
+    return max((final.date() - start.date()).days, 0)
+
+
+def _current_exposure_days(items: list, reference_date: date) -> int:
+    exposed_days: set[date] = set()
+    for item in items:
+        start = item.dt_inicio.date()
+        end = (item.dt_fim.date() if item.dt_fim else reference_date)
+        if end < start:
+            continue
+        cursor = start
+        while cursor <= min(end, reference_date):
+            exposed_days.add(cursor)
+            cursor += timedelta(days=1)
+
+    total = 0
+    cursor = reference_date
+    while cursor in exposed_days:
+        total += 1
+        cursor -= timedelta(days=1)
+    return total
+
+
+def _scheme_change_events(items: list, reference_date: date, window_days: int) -> list[str]:
+    window_start = reference_date - timedelta(days=window_days - 1)
+    events: dict[date, set[str]] = defaultdict(set)
+    for item in items:
+        antimicrobial = _antimicrobial_key(item)
+        start = item.dt_inicio.date()
+        if window_start <= start <= reference_date:
+            events[start].add(f"inicio de {antimicrobial}")
+        if item.dt_fim:
+            end = item.dt_fim.date()
+            if window_start <= end <= reference_date:
+                events[end].add(f"suspensao de {antimicrobial}")
+    return [f"{day.strftime('%d/%m')}: {', '.join(sorted(changes))}" for day, changes in sorted(events.items())]
+
+
+def _create_ingested_alert(
+    db: Session,
+    *,
+    item,
+    alert_type: str,
+    title: str,
+    description: str,
+    recommendation: str,
+    severity: str = "ALTA",
+) -> bool:
+    existing = db.scalar(
+        select(Alert).where(
+            Alert.cd_atendimento == item.cd_atendimento,
+            Alert.alert_type == alert_type,
+            Alert.status.in_(["ABERTO", "EM_ANALISE"]),
+            Alert.source == "client_ingestion",
+        )
+    )
+    if existing:
+        return False
+    db.add(
+        Alert(
+            cd_atendimento=item.cd_atendimento,
+            cd_paciente=item.cd_paciente,
+            unit=item.unit,
+            rule_id=None,
+            alert_type=alert_type,
+            severity=severity,
+            title=title,
+            description=description,
+            recommendation=recommendation,
+            status="ABERTO",
+            source="client_ingestion",
+        )
+    )
+    return True
+
+
+def _create_antimicrobial_alerts(
+    db: Session,
+    *,
+    item,
+    antimicrobials: list,
+    same_antimicrobial_days: int,
+    exposure_days: int,
+    scheme_changes_count: int,
+    scheme_changes_window_days: int,
+    reference_date: date,
+) -> int:
+    created = 0
+    active_antimicrobials = [antimicrobial for antimicrobial in antimicrobials if _is_active(antimicrobial.sn_ativo) and not antimicrobial.dt_fim]
+
+    prolonged_by_key: dict[str, int] = {}
+    for antimicrobial in active_antimicrobials:
+        key = _antimicrobial_key(antimicrobial)
+        days = antimicrobial.dias_uso or _days_between(antimicrobial.dt_inicio, antimicrobial.dt_fim)
+        prolonged_by_key[key] = max(prolonged_by_key.get(key, 0), days)
+
+    prolonged = {name: days for name, days in prolonged_by_key.items() if days >= same_antimicrobial_days}
+    if prolonged:
+        details = "; ".join(f"{name} em uso continuo ha {days} dias" for name, days in sorted(prolonged.items()))
+        if _create_ingested_alert(
+            db,
+            item=item,
+            alert_type="ANTIMICROBIAL_SAME_PROLONGED",
+            title="Alerta 1 - Mesmo antimicrobiano prolongado",
+            description=f"{details}. Calculo por prescricao/principio ativo.",
+            recommendation="Avaliar necessidade de manter, descalonar, suspender ou justificar a continuidade do mesmo antimicrobiano.",
+            severity="MEDIA",
+        ):
+            created += 1
+
+    current_exposure_days = _current_exposure_days(antimicrobials, reference_date)
+    if current_exposure_days >= exposure_days:
+        if _create_ingested_alert(
+            db,
+            item=item,
+            alert_type="ANTIMICROBIAL_EXPOSURE_PROLONGED",
+            title="Alerta 2 - Exposicao antimicrobiana prolongada",
+            description=(
+                f"Paciente recebendo algum antimicrobiano ha {current_exposure_days} dias consecutivos, "
+                "mesmo com alteracoes de esquema. Calculo por dia de internacao com ao menos um antimicrobiano administrado."
+            ),
+            recommendation="Revisar exposicao global, indicacao atual, cultura, possibilidade de descalonamento e data prevista de termino.",
+            severity="ALTA",
+        ):
+            created += 1
+
+    scheme_events = _scheme_change_events(antimicrobials, reference_date, scheme_changes_window_days)
+    if len(scheme_events) >= scheme_changes_count:
+        if _create_ingested_alert(
+            db,
+            item=item,
+            alert_type="ANTIMICROBIAL_FREQUENT_SCHEME_CHANGES",
+            title="Alerta 3 - Trocas frequentes de esquema",
+            description=(
+                f"Paciente teve {len(scheme_events)} alteracoes de esquema antimicrobiano em {scheme_changes_window_days} dias. "
+                f"Eventos considerados: {'; '.join(scheme_events)}."
+            ),
+            recommendation="Reavaliar hipotese infecciosa, resultados microbiologicos, foco infeccioso e estabilidade do plano terapeutico.",
+            severity="ALTA",
+        ):
+            created += 1
+
+    return created
+
+
 @router.post("/ingest/snapshots")
 def ingest_snapshots(
     payload: IngestPayload,
@@ -121,6 +275,10 @@ def ingest_snapshots(
         raise HTTPException(status_code=401, detail="Token hospitalar invalido")
 
     antimicrobial_days = _threshold(db, "alerts.threshold.antimicrobial_days", 7)
+    same_antimicrobial_days = _threshold(db, "alerts.threshold.same_antimicrobial_days", antimicrobial_days)
+    antimicrobial_exposure_days = _threshold(db, "alerts.threshold.antimicrobial_exposure_days", 14)
+    antimicrobial_scheme_changes_count = _threshold(db, "alerts.threshold.antimicrobial_scheme_changes_count", 3)
+    antimicrobial_scheme_changes_window_days = _threshold(db, "alerts.threshold.antimicrobial_scheme_changes_window_days", 7)
     invasive_device_days = _threshold(db, "alerts.threshold.invasive_device_days", 7)
     hospital_stay_days = _threshold(db, "alerts.threshold.hospital_stay_days", 10)
 
@@ -136,6 +294,10 @@ def ingest_snapshots(
     db.flush()
 
     created_alerts = 0
+    antimicrobials_by_attendance = defaultdict(list)
+    for antimicrobial in payload.antimicrobials:
+        antimicrobials_by_attendance[antimicrobial.cd_atendimento].append(antimicrobial)
+
     for item in payload.patients:
         attendance = _upsert_attendance(db, item)
         db.add(
@@ -157,17 +319,26 @@ def ingest_snapshots(
             reasons.append("risco alto")
         if item.has_positive_culture:
             reasons.append("cultura positiva")
-        if item.max_antimicrobial_days >= antimicrobial_days:
-            reasons.append(f"antimicrobiano por {item.max_antimicrobial_days} dias")
         if item.max_invasive_device_days >= invasive_device_days:
             reasons.append(f"procedimento invasivo por {item.max_invasive_device_days} dias")
         if item.days_in_hospital >= hospital_stay_days:
             reasons.append(f"{item.days_in_hospital} dias de internacao")
+        created_alerts += _create_antimicrobial_alerts(
+            db,
+            item=item,
+            antimicrobials=antimicrobials_by_attendance.get(item.cd_atendimento, []),
+            same_antimicrobial_days=same_antimicrobial_days,
+            exposure_days=antimicrobial_exposure_days,
+            scheme_changes_count=antimicrobial_scheme_changes_count,
+            scheme_changes_window_days=antimicrobial_scheme_changes_window_days,
+            reference_date=started_at.date(),
+        )
         if not reasons:
             continue
         existing = db.scalar(
             select(Alert).where(
                 Alert.cd_atendimento == item.cd_atendimento,
+                Alert.alert_type == "INGESTED_RISK",
                 Alert.status.in_(["ABERTO", "EM_ANALISE"]),
                 Alert.source == "client_ingestion",
             )
@@ -261,6 +432,7 @@ def ingest_snapshots(
                 "cd_item_prescricao": item.cd_item_prescricao,
                 "cd_produto": item.cd_produto,
                 "ds_antimicrobiano": item.ds_antimicrobiano,
+                "ds_principio_ativo": item.ds_principio_ativo,
                 "dt_inicio": item.dt_inicio,
                 "dt_fim": item.dt_fim,
                 "sn_ativo": item.sn_ativo,

@@ -44,6 +44,7 @@ CREATE TABLE soulmv_mock.mv_antimicrobianos (
     cd_item_prescricao VARCHAR(60) NOT NULL,
     cd_produto VARCHAR(60) NOT NULL,
     ds_antimicrobiano VARCHAR(180) NOT NULL,
+    ds_principio_ativo VARCHAR(180) NULL,
     dt_inicio TIMESTAMP NOT NULL,
     dt_fim TIMESTAMP NULL,
     sn_ativo VARCHAR(1) NOT NULL DEFAULT 'S',
@@ -122,19 +123,22 @@ INSERT INTO soulmv_mock.mv_movimentacoes_leito (
 ('900012', 'P0012', CURRENT_TIMESTAMP - INTERVAL '18 days', 'Clinica Medica', 'Leito 216', 'UTI Adulto', 'Leito 108');
 
 INSERT INTO soulmv_mock.mv_antimicrobianos (
-    cd_atendimento, cd_paciente, cd_prescricao, cd_item_prescricao, cd_produto, ds_antimicrobiano,
+    cd_atendimento, cd_paciente, cd_prescricao, cd_item_prescricao, cd_produto, ds_antimicrobiano, ds_principio_ativo,
     dt_inicio, dt_fim, sn_ativo, ds_dose, ds_via, ds_frequencia
 ) VALUES
-('900001', 'P0001', 'PR001', 'IT001', 'ATB001', 'Meropenem', CURRENT_TIMESTAMP - INTERVAL '9 days', NULL, 'S', '1g', 'EV', '8/8h'),
-('900001', 'P0001', 'PR001', 'IT002', 'ATB002', 'Vancomicina', CURRENT_TIMESTAMP - INTERVAL '4 days', NULL, 'S', '1g', 'EV', '12/12h'),
-('900002', 'P0002', 'PR002', 'IT001', 'ATB003', 'Ceftriaxona', CURRENT_TIMESTAMP - INTERVAL '3 days', NULL, 'S', '2g', 'EV', '24/24h'),
-('900003', 'P0003', 'PR003', 'IT001', 'ATB004', 'Piperacilina/Tazobactam', CURRENT_TIMESTAMP - INTERVAL '8 days', NULL, 'S', '4,5g', 'EV', '6/6h'),
-('900005', 'P0005', 'PR005', 'IT001', 'ATB001', 'Meropenem', CURRENT_TIMESTAMP - INTERVAL '13 days', NULL, 'S', '1g', 'EV', '8/8h'),
-('900006', 'P0006', 'PR006', 'IT001', 'ATB005', 'Cefepime', CURRENT_TIMESTAMP - INTERVAL '6 days', NULL, 'S', '2g', 'EV', '8/8h'),
-('900007', 'P0007', 'PR007', 'IT001', 'ATB002', 'Vancomicina', CURRENT_TIMESTAMP - INTERVAL '10 days', NULL, 'S', '1g', 'EV', '12/12h'),
-('900009', 'P0009', 'PR009', 'IT001', 'ATB006', 'Polimixina B', CURRENT_TIMESTAMP - INTERVAL '7 days', NULL, 'S', '750.000 UI', 'EV', '12/12h'),
-('900010', 'P0010', 'PR010', 'IT001', 'ATB007', 'Clindamicina', CURRENT_TIMESTAMP - INTERVAL '5 days', NULL, 'S', '600mg', 'EV', '8/8h'),
-('900012', 'P0012', 'PR012', 'IT001', 'ATB001', 'Meropenem', CURRENT_TIMESTAMP - INTERVAL '15 days', NULL, 'S', '1g', 'EV', '8/8h');
+('900001', 'P0001', 'PR001', 'IT001', 'ATB001', 'Meropenem', 'Meropenem', CURRENT_TIMESTAMP - INTERVAL '9 days', NULL, 'S', '1g', 'EV', '8/8h'),
+('900001', 'P0001', 'PR001', 'IT002', 'ATB002', 'Vancomicina', 'Vancomicina', CURRENT_TIMESTAMP - INTERVAL '4 days', NULL, 'S', '1g', 'EV', '12/12h'),
+('900002', 'P0002', 'PR002', 'IT001', 'ATB003', 'Ceftriaxona', 'Ceftriaxona', CURRENT_TIMESTAMP - INTERVAL '3 days', NULL, 'S', '2g', 'EV', '24/24h'),
+('900003', 'P0003', 'PR003', 'IT001', 'ATB004', 'Piperacilina/Tazobactam', 'Piperacilina/Tazobactam', CURRENT_TIMESTAMP - INTERVAL '8 days', NULL, 'S', '4,5g', 'EV', '6/6h'),
+('900005', 'P0005', 'PR005', 'IT001', 'ATB001', 'Meropenem', 'Meropenem', CURRENT_TIMESTAMP - INTERVAL '13 days', NULL, 'S', '1g', 'EV', '8/8h'),
+('900006', 'P0006', 'PR006', 'IT001', 'ATB005', 'Cefepime', 'Cefepime', CURRENT_TIMESTAMP - INTERVAL '6 days', NULL, 'S', '2g', 'EV', '8/8h'),
+('900007', 'P0007', 'PR007', 'IT001', 'ATB002', 'Vancomicina', 'Vancomicina', CURRENT_TIMESTAMP - INTERVAL '10 days', NULL, 'S', '1g', 'EV', '12/12h'),
+('900009', 'P0009', 'PR009', 'IT001', 'ATB006', 'Polimixina B', 'Polimixina B', CURRENT_TIMESTAMP - INTERVAL '7 days', NULL, 'S', '750.000 UI', 'EV', '12/12h'),
+('900010', 'P0010', 'PR010', 'IT001', 'ATB007', 'Clindamicina', 'Clindamicina', CURRENT_TIMESTAMP - INTERVAL '5 days', NULL, 'S', '600mg', 'EV', '8/8h'),
+('900012', 'P0012', 'PR012', 'IT001', 'ATB001', 'Meropenem', 'Meropenem', CURRENT_TIMESTAMP - INTERVAL '15 days', NULL, 'S', '1g', 'EV', '8/8h'),
+('900012', 'P0012', 'PR012', 'IT002', 'ATB003', 'Ceftriaxona', 'Ceftriaxona', CURRENT_TIMESTAMP - INTERVAL '6 days', CURRENT_TIMESTAMP - INTERVAL '4 days', 'N', '2g', 'EV', '24/24h'),
+('900012', 'P0012', 'PR012', 'IT003', 'ATB005', 'Cefepime', 'Cefepime', CURRENT_TIMESTAMP - INTERVAL '4 days', CURRENT_TIMESTAMP - INTERVAL '2 days', 'N', '2g', 'EV', '8/8h'),
+('900012', 'P0012', 'PR012', 'IT004', 'ATB002', 'Vancomicina', 'Vancomicina', CURRENT_TIMESTAMP - INTERVAL '2 days', NULL, 'S', '1g', 'EV', '12/12h');
 
 INSERT INTO soulmv_mock.mv_culturas (
     cd_atendimento, cd_paciente, cd_pedido, cd_exame, ds_exame, dt_coleta, dt_resultado,

@@ -1,0 +1,28 @@
+{
+  "database": {
+    "engine": "oracle",
+    "dsn": "usuario/senha@host:1521/service_name"
+  },
+  "sanatio": {
+    "ingest_url": "https://sanatio.seu-dominio.com.br/ingest/snapshots",
+    "token": "COLE_AQUI_O_TOKEN_DO_HOSPITAL"
+  },
+  "views": {
+    "patients": "VW_SANATIO_PACIENTES_ATENDIMENTOS",
+    "bed_movements": "VW_SANATIO_MOVIMENTACOES_LEITO",
+    "antimicrobials": "VW_SANATIO_ANTIMICROBIANOS",
+    "cultures": "VW_SANATIO_CULTURAS",
+    "invasive_procedures": "VW_SANATIO_PROCEDIMENTOS_INVASIVOS",
+    "isolations": "VW_SANATIO_ISOLAMENTOS"
+  },
+  "risk_thresholds": {
+    "antimicrobial_days_high": 7,
+    "antimicrobial_days_medium": 4,
+    "antimicrobial_exposure_days_high": 14,
+    "antimicrobial_scheme_changes_count": 3,
+    "antimicrobial_scheme_changes_window_days": 7,
+    "hospital_stay_days_high": 10,
+    "hospital_stay_days_medium": 7,
+    "invasive_device_days_high": 7
+  }
+}

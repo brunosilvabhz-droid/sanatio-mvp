@@ -51,6 +51,7 @@ class IngestAntimicrobial(BaseModel):
     cd_item_prescricao: str
     cd_produto: str | None = None
     ds_antimicrobiano: str
+    ds_principio_ativo: str | None = None
     dt_inicio: datetime
     dt_fim: datetime | None = None
     sn_ativo: str = "S"
