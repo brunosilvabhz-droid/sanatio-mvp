@@ -86,7 +86,28 @@ export default function PatientDetail() {
       setSelectedAttendance(requestedAttendance || firstAttendance);
       if (!firstAttendance) setDetail(null);
     } catch {
-      setLoadError('Nao foi possivel carregar o detalhe do paciente.');
+      try {
+        const { data } = await api.get(`/patients/${cdAtendimento}`);
+        setHistory({
+          cd_paciente: data.patient.cd_paciente,
+          attendances: [{
+            patient: data.patient,
+            summary: {
+              alerts: 0,
+              open_alerts: 0,
+              interventions: 0,
+              antimicrobial_audits: 0,
+              invasive_procedures: data.invasive_procedures?.length || 0,
+              antimicrobials: data.antimicrobials?.length || 0,
+              bed_movements: 0
+            }
+          }]
+        });
+        setSelectedAttendance(data.patient.cd_atendimento);
+        setDetail(data);
+      } catch {
+        setLoadError('Nao foi possivel carregar o detalhe do paciente.');
+      }
     }
   }
 
