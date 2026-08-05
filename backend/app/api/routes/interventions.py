@@ -7,6 +7,7 @@ from sqlalchemy import case, func, select
 from sqlalchemy.orm import Session, selectinload
 
 from app.api.deps import get_current_user
+from app.core.config import settings
 from app.core.database import get_db
 from app.models.alert import AlertAction
 from app.models.antimicrobial_audit import AntimicrobialAuditAction
@@ -18,6 +19,7 @@ from app.schemas.intervention import (
     InterventionResponseUpdate,
     RecipientRead,
 )
+from app.services.email_service import send_email
 
 router = APIRouter(tags=["Intervencoes"])
 
@@ -52,6 +54,53 @@ def _intervention_to_read(item: InterventionRequest) -> InterventionRead:
             }
             for recipient in item.recipients
         ],
+    )
+
+
+def _intervention_url(intervention_id: int) -> str:
+    if not settings.app_public_url:
+        return "Acesse a tela de Intervencoes no SANATIO."
+    return f"{settings.app_public_url.rstrip('/')}/interventions?intervention={intervention_id}"
+
+
+def _send_intervention_email(item: InterventionRequest, recipients: list[User], requester: User) -> bool:
+    body = (
+        "Uma intervencao foi solicitada no SANATIO.\n\n"
+        f"Intervencao: #{item.id}\n"
+        f"Paciente ID: {item.cd_paciente}\n"
+        f"Atendimento ID: {item.cd_atendimento}\n"
+        f"Solicitante: {requester.full_name}\n\n"
+        f"Motivo do alerta:\n{item.reason}\n\n"
+        f"Mensagem do SCIH:\n{item.message}\n\n"
+        "Por seguranca, o nome do paciente nao e enviado por e-mail.\n"
+        "Acesse o SANATIO para aceitar ou recusar a intervencao e registrar a justificativa.\n\n"
+        f"Link: {_intervention_url(item.id)}"
+    )
+    return send_email(
+        to=[user.email for user in recipients],
+        subject=f"[SANATIO] Intervencao #{item.id} - Atendimento {item.cd_atendimento}",
+        body=body,
+    )
+
+
+def _send_intervention_response_email(item: InterventionRequest, responder: User) -> bool:
+    if not item.requested_by:
+        return False
+    body = (
+        "Uma intervencao solicitada no SANATIO recebeu resposta.\n\n"
+        f"Intervencao: #{item.id}\n"
+        f"Paciente ID: {item.cd_paciente}\n"
+        f"Atendimento ID: {item.cd_atendimento}\n"
+        f"Respondido por: {responder.full_name}\n"
+        f"Resposta: {item.response}\n\n"
+        f"Justificativa:\n{item.response_justification}\n\n"
+        "Por seguranca, o nome do paciente nao e enviado por e-mail.\n\n"
+        f"Link: {_intervention_url(item.id)}"
+    )
+    return send_email(
+        to=[item.requested_by.email],
+        subject=f"[SANATIO] Intervencao #{item.id} respondida - {item.response}",
+        body=body,
     )
 
 
@@ -116,8 +165,11 @@ def create_intervention(
     )
     db.add(item)
     db.flush()
+    recipient_rows = []
     for user in recipients:
-        db.add(InterventionRecipient(intervention_id=item.id, user_id=user.id, email=user.email, status="ENVIADO"))
+        recipient = InterventionRecipient(intervention_id=item.id, user_id=user.id, email=user.email, status="ENVIADO")
+        recipient_rows.append(recipient)
+        db.add(recipient)
 
     if payload.source_type == "ALERT" and payload.source_id:
         db.add(AlertAction(alert_id=payload.source_id, user_id=current_user.id, action="INTERVENTION_SENT", comment=payload.message))
@@ -131,6 +183,10 @@ def create_intervention(
                 comment=payload.message,
             )
         )
+    email_sent = _send_intervention_email(item, recipients, current_user)
+    if not email_sent:
+        for recipient in recipient_rows:
+            recipient.status = "EMAIL_NAO_ENVIADO"
     db.commit()
     item = db.scalar(
         select(InterventionRequest)
@@ -180,6 +236,7 @@ def respond_intervention(
         )
         .where(InterventionRequest.id == intervention_id)
     )
+    _send_intervention_response_email(item, current_user)
     return _intervention_to_read(item)
 
 

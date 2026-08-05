@@ -19,6 +19,7 @@ services:
     build: ./backend
     environment:
       DATABASE_URL: postgresql+psycopg://sanatio:sanatio@postgres:5432/sanatio
+      APP_PUBLIC_URL: ${APP_PUBLIC_URL:-http://192.168.18.175:5173}
       SECRET_KEY: change-me-in-production
       ACCESS_TOKEN_EXPIRE_MINUTES: 720
       USE_MOCK_SOULMV: "true"

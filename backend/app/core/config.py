@@ -8,6 +8,7 @@ class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 
     app_name: str = "SANATIO"
+    app_public_url: str = ""
     database_url: str = "postgresql+psycopg://sanatio:sanatio@localhost:5432/sanatio"
     secret_key: str = "change-me"
     algorithm: str = "HS256"
