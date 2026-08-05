@@ -119,7 +119,7 @@ View sugerida: `VW_SANATIO_ANTIMICROBIANOS`
 
 Objetivo: listar antimicrobianos prescritos/administrados por atendimento para auditoria, alertas e relatórios.
 
-Granularidade: uma linha por item de prescrição antimicrobiana.
+Granularidade: preferencialmente uma linha por aplicação/administração antimicrobiana. Se o hospital só conseguir retornar uma linha por item de prescrição, `dt_aplicacao` deve receber a data/hora inicial ou a melhor data de administração disponível.
 
 | Alias | Obrigatório | Tipo esperado | Descrição |
 | --- | --- | --- | --- |
@@ -129,7 +129,9 @@ Granularidade: uma linha por item de prescrição antimicrobiana.
 | `cd_item_prescricao` | Sim | texto/número | Identificador do item da prescrição. |
 | `cd_produto` | Não | texto/número | Código do produto/medicamento. |
 | `ds_antimicrobiano` | Sim | texto | Nome do antimicrobiano. |
+| `ds_principio_ativo` | Sim | texto | Princípio ativo usado pelo SANATIO para agrupar o mesmo antimicrobiano. |
 | `dt_inicio` | Sim | timestamp | Início do uso. |
+| `dt_aplicacao` | Sim | timestamp | Data/hora da aplicação/administração do antimicrobiano. Campo usado para calcular dias de exposição. |
 | `dt_fim` | Não | timestamp | Fim do uso. Nulo quando ativo. |
 | `sn_ativo` | Sim | texto | `S` para ativo, `N` para encerrado. |
 | `ds_dose` | Não | texto | Dose prescrita. Ex.: `1g`, `600mg`. |
@@ -143,18 +145,12 @@ Regra recomendada para `dias_uso`:
 GREATEST(TRUNC(NVL(dt_fim, SYSDATE)) - TRUNC(dt_inicio), 0) AS dias_uso
 ```
 
-Campo recomendado adicional para `VW_SANATIO_ANTIMICROBIANOS`:
-
-| Alias | Obrigatorio | Tipo esperado | Descricao |
-| --- | --- | --- | --- |
-| `ds_principio_ativo` | Recomendado | texto | Principio ativo usado para agrupar o mesmo antimicrobiano. Se nao vier, o SANATIO usa `ds_antimicrobiano`. |
-
 Alertas derivados desta view:
 
 | Alerta | Como o SANATIO calcula |
 | --- | --- |
-| Alerta 1 - Mesmo antimicrobiano prolongado | Mesmo `ds_principio_ativo` ou `ds_antimicrobiano` ativo por mais dias que o parametro configurado, inicialmente 7 dias. |
-| Alerta 2 - Exposicao antimicrobiana prolongada | Dias consecutivos do atendimento em que houve ao menos um antimicrobiano administrado/prescrito, mesmo com troca de esquema, inicialmente 14 dias. |
+| Alerta 1 - Mesmo antimicrobiano prolongado | Mesmo `ds_principio_ativo` ativo por mais dias que o parametro configurado, inicialmente 7 dias. |
+| Alerta 2 - Exposicao antimicrobiana prolongada | Dias consecutivos do atendimento em que houve ao menos uma aplicação/administração antimicrobiana, mesmo com troca de esquema, inicialmente 14 dias. |
 | Alerta 3 - Trocas frequentes de esquema | Quantidade de alteracoes de inicio/fim de antimicrobianos dentro da janela configurada, inicialmente 3 alteracoes em 7 dias. |
 
 Para os Alertas 2 e 3 funcionarem bem, a view deve retornar tambem antimicrobianos encerrados recentes, nao apenas os ativos.
@@ -252,9 +248,9 @@ SELECT
 FROM paciente p;
 ```
 
-## 8. Snapshot de Risco Enviado ao SANATIO
+## 8. Dados de Atendimento Enviados ao SANATIO e Snapshot Calculado
 
-O integrador calcula um snapshot por atendimento combinando as views acima.
+O integrador envia os dados de atendimento e os blocos detalhados das views. O SANATIO persiste esses dados e calcula internamente o snapshot de risco de cada atendimento.
 
 Campos enviados no bloco `patients` da API:
 
@@ -267,12 +263,17 @@ Campos enviados no bloco `patients` da API:
 | `active` | `dt_alta IS NULL` |
 | `admitted_at` | `dt_atendimento` |
 | `discharged_at` | `dt_alta` |
-| `risk_status` | Calculado pelo integrador. Valores: `baixo`, `medio`, `alto`. |
-| `days_in_hospital` | Dias desde admissão. |
-| `has_positive_culture` | Existe cultura com `sn_positivo = 'S'`. |
-| `max_antimicrobial_days` | Maior `dias_uso` de antimicrobiano ativo. |
-| `max_invasive_device_days` | Maior `dias_permanencia` de procedimento invasivo ativo. |
-| `has_active_isolation` | Existe isolamento com `sn_ativo = 'S'` e sem fim. |
+
+Campos calculados e gravados pelo SANATIO em `snapshots_atendimento`:
+
+| Campo calculado | Origem do cálculo |
+| --- | --- |
+| `risk_status` | Calculado no SANATIO. Valores: `baixo`, `medio`, `alto`. |
+| `days_in_hospital` | Diferença entre `admitted_at`/`discharged_at` e a data da ingestão. |
+| `has_positive_culture` | Dados detalhados de `VW_SANATIO_CULTURAS`. |
+| `max_antimicrobial_days` | Dados detalhados de `VW_SANATIO_ANTIMICROBIANOS`. |
+| `max_invasive_device_days` | Dados detalhados de `VW_SANATIO_PROCEDIMENTOS_INVASIVOS`. |
+| `has_active_isolation` | Dados detalhados de `VW_SANATIO_ISOLAMENTOS`. |
 
 Regra inicial de risco usada no MVP:
 

@@ -140,7 +140,16 @@ def query_specs(views: dict[str, str]) -> list[QuerySpec]:
         ),
         QuerySpec(
             key="antimicrobials",
-            required_columns=("cd_atendimento", "cd_paciente", "cd_prescricao", "cd_item_prescricao", "ds_antimicrobiano", "dt_inicio"),
+            required_columns=(
+                "cd_atendimento",
+                "cd_paciente",
+                "cd_prescricao",
+                "cd_item_prescricao",
+                "ds_antimicrobiano",
+                "ds_principio_ativo",
+                "dt_inicio",
+                "dt_aplicacao",
+            ),
             sql=f"""
                 SELECT *
                 FROM {antimicrobials}
@@ -271,7 +280,6 @@ def calculate_risk(patient: dict[str, Any], rows: dict[str, list[dict[str, Any]]
 def build_payload(rows: dict[str, list[dict[str, Any]]], thresholds: dict[str, int]) -> dict[str, Any]:
     patients = []
     for row in rows["patients"]:
-        risk = calculate_risk(row, rows, thresholds)
         patients.append(
             {
                 "cd_atendimento": str(row["cd_atendimento"]),
@@ -281,7 +289,6 @@ def build_payload(rows: dict[str, list[dict[str, Any]]], thresholds: dict[str, i
                 "active": row.get("dt_alta") is None,
                 "admitted_at": iso(row.get("dt_atendimento")),
                 "discharged_at": iso(row.get("dt_alta")),
-                **risk,
             }
         )
 
@@ -309,6 +316,7 @@ def build_payload(rows: dict[str, list[dict[str, Any]]], thresholds: dict[str, i
                 "ds_antimicrobiano": row["ds_antimicrobiano"],
                 "ds_principio_ativo": row.get("ds_principio_ativo"),
                 "dt_inicio": iso(row["dt_inicio"]),
+                "dt_aplicacao": iso(row["dt_aplicacao"]),
                 "dt_fim": iso(row.get("dt_fim")),
                 "sn_ativo": "S" if parse_bool(row.get("sn_ativo", "S")) else "N",
                 "ds_frequencia": row.get("ds_frequencia"),

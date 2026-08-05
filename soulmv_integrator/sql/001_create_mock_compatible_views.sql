@@ -37,6 +37,7 @@ SELECT
     ds_antimicrobiano,
     ds_antimicrobiano AS ds_principio_ativo,
     dt_inicio,
+    COALESCE(dt_aplicacao, dt_inicio) AS dt_aplicacao,
     dt_fim,
     sn_ativo,
     ds_dose,

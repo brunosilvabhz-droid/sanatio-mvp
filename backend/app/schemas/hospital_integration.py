@@ -26,7 +26,7 @@ class IngestPatientSnapshot(BaseModel):
     active: bool = True
     admitted_at: datetime | None = None
     discharged_at: datetime | None = None
-    risk_status: str
+    risk_status: str = "baixo"
     days_in_hospital: int = 0
     has_positive_culture: bool = False
     max_antimicrobial_days: int = 0
@@ -51,8 +51,9 @@ class IngestAntimicrobial(BaseModel):
     cd_item_prescricao: str
     cd_produto: str | None = None
     ds_antimicrobiano: str
-    ds_principio_ativo: str | None = None
+    ds_principio_ativo: str
     dt_inicio: datetime
+    dt_aplicacao: datetime
     dt_fim: datetime | None = None
     sn_ativo: str = "S"
     ds_frequencia: str | None = None

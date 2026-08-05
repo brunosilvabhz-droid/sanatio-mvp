@@ -33,7 +33,9 @@ class Antimicrobial(BaseModel):
     cd_item_prescricao: str
     cd_produto: str
     ds_antimicrobiano: str
+    ds_principio_ativo: str
     dt_inicio: datetime
+    dt_aplicacao: datetime | None = None
     dt_fim: datetime | None = None
     sn_ativo: str
     ds_frequencia: str

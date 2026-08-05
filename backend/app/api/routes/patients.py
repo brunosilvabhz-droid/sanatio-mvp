@@ -150,7 +150,9 @@ def _antimicrobial_to_read(item: AntimicrobianoAtendimento, attendance: Atendime
         "cd_item_prescricao": item.id_origem_item_prescricao,
         "cd_produto": item.id_origem_produto or "",
         "ds_antimicrobiano": item.nome_antimicrobiano,
+        "ds_principio_ativo": item.principio_ativo or item.nome_antimicrobiano,
         "dt_inicio": item.data_hora_inicio,
+        "dt_aplicacao": item.data_hora_aplicacao,
         "dt_fim": item.data_hora_fim,
         "sn_ativo": "S" if item.ativo else "N",
         "ds_frequencia": item.frequencia or "",
@@ -278,8 +280,11 @@ def get_patient(cd_atendimento: str, db: Session = Depends(get_db), _: User = De
     raise HTTPException(status_code=404, detail="Paciente nao encontrado")
 
 
-@router.get("/{cd_paciente}/history")
-def patient_history(cd_paciente: str, db: Session = Depends(get_db), _: User = Depends(get_current_user)) -> dict:
+@router.get("/{identifier}/history")
+def patient_history(identifier: str, db: Session = Depends(get_db), _: User = Depends(get_current_user)) -> dict:
+    attendance_by_identifier = db.scalar(select(Atendimento).where(Atendimento.id_origem_atendimento == identifier))
+    cd_paciente = attendance_by_identifier.paciente.id_origem_paciente if attendance_by_identifier else identifier
+
     clinical_snapshots = db.scalars(
         select(SnapshotAtendimento)
         .join(SnapshotAtendimento.atendimento)
@@ -492,13 +497,16 @@ def patient_timeline(cd_atendimento: str, db: Session = Depends(get_db), _: User
         for item in clinical_rows["antimicrobials"]:
             events.append(
                 {
-                    "id": f"antimicrobiano-{item['cd_prescricao']}-{item['cd_item_prescricao']}",
+                    "id": f"antimicrobiano-{item['cd_prescricao']}-{item['cd_item_prescricao']}-{item['dt_aplicacao'] or item['dt_inicio']}",
                     "type": "ANTIMICROBIANO",
                     "title": item["ds_antimicrobiano"],
-                    "description": f"{item['dias_uso']} dias de uso; {item['ds_dose'] or '-'} | {item['ds_via'] or '-'} | {item['ds_frequencia'] or '-'}",
+                    "description": (
+                        f"Principio ativo: {item['ds_principio_ativo']}; {item['dias_uso']} dias de uso; "
+                        f"{item['ds_dose'] or '-'} | {item['ds_via'] or '-'} | {item['ds_frequencia'] or '-'}"
+                    ),
                     "status": "ATIVO" if item["sn_ativo"] == "S" else "ENCERRADO",
                     "actor": "Integracao hospitalar",
-                    "created_at": item["dt_inicio"],
+                    "created_at": item["dt_aplicacao"] or item["dt_inicio"],
                 }
             )
         for item in clinical_rows["cultures"]:

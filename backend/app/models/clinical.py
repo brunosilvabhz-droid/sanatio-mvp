@@ -89,7 +89,13 @@ class MovimentacaoLeito(Base):
 class AntimicrobianoAtendimento(Base):
     __tablename__ = "antimicrobianos_atendimento"
     __table_args__ = (
-        UniqueConstraint("atendimento_id", "id_origem_prescricao", "id_origem_item_prescricao", name="uq_antimicrobiano_atendimento_prescricao_item"),
+        UniqueConstraint(
+            "atendimento_id",
+            "id_origem_prescricao",
+            "id_origem_item_prescricao",
+            "data_hora_aplicacao",
+            name="uq_antimicrobiano_atendimento_prescricao_item_aplicacao",
+        ),
     )
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
@@ -98,7 +104,9 @@ class AntimicrobianoAtendimento(Base):
     id_origem_item_prescricao: Mapped[str] = mapped_column(String(60), nullable=False)
     id_origem_produto: Mapped[str | None] = mapped_column(String(60), nullable=True)
     nome_antimicrobiano: Mapped[str] = mapped_column(String(255), index=True, nullable=False)
+    principio_ativo: Mapped[str | None] = mapped_column(String(255), index=True, nullable=True)
     data_hora_inicio: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    data_hora_aplicacao: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), index=True, nullable=True)
     data_hora_fim: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     ativo: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False, index=True)
     dose: Mapped[str | None] = mapped_column(String(120), nullable=True)

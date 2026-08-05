@@ -75,14 +75,18 @@ export default function PatientDetail() {
   async function loadHistory() {
     if (!cdAtendimento) return;
     setLoadError('');
+    setDetail(null);
+    setHistory(null);
+    setSelectedAttendance('');
     try {
       const { data } = await api.get(`/patients/${cdAtendimento}/history`);
       setHistory(data);
+      const requestedAttendance = data.attendances?.find((item: AttendanceHistory) => item.patient.cd_atendimento === cdAtendimento)?.patient?.cd_atendimento;
       const firstAttendance = data.attendances?.[0]?.patient?.cd_atendimento || '';
-      setSelectedAttendance((current) => current || firstAttendance);
+      setSelectedAttendance(requestedAttendance || firstAttendance);
       if (!firstAttendance) setDetail(null);
     } catch {
-      setLoadError('Não foi possível carregar o detalhe do paciente.');
+      setLoadError('Nao foi possivel carregar o detalhe do paciente.');
     }
   }
 
@@ -231,7 +235,7 @@ export default function PatientDetail() {
               <Info label="Convênio" value={p.nm_convenio} />
             </Grid>
           )}
-          {tab === 1 && <SimpleRows rows={detail.antimicrobials} columns={['ds_antimicrobiano', 'dt_inicio', 'dt_fim', 'dias_uso', 'sn_ativo', 'ds_dose', 'ds_via', 'ds_frequencia']} />}
+          {tab === 1 && <SimpleRows rows={detail.antimicrobials} columns={['ds_antimicrobiano', 'ds_principio_ativo', 'dt_aplicacao', 'dt_inicio', 'dt_fim', 'dias_uso', 'sn_ativo', 'ds_dose', 'ds_via', 'ds_frequencia']} />}
           {tab === 2 && <SimpleRows rows={detail.cultures} columns={['ds_exame', 'ds_material', 'dt_coleta', 'dt_resultado', 'ds_resultado', 'ds_microorganismo', 'sn_positivo']} />}
           {tab === 3 && <SimpleRows rows={detail.invasive_procedures} columns={['ds_procedimento', 'dt_inicio', 'dt_fim', 'dias_permanencia', 'sn_ativo', 'ds_local_instalacao']} />}
           {tab === 4 && <SimpleRows rows={detail.isolations} columns={['ds_isolamento', 'dt_inicio', 'dt_fim', 'sn_ativo']} />}

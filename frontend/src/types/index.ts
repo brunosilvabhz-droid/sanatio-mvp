@@ -26,7 +26,9 @@ export type Patient = {
 
 export type Antimicrobial = {
   ds_antimicrobiano: string;
+  ds_principio_ativo: string;
   dt_inicio: string;
+  dt_aplicacao?: string;
   dt_fim?: string;
   dias_uso: number;
   sn_ativo: string;

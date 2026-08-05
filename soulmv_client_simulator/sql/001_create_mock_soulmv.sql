@@ -46,6 +46,7 @@ CREATE TABLE soulmv_mock.mv_antimicrobianos (
     ds_antimicrobiano VARCHAR(180) NOT NULL,
     ds_principio_ativo VARCHAR(180) NULL,
     dt_inicio TIMESTAMP NOT NULL,
+    dt_aplicacao TIMESTAMP NULL,
     dt_fim TIMESTAMP NULL,
     sn_ativo VARCHAR(1) NOT NULL DEFAULT 'S',
     ds_dose VARCHAR(80) NULL,
