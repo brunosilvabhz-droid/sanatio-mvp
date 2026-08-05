@@ -29,6 +29,7 @@ class Settings(BaseSettings):
     smtp_from_email: str = "sanatio@impactocg.com"
     smtp_from_name: str = "SANATIO"
     support_contact_email: str = "contato@impactocg.com"
+    cors_origin_regex: str = r"https?://(localhost|127\.0\.0\.1|10\..+|192\.168\..+|172\.(1[6-9]|2[0-9]|3[0-1])\..+):5173"
 
     @property
     def cors_origin_list(self) -> list[str]:

@@ -1,7 +1,21 @@
 import axios from 'axios';
 
+function resolveApiBaseUrl() {
+  const configuredUrl = import.meta.env.VITE_API_URL;
+  const browserHost = window.location.hostname;
+  const isBrowserLocalhost = browserHost === 'localhost' || browserHost === '127.0.0.1';
+
+  if (configuredUrl) {
+    const configured = new URL(configuredUrl);
+    const configuredIsLocalhost = configured.hostname === 'localhost' || configured.hostname === '127.0.0.1';
+    if (!configuredIsLocalhost || isBrowserLocalhost) return configuredUrl;
+  }
+
+  return `${window.location.protocol}//${browserHost}:8000`;
+}
+
 export const api = axios.create({
-  baseURL: import.meta.env.VITE_API_URL || 'http://localhost:8000'
+  baseURL: resolveApiBaseUrl()
 });
 
 api.interceptors.request.use((config) => {
