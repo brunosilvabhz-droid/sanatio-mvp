@@ -1,6 +1,7 @@
 import UploadFileIcon from '@mui/icons-material/UploadFile';
 import { Alert, Box, Button, Chip, MenuItem, Paper, Stack, Table, TableBody, TableCell, TableHead, TableRow, TextField, Typography } from '@mui/material';
 import { ChangeEvent, useEffect, useState } from 'react';
+import axios from 'axios';
 import { api } from '../../api/client';
 import PageHeader from '../../components/PageHeader';
 import { EpidemiologyReference, EpidemiologyReferenceImport } from '../../types';
@@ -12,6 +13,8 @@ export default function EpidemiologyReferences() {
   const [year, setYear] = useState('');
   const [unit, setUnit] = useState('');
   const [message, setMessage] = useState('');
+  const [messageType, setMessageType] = useState<'success' | 'error'>('success');
+  const [uploading, setUploading] = useState(false);
 
   async function load() {
     const params = { indicador: indicator || undefined, ano: year || undefined, tipo_unidade: unit || undefined };
@@ -26,12 +29,23 @@ export default function EpidemiologyReferences() {
   async function upload(event: ChangeEvent<HTMLInputElement>) {
     const file = event.target.files?.[0];
     if (!file) return;
-    const data = new FormData();
-    data.append('file', file);
-    const response = await api.post('/epidemiology/public-references/references/import-csv', data);
-    setMessage(`Importação concluída: ${response.data.quantidade_registros} registros, ${response.data.quantidade_erros} erros.`);
-    await load();
-    event.target.value = '';
+    setUploading(true);
+    setMessage('');
+    try {
+      const data = new FormData();
+      data.append('file', file);
+      const response = await api.post('/epidemiology/public-references/references/import-csv', data);
+      setMessageType(response.data.quantidade_erros ? 'error' : 'success');
+      setMessage(`Importação concluída: ${response.data.quantidade_registros} registros, ${response.data.quantidade_erros} erros.${response.data.mensagem_erro ? ` ${response.data.mensagem_erro}` : ''}`);
+      await load();
+    } catch (error) {
+      const detail = axios.isAxiosError(error) ? error.response?.data?.detail : null;
+      setMessageType('error');
+      setMessage(typeof detail === 'string' ? detail : 'Não foi possível importar o arquivo. Confira o formato e tente novamente.');
+    } finally {
+      setUploading(false);
+      event.target.value = '';
+    }
   }
 
   async function toggle(id: number, active: boolean) {
@@ -50,7 +64,7 @@ export default function EpidemiologyReferences() {
         title="Referências Epidemiológicas"
         subtitle="Base interna versionada para referências públicas, com importação manual de CSV e histórico."
       />
-      {message && <Alert severity="success">{message}</Alert>}
+      {message && <Alert severity={messageType}>{message}</Alert>}
 
       <Paper sx={{ p: 2 }}>
         <Stack direction={{ xs: 'column', md: 'row' }} spacing={1.5} alignItems={{ xs: 'stretch', md: 'center' }}>
@@ -58,8 +72,8 @@ export default function EpidemiologyReferences() {
           <TextField label="Ano" value={year} onChange={(event) => setYear(event.target.value)} />
           <TextField label="Tipo de unidade" value={unit} onChange={(event) => setUnit(event.target.value)} />
           <Button variant="outlined" onClick={load}>Filtrar</Button>
-          <Button component="label" variant="contained" startIcon={<UploadFileIcon />}>
-            Importar CSV/Excel
+          <Button component="label" variant="contained" startIcon={<UploadFileIcon />} disabled={uploading}>
+            {uploading ? 'Importando...' : 'Importar CSV/Excel'}
             <input type="file" accept=".csv,.xlsx" hidden onChange={upload} />
           </Button>
         </Stack>

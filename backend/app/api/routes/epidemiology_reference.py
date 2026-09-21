@@ -50,6 +50,16 @@ CSV_COLUMNS = [
     "url_fonte",
 ]
 
+REQUIRED_IMPORT_COLUMNS = [
+    "codigo_indicador",
+    "nome_indicador",
+    "tipo_unidade",
+    "populacao_referencia",
+    "ano_referencia",
+    "unidade_medida",
+    "fonte",
+]
+
 
 def _audit(db: Session, user: User | None, acao: str, registro: str, before: object | None = None, after: object | None = None) -> None:
     db.add(
@@ -88,6 +98,31 @@ def _validate_percentiles(values: list[float | None]) -> None:
         if previous is not None and value < previous:
             raise ValueError("Percentis devem seguir a ordem P10 <= P25 <= P50 <= P75 <= P90")
         previous = value
+
+
+def _normalize_import_row(row: dict) -> dict[str, str]:
+    return {
+        str(key or "").strip().lower(): str(value or "").strip()
+        for key, value in row.items()
+        if key is not None
+    }
+
+
+def _read_csv(raw_content: bytes) -> list[dict[str, str]]:
+    try:
+        content = raw_content.decode("utf-8-sig")
+    except UnicodeDecodeError:
+        content = raw_content.decode("cp1252")
+    if not content.strip():
+        return []
+    sample = content[:4096]
+    try:
+        dialect = csv.Sniffer().sniff(sample, delimiters=",;\t")
+        reader = csv.DictReader(io.StringIO(content), dialect=dialect)
+    except csv.Error:
+        delimiter = ";" if sample.count(";") > sample.count(",") else ","
+        reader = csv.DictReader(io.StringIO(content), delimiter=delimiter)
+    return [_normalize_import_row(row) for row in reader if any(str(value or "").strip() for value in row.values())]
 
 
 @router.get("/references", response_model=list[ReferenciaEpidemiologicaRead])
@@ -140,15 +175,16 @@ async def import_csv(file: UploadFile = File(...), db: Session = Depends(get_db)
     filename = original_filename.lower()
     raw_content = await file.read()
     if filename.endswith(".csv"):
-        content = raw_content.decode("utf-8-sig")
-        rows = list(csv.DictReader(io.StringIO(content)))
+        rows = _read_csv(raw_content)
     elif filename.endswith(".xlsx"):
         rows = _read_xlsx(raw_content)
     else:
         raise HTTPException(status_code=422, detail="Importação aceita arquivos CSV ou Excel .xlsx")
-    missing = [column for column in CSV_COLUMNS if column not in (rows[0].keys() if rows else [])]
+    if not rows:
+        raise HTTPException(status_code=422, detail="O arquivo está vazio ou não possui linhas de dados")
+    missing = [column for column in REQUIRED_IMPORT_COLUMNS if column not in rows[0]]
     if missing:
-        raise HTTPException(status_code=422, detail=f"CSV sem colunas obrigatórias: {', '.join(missing)}")
+        raise HTTPException(status_code=422, detail=f"Arquivo sem colunas obrigatórias: {', '.join(missing)}")
 
     importacao = ImportacaoReferenciaEpidemiologica(nome_arquivo=original_filename, fonte="CSV/Excel", usuario_id=user.id, status="EM_PROCESSAMENTO")
     db.add(importacao)
@@ -226,7 +262,7 @@ def _read_xlsx(raw_content: bytes) -> list[dict]:
     headers = [str(value).strip() if value is not None else "" for value in rows[0]]
     parsed = []
     for row in rows[1:]:
-        parsed.append({headers[index]: "" if value is None else str(value) for index, value in enumerate(row) if index < len(headers)})
+        parsed.append(_normalize_import_row({headers[index]: "" if value is None else str(value) for index, value in enumerate(row) if index < len(headers)}))
     return parsed
 
 
