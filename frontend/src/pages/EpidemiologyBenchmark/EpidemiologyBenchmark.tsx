@@ -14,7 +14,12 @@ const indicators = [
   { code: 'RESISTENCIA_AM', label: 'Resistência antimicrobiana' }
 ];
 
-const estados = ['AC', 'AL', 'AP', 'AM', 'BA', 'CE', 'DF', 'ES', 'GO', 'MA', 'MT', 'MS', 'MG', 'PA', 'PB', 'PR', 'PE', 'PI', 'RJ', 'RN', 'RS', 'RO', 'RR', 'SC', 'SP', 'SE', 'TO'];
+const estados = [{ code: '', label: 'Todos (Brasil)' }, ...['AC', 'AL', 'AP', 'AM', 'BA', 'CE', 'DF', 'ES', 'GO', 'MA', 'MT', 'MS', 'MG', 'PA', 'PB', 'PR', 'PE', 'PI', 'RJ', 'RN', 'RS', 'RO', 'RR', 'SC', 'SP', 'SE', 'TO'].map((code) => ({ code, label: code }))];
+const unidades = [
+  { code: 'UTI_ADULTO', label: 'UTI Adulto' },
+  { code: 'UTI_PEDIATRICA', label: 'UTI Pediátrica' },
+  { code: 'UTI_NEONATAL', label: 'UTI Neonatal' }
+];
 
 function currentPeriod() {
   const now = new Date();
@@ -48,7 +53,7 @@ export default function EpidemiologyBenchmark() {
   const [uf, setUf] = useState('MG');
 
   useEffect(() => {
-    api.get('/epidemiology/public-references/benchmark/comparisons', { params: { periodo, tipo_unidade: tipoUnidade, uf, indicador: indicador || undefined } })
+    api.get('/epidemiology/public-references/benchmark/comparisons', { params: { periodo, tipo_unidade: tipoUnidade, uf: uf || undefined, indicador: indicador || undefined } })
       .then(({ data }) => setRows(data));
   }, [periodo, tipoUnidade, uf, indicador]);
 
@@ -75,9 +80,11 @@ export default function EpidemiologyBenchmark() {
           <TextField select label="Indicador" value={indicador} onChange={(event) => setIndicador(event.target.value)} sx={{ minWidth: 260 }}>
             {indicators.map((item) => <MenuItem key={item.code} value={item.code}>{item.label}</MenuItem>)}
           </TextField>
-          <TextField label="Unidade" value={tipoUnidade} onChange={(event) => setTipoUnidade(event.target.value)} sx={{ minWidth: 180 }} />
+          <TextField select label="Setor" value={tipoUnidade} onChange={(event) => setTipoUnidade(event.target.value)} sx={{ minWidth: 190 }}>
+            {unidades.map((unidade) => <MenuItem key={unidade.code} value={unidade.code}>{unidade.label}</MenuItem>)}
+          </TextField>
           <TextField select label="UF da referência" value={uf} onChange={(event) => setUf(event.target.value)} sx={{ minWidth: 170 }}>
-            {estados.map((estado) => <MenuItem key={estado} value={estado}>{estado}</MenuItem>)}
+            {estados.map((estado) => <MenuItem key={estado.code || 'TODOS'} value={estado.code}>{estado.label}</MenuItem>)}
           </TextField>
         </Stack>
       </Paper>

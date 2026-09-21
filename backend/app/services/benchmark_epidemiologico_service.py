@@ -1,5 +1,7 @@
 from dataclasses import dataclass
 from datetime import date, datetime, timedelta, timezone
+from statistics import median
+from types import SimpleNamespace
 
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
@@ -101,13 +103,38 @@ class BenchmarkEpidemiologicoService:
         )
         if uf:
             query = query.where(ReferenciaEpidemiologica.uf == uf.strip().upper())
-        return self.db.scalar(
-            query.order_by(
+            return self.db.scalar(query.order_by(
                 ReferenciaEpidemiologica.ano_referencia.desc(),
                 ReferenciaEpidemiologica.data_importacao.desc(),
                 ReferenciaEpidemiologica.id.desc(),
-            )
+            ))
+
+        references = list(self.db.scalars(query.order_by(ReferenciaEpidemiologica.ano_referencia.desc())))
+        if not references:
+            return None
+        latest_year = references[0].ano_referencia
+        latest = [reference for reference in references if reference.ano_referencia == latest_year]
+        national = next((reference for reference in latest if not reference.uf), None)
+        if national:
+            return national
+        return SimpleNamespace(
+            id=latest[0].id,
+            unidade_medida=latest[0].unidade_medida,
+            p10=self._median_percentile(latest, "p10"),
+            p25=self._median_percentile(latest, "p25"),
+            p50=self._median_percentile(latest, "p50"),
+            p75=self._median_percentile(latest, "p75"),
+            p90=self._median_percentile(latest, "p90"),
+            ano_referencia=latest_year,
+            uf="BRASIL",
+            regiao="CONSOLIDADO DAS UFS",
+            fonte=f"{latest[0].fonte} (consolidação SANATIO das UFs)",
+            url_fonte=latest[0].url_fonte,
         )
+
+    def _median_percentile(self, references: list[ReferenciaEpidemiologica], field: str) -> float | None:
+        values = [getattr(reference, field) for reference in references if getattr(reference, field) is not None]
+        return float(median(values)) if values else None
 
     def _historico(self, codigo: str, periodo: str, referencia: ReferenciaEpidemiologica | None, tipo_unidade: str) -> list[dict]:
         ano, mes = [int(part) for part in periodo.split("-")]

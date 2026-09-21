@@ -125,6 +125,70 @@ def _read_csv(raw_content: bytes) -> list[dict[str, str]]:
     return [_normalize_import_row(row) for row in reader if any(str(value or "").strip() for value in row.values())]
 
 
+def _percentile(values: list[float], percentile: int) -> float:
+    ordered = sorted(values)
+    if len(ordered) == 1:
+        return ordered[0]
+    position = (len(ordered) - 1) * percentile / 100
+    lower = int(position)
+    upper = min(lower + 1, len(ordered) - 1)
+    fraction = position - lower
+    return round(ordered[lower] + (ordered[upper] - ordered[lower]) * fraction, 4)
+
+
+def _prepare_resistance_rows(rows: list[dict[str, str]]) -> list[dict[str, str]]:
+    required = {"tipo_unidade", "regiao", "uf", "ano_referencia", "percentual_resistencia", "fonte"}
+    if not rows or not required.issubset(rows[0]):
+        return rows
+    grouped: dict[tuple[str, str, str, str], list[dict[str, str]]] = {}
+    for row in rows:
+        key = (
+            (row.get("tipo_unidade") or "").strip().upper(),
+            (row.get("regiao") or "").strip().upper(),
+            (row.get("uf") or "").strip().upper(),
+            (row.get("ano_referencia") or "").strip(),
+        )
+        grouped.setdefault(key, []).append(row)
+
+    prepared: list[dict[str, str]] = []
+    national: dict[tuple[str, str], list[dict[str, str]]] = {}
+    for (tipo, regiao, uf, ano), group in grouped.items():
+        national.setdefault((tipo, ano), []).extend(group)
+        prepared.append(_resistance_benchmark_row(group, tipo, regiao, uf, ano))
+    for (tipo, ano), group in national.items():
+        prepared.append(_resistance_benchmark_row(group, tipo, "BRASIL", "", ano, national=True))
+    return prepared
+
+
+def _resistance_benchmark_row(
+    rows: list[dict[str, str]], tipo: str, regiao: str, uf: str, ano: str, national: bool = False
+) -> dict[str, str]:
+    values = [_to_float(row.get("percentual_resistencia")) for row in rows]
+    percentages = [value for value in values if value is not None]
+    if not percentages:
+        raise ValueError("Arquivo de resistência sem percentuais válidos")
+    source = (rows[0].get("fonte") or "Anvisa").strip()
+    if national:
+        source = f"{source} (consolidação SANATIO das UFs)"
+    return {
+        "codigo_indicador": "RESISTENCIA_AM",
+        "nome_indicador": "Resistência antimicrobiana",
+        "tipo_unidade": tipo,
+        "populacao_referencia": "PERFIS_MICRORGANISMO_ANTIMICROBIANO",
+        "regiao": regiao,
+        "uf": uf,
+        "ano_referencia": ano,
+        "p10": str(_percentile(percentages, 10)),
+        "p25": str(_percentile(percentages, 25)),
+        "p50": str(_percentile(percentages, 50)),
+        "p75": str(_percentile(percentages, 75)),
+        "p90": str(_percentile(percentages, 90)),
+        "unidade_medida": "% dos perfis publicados",
+        "fonte": source,
+        "url_fonte": rows[0].get("url_fonte") or "",
+    }
+
+
 @router.get("/references", response_model=list[ReferenciaEpidemiologicaRead])
 def references(
     indicador: str | None = None,
@@ -182,6 +246,10 @@ async def import_csv(file: UploadFile = File(...), db: Session = Depends(get_db)
         raise HTTPException(status_code=422, detail="Importação aceita arquivos CSV ou Excel .xlsx")
     if not rows:
         raise HTTPException(status_code=422, detail="O arquivo está vazio ou não possui linhas de dados")
+    try:
+        rows = _prepare_resistance_rows(rows)
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
     missing = [column for column in REQUIRED_IMPORT_COLUMNS if column not in rows[0]]
     if missing:
         raise HTTPException(status_code=422, detail=f"Arquivo sem colunas obrigatórias: {', '.join(missing)}")
