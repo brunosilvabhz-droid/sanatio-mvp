@@ -16,6 +16,15 @@ LOG = logging.getLogger("sanatio_soulmv_integrator")
 
 DEFAULT_CONFIG = "config.hml.json"
 
+LEGACY_VIEW_NAMES = {
+    "VW_SANATIO_PACIENTES_ATENDIMENTOS": "SANATIO.VW_PACIENTES_ATENDIMENTOS",
+    "VW_SANATIO_MOVIMENTACOES_LEITO": "SANATIO.VW_MOVIMENTACOES_LEITO",
+    "VW_SANATIO_ANTIMICROBIANOS": "SANATIO.VW_ANTIMICROBIANOS",
+    "VW_SANATIO_CULTURAS": "SANATIO.VW_CULTURAS",
+    "VW_SANATIO_PROCEDIMENTOS_INVASIVOS": "SANATIO.VW_PROCEDIMENTOS_INVASIVOS",
+    "VW_SANATIO_ISOLAMENTOS": "SANATIO.VW_ISOLAMENTOS",
+}
+
 
 @dataclass(frozen=True)
 class QuerySpec:
@@ -91,6 +100,10 @@ def load_config(path: str) -> dict[str, Any]:
     config["database"]["dsn"] = os.getenv("SOULMV_DSN", config["database"].get("dsn", ""))
     config["sanatio"]["ingest_url"] = os.getenv("SANATIO_INGEST_URL", config["sanatio"].get("ingest_url", ""))
     config["sanatio"]["token"] = os.getenv("SANATIO_TOKEN", config["sanatio"].get("token", ""))
+    config["views"] = {
+        key: LEGACY_VIEW_NAMES.get(value, value)
+        for key, value in config["views"].items()
+    }
     return config
 
 

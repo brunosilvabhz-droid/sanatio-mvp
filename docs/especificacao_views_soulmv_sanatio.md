@@ -26,7 +26,7 @@ O servidor de integração do cliente lerá essas views no ambiente do hospital 
 
 ## 1. Pacientes e Atendimentos
 
-View sugerida: `VW_SANATIO_PACIENTES_ATENDIMENTOS`
+View sugerida: `SANATIO.VW_PACIENTES_ATENDIMENTOS`
 
 Objetivo: listar todos os pacientes/atendimentos que devem existir no SANATIO, ativos ou inativos.
 
@@ -61,7 +61,7 @@ Campos calculados pelo integrador a partir desta view:
 Exemplo de estrutura:
 
 ```sql
-CREATE OR REPLACE VIEW VW_SANATIO_PACIENTES_ATENDIMENTOS AS
+CREATE OR REPLACE VIEW SANATIO.VW_PACIENTES_ATENDIMENTOS AS
 SELECT
     a.cd_atendimento          AS cd_atendimento,
     p.cd_paciente             AS cd_paciente,
@@ -87,7 +87,7 @@ LEFT JOIN convenio c ON c.cd_convenio = a.cd_convenio;
 
 ## 2. Movimentações de Leito
 
-View sugerida: `VW_SANATIO_MOVIMENTACOES_LEITO`
+View sugerida: `SANATIO.VW_MOVIMENTACOES_LEITO`
 
 Objetivo: alimentar a linha do tempo do atendimento com transferências de unidade/leito.
 
@@ -115,7 +115,7 @@ Aliases enviados pelo integrador:
 
 ## 3. Antimicrobianos
 
-View sugerida: `VW_SANATIO_ANTIMICROBIANOS`
+View sugerida: `SANATIO.VW_ANTIMICROBIANOS`
 
 Objetivo: listar antimicrobianos prescritos/administrados por atendimento para auditoria, alertas e relatórios.
 
@@ -157,7 +157,7 @@ Para os Alertas 2 e 3 funcionarem bem, a view deve retornar tambem antimicrobian
 
 ## 4. Culturas e Microbiologia
 
-View sugerida: `VW_SANATIO_CULTURAS`
+View sugerida: `SANATIO.VW_CULTURAS`
 
 Objetivo: informar exames microbiológicos, resultado, material e microrganismo.
 
@@ -179,7 +179,7 @@ Granularidade: uma linha por exame/cultura.
 
 ## 5. Procedimentos Invasivos / Dispositivos
 
-View sugerida: `VW_SANATIO_PROCEDIMENTOS_INVASIVOS`
+View sugerida: `SANATIO.VW_PROCEDIMENTOS_INVASIVOS`
 
 Objetivo: informar dispositivos e procedimentos invasivos ativos ou encerrados, como CVC, SVD, ventilação mecânica e drenos.
 
@@ -205,7 +205,7 @@ GREATEST(TRUNC(NVL(dt_fim, SYSDATE)) - TRUNC(dt_inicio), 0) AS dias_permanencia
 
 ## 6. Isolamentos
 
-View sugerida: `VW_SANATIO_ISOLAMENTOS`
+View sugerida: `SANATIO.VW_ISOLAMENTOS`
 
 Objetivo: informar isolamentos ativos ou encerrados para priorização e linha do tempo.
 
@@ -223,7 +223,7 @@ Granularidade: uma linha por isolamento do atendimento.
 
 ## 7. View Local Opcional para Resolução de Nome
 
-View sugerida: `VW_SANATIO_RESOLVE_PACIENTE`
+View sugerida: `SANATIO.VW_RESOLVE_PACIENTE`
 
 Objetivo: permitir que um serviço local, dentro da rede do cliente, resolva o nome do paciente quando permitido.
 
@@ -240,7 +240,7 @@ Granularidade: uma linha por paciente.
 Exemplo:
 
 ```sql
-CREATE OR REPLACE VIEW VW_SANATIO_RESOLVE_PACIENTE AS
+CREATE OR REPLACE VIEW SANATIO.VW_RESOLVE_PACIENTE AS
 SELECT
     p.cd_paciente AS cd_paciente,
     p.nm_paciente AS nm_paciente,
@@ -256,8 +256,8 @@ Campos enviados no bloco `patients` da API:
 
 | Campo JSON | Origem/cálculo |
 | --- | --- |
-| `cd_atendimento` | `VW_SANATIO_PACIENTES_ATENDIMENTOS.cd_atendimento` |
-| `cd_paciente` | `VW_SANATIO_PACIENTES_ATENDIMENTOS.cd_paciente` |
+| `cd_atendimento` | `SANATIO.VW_PACIENTES_ATENDIMENTOS.cd_atendimento` |
+| `cd_paciente` | `SANATIO.VW_PACIENTES_ATENDIMENTOS.cd_paciente` |
 | `unit` | `ds_unidade` |
 | `bed` | `ds_leito` |
 | `active` | `dt_alta IS NULL` |
@@ -270,10 +270,10 @@ Campos calculados e gravados pelo SANATIO em `snapshots_atendimento`:
 | --- | --- |
 | `risk_status` | Calculado no SANATIO. Valores: `baixo`, `medio`, `alto`. |
 | `days_in_hospital` | Diferença entre `admitted_at`/`discharged_at` e a data da ingestão. |
-| `has_positive_culture` | Dados detalhados de `VW_SANATIO_CULTURAS`. |
-| `max_antimicrobial_days` | Dados detalhados de `VW_SANATIO_ANTIMICROBIANOS`. |
-| `max_invasive_device_days` | Dados detalhados de `VW_SANATIO_PROCEDIMENTOS_INVASIVOS`. |
-| `has_active_isolation` | Dados detalhados de `VW_SANATIO_ISOLAMENTOS`. |
+| `has_positive_culture` | Dados detalhados de `SANATIO.VW_CULTURAS`. |
+| `max_antimicrobial_days` | Dados detalhados de `SANATIO.VW_ANTIMICROBIANOS`. |
+| `max_invasive_device_days` | Dados detalhados de `SANATIO.VW_PROCEDIMENTOS_INVASIVOS`. |
+| `has_active_isolation` | Dados detalhados de `SANATIO.VW_ISOLAMENTOS`. |
 
 Regra inicial de risco usada no MVP:
 
@@ -294,12 +294,12 @@ Os limites definitivos são parametrizados na tela de Configuração de Alertas 
 - [ ] Atendimentos inativos retornando com `dt_alta` preenchido.
 - [ ] Registros ativos retornando com `dt_fim` nulo e `sn_ativo = 'S'`.
 - [ ] Nome do paciente fora das views de ingestão.
-- [ ] View `VW_SANATIO_RESOLVE_PACIENTE` liberada somente para serviço local, se usada.
+- [ ] View `SANATIO.VW_RESOLVE_PACIENTE` liberada somente para serviço local, se usada.
 - [ ] Usuário de banco do integrador com permissão apenas de leitura nas views.
 
 ## 10. Cirurgias e Egressos Cirúrgicos
 
-View sugerida: `VW_SANATIO_CIRURGIAS`
+View sugerida: `SANATIO.VW_CIRURGIAS`
 
 Objetivo: substituir a planilha de egresso cirúrgico e permitir o cálculo de infecção de sítio cirúrgico em cirurgia limpa.
 
@@ -323,7 +323,7 @@ Granularidade: uma linha por procedimento cirúrgico realizado.
 
 ## 11. Classificação de IRAS Validada pelo SCIH
 
-View sugerida: `VW_SANATIO_IRAS`
+View sugerida: `SANATIO.VW_IRAS`
 
 Objetivo: registrar casos confirmados pelo SCIH. Culturas e dispositivos ajudam na busca ativa, mas não devem substituir a classificação epidemiológica validada.
 
@@ -345,7 +345,7 @@ Somente eventos com `status_validacao = 'CONFIRMADO'` devem compor o numerador o
 
 ## 12. Doenças Infectocontagiosas e SINAN
 
-View sugerida: `VW_SANATIO_NOTIFICACOES`
+View sugerida: `SANATIO.VW_NOTIFICACOES`
 
 Objetivo: apoiar a busca ativa, o isolamento e o controle das fichas de notificação.
 
@@ -363,7 +363,7 @@ Objetivo: apoiar a busca ativa, o isolamento e o controle das fichas de notifica
 
 ## 13. Linha de Sepse
 
-View sugerida: `VW_SANATIO_LINHA_SEPSE`
+View sugerida: `SANATIO.VW_LINHA_SEPSE`
 
 Granularidade: uma linha por abertura de protocolo.
 
@@ -381,7 +381,7 @@ Protocolos abertos devem poder gerar alerta e e-mail conforme configuração do 
 
 ## 14. Antibiograma Estruturado
 
-View sugerida: `VW_SANATIO_ANTIBIOGRAMA`
+View sugerida: `SANATIO.VW_ANTIBIOGRAMA`
 
 Granularidade: uma linha por combinação cultura, microrganismo e antimicrobiano testado.
 
@@ -399,7 +399,7 @@ Granularidade: uma linha por combinação cultura, microrganismo e antimicrobian
 
 ## 15. Consumo de Higiene
 
-View sugerida: `VW_SANATIO_CONSUMO_HIGIENE`
+View sugerida: `SANATIO.VW_CONSUMO_HIGIENE`
 
 Granularidade: uma linha por competência, unidade e produto.
 
@@ -416,7 +416,7 @@ O indicador deve ser calculado no SANATIO conforme a regra institucional e apres
 ## 16. Ordem Recomendada de Implantação
 
 1. Validar as seis views já consumidas pelo integrador atual.
-2. Implantar `VW_SANATIO_IRAS` e `VW_SANATIO_CIRURGIAS`, necessárias para indicadores oficiais e egresso cirúrgico.
-3. Implantar `VW_SANATIO_ANTIBIOGRAMA` para resistência antimicrobiana estruturada.
+2. Implantar `SANATIO.VW_IRAS` e `SANATIO.VW_CIRURGIAS`, necessárias para indicadores oficiais e egresso cirúrgico.
+3. Implantar `SANATIO.VW_ANTIBIOGRAMA` para resistência antimicrobiana estruturada.
 4. Implantar notificações, linha de sepse e consumo de higiene.
 5. Liberar `SELECT` somente nas views ao usuário técnico do integrador.

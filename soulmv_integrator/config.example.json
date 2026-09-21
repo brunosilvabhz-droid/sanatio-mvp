@@ -8,12 +8,12 @@
     "token": "COLE_AQUI_O_TOKEN_DO_HOSPITAL"
   },
   "views": {
-    "patients": "VW_SANATIO_PACIENTES_ATENDIMENTOS",
-    "bed_movements": "VW_SANATIO_MOVIMENTACOES_LEITO",
-    "antimicrobials": "VW_SANATIO_ANTIMICROBIANOS",
-    "cultures": "VW_SANATIO_CULTURAS",
-    "invasive_procedures": "VW_SANATIO_PROCEDIMENTOS_INVASIVOS",
-    "isolations": "VW_SANATIO_ISOLAMENTOS"
+    "patients": "SANATIO.VW_PACIENTES_ATENDIMENTOS",
+    "bed_movements": "SANATIO.VW_MOVIMENTACOES_LEITO",
+    "antimicrobials": "SANATIO.VW_ANTIMICROBIANOS",
+    "cultures": "SANATIO.VW_CULTURAS",
+    "invasive_procedures": "SANATIO.VW_PROCEDIMENTOS_INVASIVOS",
+    "isolations": "SANATIO.VW_ISOLAMENTOS"
   },
   "risk_thresholds": {
     "antimicrobial_days_high": 7,

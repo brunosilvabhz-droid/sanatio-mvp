@@ -6,26 +6,26 @@ from app.core.oracle import oracle_connection
 from app.services import mock_data
 
 VIEW_COLUMNS = {
-    "VW_SANATIO_PACIENTES_INTERNADOS": [
+    "SANATIO.VW_PACIENTES_ATENDIMENTOS": [
         "cd_atendimento", "cd_paciente", "nm_paciente", "dt_nascimento", "tp_sexo", "dt_atendimento",
         "cd_unidade", "ds_unidade", "cd_leito", "ds_leito", "cd_prestador", "nm_prestador", "cd_convenio", "nm_convenio",
     ],
-    "VW_SANATIO_MOVIMENTACOES": [
+    "SANATIO.VW_MOVIMENTACOES_LEITO": [
         "cd_atendimento", "cd_paciente", "dt_movimentacao", "cd_unidade_origem", "ds_unidade_origem",
         "cd_unidade_destino", "ds_unidade_destino", "cd_leito_origem", "ds_leito_origem", "cd_leito_destino", "ds_leito_destino",
     ],
-    "VW_SANATIO_ANTIMICROBIANOS": [
+    "SANATIO.VW_ANTIMICROBIANOS": [
         "cd_atendimento", "cd_paciente", "cd_prescricao", "cd_item_prescricao", "cd_produto", "ds_antimicrobiano",
         "dt_inicio", "dt_fim", "sn_ativo", "ds_frequencia", "ds_via", "ds_dose",
     ],
-    "VW_SANATIO_CULTURAS": [
+    "SANATIO.VW_CULTURAS": [
         "cd_atendimento", "cd_paciente", "cd_pedido", "cd_exame", "ds_exame", "dt_coleta", "dt_resultado",
         "ds_material", "ds_microorganismo", "ds_resultado", "sn_positivo",
     ],
-    "VW_SANATIO_PROCEDIMENTOS_INVASIVOS": [
+    "SANATIO.VW_PROCEDIMENTOS_INVASIVOS": [
         "cd_atendimento", "cd_paciente", "cd_procedimento", "ds_procedimento", "dt_inicio", "dt_fim", "sn_ativo", "ds_local_instalacao",
     ],
-    "VW_SANATIO_ISOLAMENTOS": [
+    "SANATIO.VW_ISOLAMENTOS": [
         "cd_atendimento", "cd_paciente", "cd_isolamento", "ds_isolamento", "dt_inicio", "dt_fim", "sn_ativo",
     ],
 }
@@ -68,7 +68,7 @@ def _with_procedure_metrics(row: dict) -> dict:
 
 
 def get_patients() -> list[dict]:
-    rows = mock_data.mock_patients() if settings.use_mock_soulmv else _oracle_select("VW_SANATIO_PACIENTES_INTERNADOS")
+    rows = mock_data.mock_patients() if settings.use_mock_soulmv else _oracle_select("SANATIO.VW_PACIENTES_ATENDIMENTOS")
     patients = [_with_patient_metrics(row) for row in rows]
     if settings.expose_patient_names_in_api:
         return patients
@@ -76,7 +76,7 @@ def get_patients() -> list[dict]:
 
 
 def get_patients_internal() -> list[dict]:
-    rows = mock_data.mock_patients() if settings.use_mock_soulmv else _oracle_select("VW_SANATIO_PACIENTES_INTERNADOS")
+    rows = mock_data.mock_patients() if settings.use_mock_soulmv else _oracle_select("SANATIO.VW_PACIENTES_ATENDIMENTOS")
     return [_with_patient_metrics(row) for row in rows]
 
 
@@ -94,27 +94,27 @@ def _filter(rows: Iterable[dict], cd_atendimento: str) -> list[dict]:
 
 def get_antimicrobials(cd_atendimento: str) -> list[dict]:
     rows = mock_data.mock_antimicrobials() if settings.use_mock_soulmv else _oracle_select(
-        "VW_SANATIO_ANTIMICROBIANOS", "WHERE cd_atendimento = :cd_atendimento", {"cd_atendimento": cd_atendimento}
+        "SANATIO.VW_ANTIMICROBIANOS", "WHERE cd_atendimento = :cd_atendimento", {"cd_atendimento": cd_atendimento}
     )
     return [_with_antimicrobial_metrics(row) for row in _filter(rows, cd_atendimento)]
 
 
 def get_cultures(cd_atendimento: str) -> list[dict]:
     rows = mock_data.mock_cultures() if settings.use_mock_soulmv else _oracle_select(
-        "VW_SANATIO_CULTURAS", "WHERE cd_atendimento = :cd_atendimento", {"cd_atendimento": cd_atendimento}
+        "SANATIO.VW_CULTURAS", "WHERE cd_atendimento = :cd_atendimento", {"cd_atendimento": cd_atendimento}
     )
     return _filter(rows, cd_atendimento)
 
 
 def get_invasive_procedures(cd_atendimento: str) -> list[dict]:
     rows = mock_data.mock_invasive_procedures() if settings.use_mock_soulmv else _oracle_select(
-        "VW_SANATIO_PROCEDIMENTOS_INVASIVOS", "WHERE cd_atendimento = :cd_atendimento", {"cd_atendimento": cd_atendimento}
+        "SANATIO.VW_PROCEDIMENTOS_INVASIVOS", "WHERE cd_atendimento = :cd_atendimento", {"cd_atendimento": cd_atendimento}
     )
     return [_with_procedure_metrics(row) for row in _filter(rows, cd_atendimento)]
 
 
 def get_isolations(cd_atendimento: str) -> list[dict]:
     rows = mock_data.mock_isolations() if settings.use_mock_soulmv else _oracle_select(
-        "VW_SANATIO_ISOLAMENTOS", "WHERE cd_atendimento = :cd_atendimento", {"cd_atendimento": cd_atendimento}
+        "SANATIO.VW_ISOLAMENTOS", "WHERE cd_atendimento = :cd_atendimento", {"cd_atendimento": cd_atendimento}
     )
     return _filter(rows, cd_atendimento)

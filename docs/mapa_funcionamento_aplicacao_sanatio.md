@@ -21,12 +21,12 @@ O integrador atual lê seis views principais:
 
 | Assunto | View esperada | Bloco JSON enviado |
 | --- | --- | --- |
-| Pacientes e atendimentos | `VW_SANATIO_PACIENTES_ATENDIMENTOS` | `patients` |
-| Movimentações de leito | `VW_SANATIO_MOVIMENTACOES_LEITO` | `bed_movements` |
-| Antimicrobianos | `VW_SANATIO_ANTIMICROBIANOS` | `antimicrobials` |
-| Culturas e microbiologia | `VW_SANATIO_CULTURAS` | `cultures` |
-| Procedimentos invasivos | `VW_SANATIO_PROCEDIMENTOS_INVASIVOS` | `invasive_procedures` |
-| Isolamentos | `VW_SANATIO_ISOLAMENTOS` | `isolations` |
+| Pacientes e atendimentos | `SANATIO.VW_PACIENTES_ATENDIMENTOS` | `patients` |
+| Movimentações de leito | `SANATIO.VW_MOVIMENTACOES_LEITO` | `bed_movements` |
+| Antimicrobianos | `SANATIO.VW_ANTIMICROBIANOS` | `antimicrobials` |
+| Culturas e microbiologia | `SANATIO.VW_CULTURAS` | `cultures` |
+| Procedimentos invasivos | `SANATIO.VW_PROCEDIMENTOS_INVASIVOS` | `invasive_procedures` |
+| Isolamentos | `SANATIO.VW_ISOLAMENTOS` | `isolations` |
 
 ## 3. Autenticação da integração
 
@@ -68,7 +68,7 @@ O SANATIO cria:
 
 ### Origem
 
-View: `VW_SANATIO_PACIENTES_ATENDIMENTOS`
+View: `SANATIO.VW_PACIENTES_ATENDIMENTOS`
 
 | Alias da view | Campo JSON | Tabela principal | Campo no banco |
 | --- | --- | --- | --- |
@@ -179,7 +179,7 @@ Motivos exibidos:
 
 ### Origem
 
-View: `VW_SANATIO_MOVIMENTACOES_LEITO`
+View: `SANATIO.VW_MOVIMENTACOES_LEITO`
 
 | Alias da view | Campo JSON | Tabela clínica | Campo no banco |
 | --- | --- | --- | --- |
@@ -221,7 +221,7 @@ Esses eventos aparecem na linha do tempo como `MOVIMENTACAO_LEITO`.
 
 ### Origem
 
-View: `VW_SANATIO_ANTIMICROBIANOS`
+View: `SANATIO.VW_ANTIMICROBIANOS`
 
 | Alias da view | Campo JSON | Tabela clínica | Campo no banco |
 | --- | --- | --- | --- |
@@ -424,7 +424,7 @@ Quando o SCIH ou farmácia registra uma decisão, o sistema grava:
 
 ### Origem
 
-View: `VW_SANATIO_CULTURAS`
+View: `SANATIO.VW_CULTURAS`
 
 | Alias da view | Campo JSON | Tabela clínica | Campo no banco |
 | --- | --- | --- | --- |
@@ -463,7 +463,7 @@ Resultado:
 
 ### Origem
 
-View: `VW_SANATIO_PROCEDIMENTOS_INVASIVOS`
+View: `SANATIO.VW_PROCEDIMENTOS_INVASIVOS`
 
 | Alias da view | Campo JSON | Tabela clínica | Campo no banco |
 | --- | --- | --- | --- |
@@ -502,7 +502,7 @@ Alerta geral: "procedimento invasivo por 9 dias"
 
 ### Origem
 
-View: `VW_SANATIO_ISOLAMENTOS`
+View: `SANATIO.VW_ISOLAMENTOS`
 
 | Alias da view | Campo JSON | Tabela clínica | Campo no banco |
 | --- | --- | --- | --- |
@@ -732,7 +732,7 @@ Observação: DDD/DOT hoje está simplificado para MVP. Para produção epidemio
 ### Dados vindos das views
 
 ```text
-VW_SANATIO_PACIENTES_ATENDIMENTOS
+SANATIO.VW_PACIENTES_ATENDIMENTOS
 cd_paciente = 4567
 cd_atendimento = 900123
 dt_atendimento = 2026-07-19 08:10
@@ -740,17 +740,17 @@ dt_alta = null
 ds_unidade = UTI Adulto
 ds_leito = Leito 12
 
-VW_SANATIO_ANTIMICROBIANOS
+SANATIO.VW_ANTIMICROBIANOS
 Meropenem, principio ativo Meropenem, inicio 2026-07-21, ativo S, dias_uso 8
 Vancomicina, principio ativo Vancomicina, inicio 2026-07-25, ativo S, dias_uso 4
 
-VW_SANATIO_CULTURAS
+SANATIO.VW_CULTURAS
 Hemocultura, sangue, Klebsiella pneumoniae, positivo S
 
-VW_SANATIO_PROCEDIMENTOS_INVASIVOS
+SANATIO.VW_PROCEDIMENTOS_INVASIVOS
 CVC, inicio 2026-07-20, ativo S, dias_permanencia 9
 
-VW_SANATIO_ISOLAMENTOS
+SANATIO.VW_ISOLAMENTOS
 Contato, inicio 2026-07-26, ativo S
 ```
 

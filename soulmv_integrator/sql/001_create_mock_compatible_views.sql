@@ -1,4 +1,6 @@
-CREATE OR REPLACE VIEW VW_SANATIO_PACIENTES_ATENDIMENTOS AS
+CREATE SCHEMA IF NOT EXISTS sanatio;
+
+CREATE OR REPLACE VIEW sanatio.VW_PACIENTES_ATENDIMENTOS AS
 SELECT
     cd_atendimento,
     cd_paciente,
@@ -16,7 +18,7 @@ SELECT
     nm_convenio
 FROM soulmv_mock.mv_pacientes_internados;
 
-CREATE OR REPLACE VIEW VW_SANATIO_MOVIMENTACOES_LEITO AS
+CREATE OR REPLACE VIEW sanatio.VW_MOVIMENTACOES_LEITO AS
 SELECT
     cd_atendimento,
     cd_paciente,
@@ -27,7 +29,7 @@ SELECT
     ds_leito_destino
 FROM soulmv_mock.mv_movimentacoes_leito;
 
-CREATE OR REPLACE VIEW VW_SANATIO_ANTIMICROBIANOS AS
+CREATE OR REPLACE VIEW sanatio.VW_ANTIMICROBIANOS AS
 SELECT
     cd_atendimento,
     cd_paciente,
@@ -45,7 +47,7 @@ SELECT
     ds_frequencia
 FROM soulmv_mock.mv_antimicrobianos;
 
-CREATE OR REPLACE VIEW VW_SANATIO_CULTURAS AS
+CREATE OR REPLACE VIEW sanatio.VW_CULTURAS AS
 SELECT
     cd_atendimento,
     cd_paciente,
@@ -60,7 +62,7 @@ SELECT
     sn_positivo
 FROM soulmv_mock.mv_culturas;
 
-CREATE OR REPLACE VIEW VW_SANATIO_PROCEDIMENTOS_INVASIVOS AS
+CREATE OR REPLACE VIEW sanatio.VW_PROCEDIMENTOS_INVASIVOS AS
 SELECT
     cd_atendimento,
     cd_paciente,
@@ -72,7 +74,7 @@ SELECT
     ds_local_instalacao
 FROM soulmv_mock.mv_procedimentos_invasivos;
 
-CREATE OR REPLACE VIEW VW_SANATIO_ISOLAMENTOS AS
+CREATE OR REPLACE VIEW sanatio.VW_ISOLAMENTOS AS
 SELECT
     cd_atendimento,
     cd_paciente,
