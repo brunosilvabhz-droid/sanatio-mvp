@@ -14,6 +14,8 @@ const indicators = [
   { code: 'RESISTENCIA_AM', label: 'Resistência antimicrobiana' }
 ];
 
+const estados = ['AC', 'AL', 'AP', 'AM', 'BA', 'CE', 'DF', 'ES', 'GO', 'MA', 'MT', 'MS', 'MG', 'PA', 'PB', 'PR', 'PE', 'PI', 'RJ', 'RN', 'RS', 'RO', 'RR', 'SC', 'SP', 'SE', 'TO'];
+
 function currentPeriod() {
   const now = new Date();
   return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
@@ -43,11 +45,12 @@ export default function EpidemiologyBenchmark() {
   const [periodo, setPeriodo] = useState(currentPeriod());
   const [indicador, setIndicador] = useState('');
   const [tipoUnidade, setTipoUnidade] = useState('UTI_ADULTO');
+  const [uf, setUf] = useState('MG');
 
   useEffect(() => {
-    api.get('/epidemiology/public-references/benchmark/comparisons', { params: { periodo, tipo_unidade: tipoUnidade, indicador: indicador || undefined } })
+    api.get('/epidemiology/public-references/benchmark/comparisons', { params: { periodo, tipo_unidade: tipoUnidade, uf, indicador: indicador || undefined } })
       .then(({ data }) => setRows(data));
-  }, [periodo, tipoUnidade, indicador]);
+  }, [periodo, tipoUnidade, uf, indicador]);
 
   const missingReferences = useMemo(() => rows.filter((row) => !row.benchmark_utilizado).length, [rows]);
 
@@ -73,6 +76,9 @@ export default function EpidemiologyBenchmark() {
             {indicators.map((item) => <MenuItem key={item.code} value={item.code}>{item.label}</MenuItem>)}
           </TextField>
           <TextField label="Unidade" value={tipoUnidade} onChange={(event) => setTipoUnidade(event.target.value)} sx={{ minWidth: 180 }} />
+          <TextField select label="UF da referência" value={uf} onChange={(event) => setUf(event.target.value)} sx={{ minWidth: 170 }}>
+            {estados.map((estado) => <MenuItem key={estado} value={estado}>{estado}</MenuItem>)}
+          </TextField>
         </Stack>
       </Paper>
 
@@ -147,6 +153,7 @@ function BenchmarkCard({ row }: { row: EpidemiologyBenchmarkComparison }) {
 
         <Stack direction="row" gap={1} flexWrap="wrap" alignItems="center">
           <Chip size="small" icon={<SourceIcon />} label={row.fonte ? `Fonte: ${row.fonte} – ano ${row.ano_referencia}` : 'Sem referência cadastrada'} />
+          {row.uf_referencia && <Chip size="small" label={`Referência: ${row.uf_referencia}${row.regiao_referencia ? ` · ${row.regiao_referencia}` : ''}`} variant="outlined" />}
           <Chip size="small" icon={<TimelineIcon />} label="Interpretação estatística neutra" variant="outlined" />
         </Stack>
       </Stack>

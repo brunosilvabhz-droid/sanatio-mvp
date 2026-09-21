@@ -22,16 +22,23 @@ INDICADORES = [
     IndicadorSpec("RESISTENCIA_AM", "Resistência antimicrobiana", "% das culturas positivas"),
 ]
 
+CODIGOS_REFERENCIA = {
+    "IPCSL": ("IPCSL", "IPCSL_CVC"),
+    "PAV": ("PAV", "PAV_VM"),
+    "ITU_CVD": ("ITU_CVD",),
+    "RESISTENCIA_AM": ("RESISTENCIA_AM",),
+}
+
 
 class BenchmarkEpidemiologicoService:
     def __init__(self, db: Session):
         self.db = db
 
-    def comparar(self, indicador: str, periodo: str, tipo_unidade: str = "UTI_ADULTO") -> dict:
+    def comparar(self, indicador: str, periodo: str, tipo_unidade: str = "UTI_ADULTO", uf: str | None = None) -> dict:
         spec = self._spec(indicador)
         inicio, fim = self._periodo(periodo)
         numerador, denominador, valor = self._calcular_indicador(spec.codigo, inicio, fim, tipo_unidade)
-        referencia = self._referencia(spec.codigo, tipo_unidade)
+        referencia = self._referencia(spec.codigo, tipo_unidade, uf)
         return {
             "indicador": spec.nome,
             "codigo_indicador": spec.codigo,
@@ -48,6 +55,8 @@ class BenchmarkEpidemiologicoService:
             "faixa_estatistica": self._faixa(valor, referencia),
             "periodo_referencia": periodo,
             "ano_referencia": referencia.ano_referencia if referencia else None,
+            "uf_referencia": referencia.uf if referencia else None,
+            "regiao_referencia": referencia.regiao if referencia else None,
             "fonte": referencia.fonte if referencia else None,
             "url_fonte": referencia.url_fonte if referencia else None,
             "historico": self._historico(spec.codigo, periodo, referencia, tipo_unidade),
@@ -81,15 +90,23 @@ class BenchmarkEpidemiologicoService:
                 return spec
         return INDICADORES[0]
 
-    def _referencia(self, codigo: str, tipo_unidade: str) -> ReferenciaEpidemiologica | None:
+    def _referencia(self, codigo: str, tipo_unidade: str, uf: str | None = None) -> ReferenciaEpidemiologica | None:
+        unidade = tipo_unidade.strip().upper().replace(" ", "_").replace("-", "_")
+        codigos_base = CODIGOS_REFERENCIA.get(codigo, (codigo,))
+        codigos = {base for base in codigos_base} | {f"{base}_{unidade}" for base in codigos_base}
+        query = select(ReferenciaEpidemiologica).where(
+            ReferenciaEpidemiologica.codigo_indicador.in_(codigos),
+            ReferenciaEpidemiologica.tipo_unidade == unidade,
+            ReferenciaEpidemiologica.ativo.is_(True),
+        )
+        if uf:
+            query = query.where(ReferenciaEpidemiologica.uf == uf.strip().upper())
         return self.db.scalar(
-            select(ReferenciaEpidemiologica)
-            .where(
-                ReferenciaEpidemiologica.codigo_indicador == codigo,
-                ReferenciaEpidemiologica.tipo_unidade == tipo_unidade,
-                ReferenciaEpidemiologica.ativo.is_(True),
+            query.order_by(
+                ReferenciaEpidemiologica.ano_referencia.desc(),
+                ReferenciaEpidemiologica.data_importacao.desc(),
+                ReferenciaEpidemiologica.id.desc(),
             )
-            .order_by(ReferenciaEpidemiologica.ano_referencia.desc(), ReferenciaEpidemiologica.data_importacao.desc())
         )
 
     def _historico(self, codigo: str, periodo: str, referencia: ReferenciaEpidemiologica | None, tipo_unidade: str) -> list[dict]:

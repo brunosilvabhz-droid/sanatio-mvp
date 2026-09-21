@@ -78,6 +78,8 @@ class BenchmarkComparacaoRead(BaseModel):
     faixa_estatistica: str
     periodo_referencia: str
     ano_referencia: int | None = None
+    uf_referencia: str | None = None
+    regiao_referencia: str | None = None
     fonte: str | None = None
     url_fonte: str | None = None
     historico: list[BenchmarkHistoricoRead]

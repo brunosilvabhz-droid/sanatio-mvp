@@ -275,13 +275,14 @@ def imports(db: Session = Depends(get_db), _: User = Depends(get_current_user)) 
 def benchmark_comparisons(
     periodo: str = Query(default_factory=_today_period),
     tipo_unidade: str = "UTI_ADULTO",
+    uf: str | None = None,
     indicador: str | None = None,
     db: Session = Depends(get_db),
     _: User = Depends(get_current_user),
 ) -> list[dict]:
     service = BenchmarkEpidemiologicoService(db)
     specs = [spec for spec in INDICADORES if not indicador or indicador.upper() in {spec.codigo.upper(), spec.nome.upper()}]
-    return [service.comparar(spec.codigo, periodo, tipo_unidade) for spec in specs]
+    return [service.comparar(spec.codigo, periodo, tipo_unidade, uf) for spec in specs]
 
 
 @router.get("/establishment-profile", response_model=PerfilEstabelecimentoRead | None)

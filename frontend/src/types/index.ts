@@ -289,6 +289,8 @@ export type EpidemiologyBenchmarkComparison = {
   faixa_estatistica: string;
   periodo_referencia: string;
   ano_referencia: number;
+  uf_referencia?: string;
+  regiao_referencia?: string;
   url_fonte?: string;
   historico: EpidemiologyBenchmarkHistory[];
   fonte?: string;
