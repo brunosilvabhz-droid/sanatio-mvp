@@ -1,4 +1,5 @@
 import DashboardIcon from '@mui/icons-material/Dashboard';
+import DomainIcon from '@mui/icons-material/Domain';
 import FactCheckIcon from '@mui/icons-material/FactCheck';
 import GroupIcon from '@mui/icons-material/Group';
 import LocalHospitalIcon from '@mui/icons-material/LocalHospital';
@@ -12,6 +13,8 @@ import RuleIcon from '@mui/icons-material/Rule';
 import SettingsIcon from '@mui/icons-material/Settings';
 import SickIcon from '@mui/icons-material/Sick';
 import SupportAgentIcon from '@mui/icons-material/SupportAgent';
+import TravelExploreIcon from '@mui/icons-material/TravelExplore';
+import UploadFileIcon from '@mui/icons-material/UploadFile';
 import {
   AppBar,
   Box,
@@ -50,6 +53,8 @@ const groups = [
     title: 'Análise e controle',
     items: [
       { label: 'Epidemiologia', path: '/epidemiology-reports', icon: <QueryStatsIcon /> },
+      { label: 'Benchmark Epidemiológico', path: '/epidemiology-benchmark', icon: <TravelExploreIcon /> },
+      { label: 'Fechamento Anvisa', path: '/anvisa-closure', icon: <FactCheckIcon /> },
       { label: 'Config. alertas', path: '/alert-rules', icon: <RuleIcon /> },
       { label: 'Execuções', path: '/monitoring-runs', icon: <ManageHistoryIcon /> },
       { label: 'Relatórios', path: '/alert-audit', icon: <FactCheckIcon /> }
@@ -65,6 +70,8 @@ const groups = [
     title: 'Administração',
     items: [
       { label: 'Usuários', path: '/users', icon: <GroupIcon /> },
+      { label: 'Referências Epidemiológicas', path: '/epidemiology-references', icon: <UploadFileIcon /> },
+      { label: 'Perfil do Estabelecimento', path: '/establishment-profile', icon: <DomainIcon /> },
       { label: 'Configurações', path: '/settings', icon: <SettingsIcon /> }
     ]
   }

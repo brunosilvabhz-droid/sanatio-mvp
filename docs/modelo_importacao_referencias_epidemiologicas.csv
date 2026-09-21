@@ -1,0 +1,5 @@
+codigo_indicador,nome_indicador,tipo_unidade,populacao_referencia,regiao,uf,ano_referencia,p10,p25,p50,p75,p90,unidade_medida,fonte,url_fonte
+IPCSL,IPCSL associada a CVC,UTI_ADULTO,NACIONAL,BRASIL,,2025,,,,,,/ 1.000 CVC-dia,ANVISA,
+PAV,PAV,UTI_ADULTO,NACIONAL,BRASIL,,2025,,,,,,/ 1.000 VM-dia,ANVISA,
+ITU_CVD,ITU associada a CVD,UTI_ADULTO,NACIONAL,BRASIL,,2025,,,,,,/ 1.000 CVD-dia,ANVISA,
+RESISTENCIA_AM,Resistência antimicrobiana,UTI_ADULTO,NACIONAL,BRASIL,,2025,,,,,,% das culturas positivas,ANVISA,

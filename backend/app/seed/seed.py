@@ -46,7 +46,6 @@ SETTINGS = [
     ("monitoring.schedule.timezone", "America/Sao_Paulo", "Fuso horario da agenda automatica"),
 ]
 
-
 def main() -> None:
     db = SessionLocal()
     try:

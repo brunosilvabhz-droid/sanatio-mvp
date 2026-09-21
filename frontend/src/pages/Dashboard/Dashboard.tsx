@@ -1,11 +1,13 @@
 import AirlineSeatFlatIcon from '@mui/icons-material/AirlineSeatFlat';
 import BiotechIcon from '@mui/icons-material/Biotech';
 import MedicationIcon from '@mui/icons-material/Medication';
+import MasksIcon from '@mui/icons-material/Masks';
 import NotificationsActiveIcon from '@mui/icons-material/NotificationsActive';
 import PriorityHighIcon from '@mui/icons-material/PriorityHigh';
 import SickIcon from '@mui/icons-material/Sick';
-import { Alert as MuiAlert, Box, Grid, LinearProgress, Paper, Stack, Typography } from '@mui/material';
+import { Alert as MuiAlert, Box, Button, Chip, Grid, LinearProgress, Paper, Stack, Table, TableBody, TableCell, TableHead, TableRow, Typography } from '@mui/material';
 import { useEffect, useMemo, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { api } from '../../api/client';
 import MetricCard from '../../components/MetricCard';
 import PageHeader from '../../components/PageHeader';
@@ -17,8 +19,24 @@ const metrics = [
   { key: 'critical_alerts', label: 'Alertas críticos', color: '#b42318', icon: <PriorityHighIcon /> },
   { key: 'high_risk_patients', label: 'Pacientes alto risco', color: '#c2410c', icon: <AirlineSeatFlatIcon /> },
   { key: 'positive_cultures', label: 'Culturas positivas', color: '#6f42c1', icon: <BiotechIcon /> },
-  { key: 'prolonged_antimicrobials', label: 'Antimicrobianos prolongados', color: '#027a48', icon: <MedicationIcon /> }
+  { key: 'prolonged_antimicrobials', label: 'Antimicrobianos prolongados', color: '#027a48', icon: <MedicationIcon /> },
+  { key: 'active_isolations', label: 'Pacientes em isolamento', color: '#7c3aed', icon: <MasksIcon /> }
 ];
+
+type IsolationMapItem = {
+  cd_atendimento: string;
+  cd_paciente: string;
+  unidade?: string;
+  leito?: string;
+  isolamento: string;
+  inicio: string;
+};
+
+type DeviceUsage = {
+  periodo: string;
+  totais: { cvc_dia: number; vm_dia: number; svd_dia: number };
+  por_unidade: { unidade: string; cvc_dia: number; vm_dia: number; svd_dia: number }[];
+};
 
 const riskColors = {
   baixo: '#027a48',
@@ -27,23 +45,30 @@ const riskColors = {
 };
 
 export default function Dashboard() {
+  const navigate = useNavigate();
   const [summary, setSummary] = useState<Record<string, number>>({});
   const [patients, setPatients] = useState<Patient[]>([]);
   const [alerts, setAlerts] = useState<Alert[]>([]);
   const [loadError, setLoadError] = useState('');
+  const [isolationMap, setIsolationMap] = useState<IsolationMapItem[]>([]);
+  const [deviceUsage, setDeviceUsage] = useState<DeviceUsage | null>(null);
 
   async function load() {
     setLoadError('');
-    const [summaryResponse, patientsResponse, alertsResponse] = await Promise.allSettled([
+    const [summaryResponse, patientsResponse, alertsResponse, isolationResponse, deviceResponse] = await Promise.allSettled([
       api.get('/dashboard/summary'),
       api.get('/patients'),
-      api.get('/alerts')
+      api.get('/alerts'),
+      api.get('/dashboard/isolation-map'),
+      api.get('/epidemiology/device-usage')
     ]);
 
     if (summaryResponse.status === 'fulfilled') setSummary(summaryResponse.value.data);
     if (patientsResponse.status === 'fulfilled') setPatients(patientsResponse.value.data);
     if (alertsResponse.status === 'fulfilled') setAlerts(alertsResponse.value.data);
-    if ([summaryResponse, patientsResponse, alertsResponse].some((response) => response.status === 'rejected')) {
+    if (isolationResponse.status === 'fulfilled') setIsolationMap(isolationResponse.value.data);
+    if (deviceResponse.status === 'fulfilled') setDeviceUsage(deviceResponse.value.data);
+    if ([summaryResponse, patientsResponse, alertsResponse, isolationResponse, deviceResponse].some((response) => response.status === 'rejected')) {
       setLoadError('Alguns indicadores não foram carregados. Verifique se o backend está ativo e se o token de login ainda é válido.');
     }
   }
@@ -104,6 +129,45 @@ export default function Dashboard() {
       </Grid>
 
       <Grid container spacing={2}>
+        <Grid item xs={12}>
+          <Paper sx={{ p: 2.5 }}>
+            <Stack direction={{ xs: 'column', md: 'row' }} justifyContent="space-between" spacing={1} sx={{ mb: 2 }}>
+              <Box>
+                <Typography variant="h6" fontWeight={800}>Mapa de isolamentos ativos</Typography>
+                <Typography variant="body2" color="text.secondary">Pacientes que exigem atenção imediata da equipe assistencial.</Typography>
+              </Box>
+              <Chip icon={<MasksIcon />} label={`${isolationMap.length} isolamento(s)`} color={isolationMap.length ? 'warning' : 'default'} />
+            </Stack>
+            {isolationMap.length ? (
+              <Table size="small">
+                <TableHead><TableRow><TableCell>Unidade</TableCell><TableCell>Leito</TableCell><TableCell>Paciente</TableCell><TableCell>Precaução</TableCell><TableCell>Início</TableCell><TableCell /></TableRow></TableHead>
+                <TableBody>
+                  {isolationMap.map((item) => (
+                    <TableRow key={`${item.cd_atendimento}-${item.isolamento}`} hover>
+                      <TableCell>{item.unidade || '-'}</TableCell><TableCell>{item.leito || '-'}</TableCell>
+                      <TableCell>ID {item.cd_paciente}</TableCell><TableCell>{item.isolamento}</TableCell>
+                      <TableCell>{new Date(item.inicio).toLocaleDateString('pt-BR')}</TableCell>
+                      <TableCell align="right"><Button size="small" onClick={() => navigate(`/patients/${item.cd_atendimento}`)}>Abrir</Button></TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            ) : <Typography color="text.secondary">Nenhum isolamento ativo recebido na integração.</Typography>}
+          </Paper>
+        </Grid>
+
+        <Grid item xs={12}>
+          <Paper sx={{ p: 2.5 }}>
+            <Typography variant="h6" fontWeight={800}>Uso de dispositivos invasivos no mês</Typography>
+            <Typography variant="body2" color="text.secondary">Consolidado automático para substituir a contagem manual de CVC, ventilação mecânica e sonda vesical.</Typography>
+            <Grid container spacing={2} sx={{ mt: 0.5 }}>
+              {[['CVC-dia', deviceUsage?.totais.cvc_dia || 0], ['VM-dia', deviceUsage?.totais.vm_dia || 0], ['SVD-dia', deviceUsage?.totais.svd_dia || 0]].map(([label, value]) => (
+                <Grid item xs={12} sm={4} key={String(label)}><Paper variant="outlined" sx={{ p: 2 }}><Typography color="text.secondary">{label}</Typography><Typography variant="h4" fontWeight={800}>{value}</Typography></Paper></Grid>
+              ))}
+            </Grid>
+          </Paper>
+        </Grid>
+
         <Grid item xs={12} lg={5}>
           <Paper sx={{ p: 2.5, height: '100%' }}>
             <Typography variant="h6" fontWeight={800}>

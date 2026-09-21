@@ -296,3 +296,127 @@ Os limites definitivos são parametrizados na tela de Configuração de Alertas 
 - [ ] Nome do paciente fora das views de ingestão.
 - [ ] View `VW_SANATIO_RESOLVE_PACIENTE` liberada somente para serviço local, se usada.
 - [ ] Usuário de banco do integrador com permissão apenas de leitura nas views.
+
+## 10. Cirurgias e Egressos Cirúrgicos
+
+View sugerida: `VW_SANATIO_CIRURGIAS`
+
+Objetivo: substituir a planilha de egresso cirúrgico e permitir o cálculo de infecção de sítio cirúrgico em cirurgia limpa.
+
+Granularidade: uma linha por procedimento cirúrgico realizado.
+
+| Alias | Obrigatório | Tipo esperado | Descrição |
+| --- | --- | --- | --- |
+| `cd_atendimento` | Sim | texto/número | Atendimento relacionado. |
+| `cd_paciente` | Sim | texto/número | Paciente relacionado. |
+| `cd_cirurgia` | Sim | texto/número | Identificador único da cirurgia. |
+| `cd_procedimento` | Sim | texto/número | Código do procedimento principal. |
+| `ds_procedimento` | Sim | texto | Descrição do procedimento principal. |
+| `dt_inicio_cirurgia` | Sim | timestamp | Início da cirurgia. |
+| `dt_fim_cirurgia` | Não | timestamp | Término da cirurgia. |
+| `ds_unidade` | Sim | texto | Unidade ou bloco cirúrgico. |
+| `potencial_contaminacao` | Sim | texto | Limpa, potencialmente contaminada, contaminada ou infectada. |
+| `asa` | Não | texto/número | Classificação ASA. |
+| `sn_urgencia` | Não | texto | Cirurgia de urgência. |
+| `sn_reoperacao` | Não | texto | Indica reoperação. |
+| `dt_alta` | Não | timestamp | Alta do atendimento para acompanhamento do egresso. |
+
+## 11. Classificação de IRAS Validada pelo SCIH
+
+View sugerida: `VW_SANATIO_IRAS`
+
+Objetivo: registrar casos confirmados pelo SCIH. Culturas e dispositivos ajudam na busca ativa, mas não devem substituir a classificação epidemiológica validada.
+
+Granularidade: uma linha por evento de IRAS.
+
+| Alias | Obrigatório | Tipo esperado | Descrição |
+| --- | --- | --- | --- |
+| `cd_iras` | Sim | texto/número | Identificador único do caso. |
+| `cd_atendimento` | Sim | texto/número | Atendimento relacionado. |
+| `cd_paciente` | Sim | texto/número | Paciente relacionado. |
+| `tp_iras` | Sim | texto | Valores padronizados: `IPCSL`, `PAV`, `ITU_CVD`, `ISC`. |
+| `dt_evento` | Sim | timestamp | Data epidemiológica do evento. |
+| `ds_unidade` | Sim | texto | Unidade de atribuição. |
+| `cd_cirurgia` | Condicional | texto/número | Cirurgia relacionada quando `tp_iras = ISC`. |
+| `status_validacao` | Sim | texto | Suspeito, confirmado ou descartado. |
+| `dt_validacao` | Não | timestamp | Data da validação pelo SCIH. |
+
+Somente eventos com `status_validacao = 'CONFIRMADO'` devem compor o numerador oficial dos indicadores.
+
+## 12. Doenças Infectocontagiosas e SINAN
+
+View sugerida: `VW_SANATIO_NOTIFICACOES`
+
+Objetivo: apoiar a busca ativa, o isolamento e o controle das fichas de notificação.
+
+| Alias | Obrigatório | Tipo esperado | Descrição |
+| --- | --- | --- | --- |
+| `cd_notificacao` | Sim | texto/número | Identificador único. |
+| `cd_atendimento` | Sim | texto/número | Atendimento relacionado. |
+| `cd_paciente` | Sim | texto/número | Paciente relacionado. |
+| `cd_diagnostico` | Não | texto/número | Código CID ou código local. |
+| `ds_diagnostico` | Sim | texto | Diagnóstico ou suspeita. |
+| `dt_identificacao` | Sim | timestamp | Data da identificação. |
+| `sn_exige_sinan` | Sim | texto | Indica necessidade de ficha SINAN. |
+| `status_ficha` | Sim | texto | Pendente, solicitada, preenchida ou descartada. |
+| `sn_exige_isolamento` | Não | texto | Indica precaução recomendada. |
+
+## 13. Linha de Sepse
+
+View sugerida: `VW_SANATIO_LINHA_SEPSE`
+
+Granularidade: uma linha por abertura de protocolo.
+
+| Alias | Obrigatório | Tipo esperado | Descrição |
+| --- | --- | --- | --- |
+| `cd_protocolo` | Sim | texto/número | Identificador do protocolo. |
+| `cd_atendimento` | Sim | texto/número | Atendimento relacionado. |
+| `cd_paciente` | Sim | texto/número | Paciente relacionado. |
+| `dt_abertura` | Sim | timestamp | Abertura da linha de sepse. |
+| `dt_encerramento` | Não | timestamp | Encerramento do protocolo. |
+| `status_protocolo` | Sim | texto | Aberto, confirmado, descartado ou encerrado. |
+| `ds_unidade` | Sim | texto | Unidade do paciente. |
+
+Protocolos abertos devem poder gerar alerta e e-mail conforme configuração do SCIH.
+
+## 14. Antibiograma Estruturado
+
+View sugerida: `VW_SANATIO_ANTIBIOGRAMA`
+
+Granularidade: uma linha por combinação cultura, microrganismo e antimicrobiano testado.
+
+| Alias | Obrigatório | Tipo esperado | Descrição |
+| --- | --- | --- | --- |
+| `cd_pedido` | Sim | texto/número | Pedido da cultura. |
+| `cd_exame` | Sim | texto/número | Exame relacionado. |
+| `cd_microorganismo` | Sim | texto/número | Código do microrganismo. |
+| `ds_microorganismo` | Sim | texto | Nome do microrganismo. |
+| `cd_antimicrobiano` | Sim | texto/número | Código do antimicrobiano testado. |
+| `ds_antimicrobiano` | Sim | texto | Antimicrobiano testado. |
+| `resultado_sensibilidade` | Sim | texto | Padronizado como `S`, `I` ou `R`. |
+| `valor_mic` | Não | texto/número | Concentração inibitória mínima. |
+| `dt_resultado` | Sim | timestamp | Data do resultado. |
+
+## 15. Consumo de Higiene
+
+View sugerida: `VW_SANATIO_CONSUMO_HIGIENE`
+
+Granularidade: uma linha por competência, unidade e produto.
+
+| Alias | Obrigatório | Tipo esperado | Descrição |
+| --- | --- | --- | --- |
+| `competencia` | Sim | date | Primeiro dia do mês de referência. |
+| `ds_unidade` | Sim | texto | Unidade assistencial. |
+| `tp_produto` | Sim | texto | `SABAO` ou `PREPARACAO_ALCOOLICA`. |
+| `quantidade_ml` | Sim | número | Quantidade consumida em mililitros. |
+| `paciente_dia` | Sim | número | Denominador paciente-dia da competência e unidade. |
+
+O indicador deve ser calculado no SANATIO conforme a regra institucional e apresentado com numerador, denominador e unidade de medida.
+
+## 16. Ordem Recomendada de Implantação
+
+1. Validar as seis views já consumidas pelo integrador atual.
+2. Implantar `VW_SANATIO_IRAS` e `VW_SANATIO_CIRURGIAS`, necessárias para indicadores oficiais e egresso cirúrgico.
+3. Implantar `VW_SANATIO_ANTIBIOGRAMA` para resistência antimicrobiana estruturada.
+4. Implantar notificações, linha de sepse e consumo de higiene.
+5. Liberar `SELECT` somente nas views ao usuário técnico do integrador.

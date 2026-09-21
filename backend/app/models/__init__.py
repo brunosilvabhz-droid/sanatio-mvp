@@ -11,6 +11,13 @@ from app.models.clinical import (
     ProcedimentoInvasivoAtendimento,
     SnapshotAtendimento,
 )
+from app.models.epidemiology_reference import (
+    FechamentoAnvisa,
+    ImportacaoReferenciaEpidemiologica,
+    LogAuditoria,
+    PerfilEstabelecimento,
+    ReferenciaEpidemiologica,
+)
 from app.models.hospital_integration import HospitalIntegration
 from app.models.intervention import InterventionRecipient, InterventionRequest
 from app.models.monitoring_run import MonitoringRun
@@ -31,9 +38,12 @@ __all__ = [
     "Atendimento",
     "CulturaAtendimento",
     "ExecucaoIntegracao",
+    "FechamentoAnvisa",
     "HospitalIntegration",
+    "ImportacaoReferenciaEpidemiologica",
     "InterventionRecipient",
     "InterventionRequest",
+    "LogAuditoria",
     "MonitoringRun",
     "MonitoringRule",
     "IsolamentoAtendimento",
@@ -42,7 +52,9 @@ __all__ = [
     "PatientMonitoringSnapshot",
     "PatientBedMovement",
     "PatientTimelineNote",
+    "PerfilEstabelecimento",
     "ProcedimentoInvasivoAtendimento",
+    "ReferenciaEpidemiologica",
     "Role",
     "Setting",
     "SnapshotAtendimento",

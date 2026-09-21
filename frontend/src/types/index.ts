@@ -224,3 +224,104 @@ export type SupportTicket = {
   updated_at: string;
   responded_at?: string;
 };
+
+export type EpidemiologyReference = {
+  id: number;
+  codigo_indicador: string;
+  nome_indicador: string;
+  tipo_unidade: string;
+  populacao_referencia: string;
+  regiao?: string;
+  uf?: string;
+  ano_referencia: number;
+  periodo_referencia?: string;
+  p10?: number;
+  p25?: number;
+  p50?: number;
+  p75?: number;
+  p90?: number;
+  unidade_medida: string;
+  fonte: string;
+  descricao_fonte?: string;
+  url_fonte?: string;
+  versao_referencia: string;
+  data_publicacao?: string;
+  data_importacao: string;
+  ativo: boolean;
+  data_criacao: string;
+  data_atualizacao: string;
+};
+
+export type EpidemiologyReferenceImport = {
+  id: number;
+  nome_arquivo: string;
+  fonte: string;
+  ano_referencia?: number;
+  quantidade_registros: number;
+  quantidade_erros: number;
+  status: string;
+  usuario_id?: number;
+  data_hora_inicio: string;
+  data_hora_fim?: string;
+  mensagem_erro?: string;
+};
+
+export type EpidemiologyBenchmarkHistory = {
+  mes: string;
+  valor: number;
+  p50?: number;
+  p75?: number;
+};
+
+export type EpidemiologyBenchmarkComparison = {
+  indicador: string;
+  codigo_indicador: string;
+  valor_hospital: number;
+  numerador: number;
+  denominador: number;
+  unidade_medida: string;
+  benchmark_utilizado?: number;
+  p10?: number;
+  p25?: number;
+  p50?: number;
+  p75?: number;
+  p90?: number;
+  faixa_estatistica: string;
+  periodo_referencia: string;
+  ano_referencia: number;
+  url_fonte?: string;
+  historico: EpidemiologyBenchmarkHistory[];
+  fonte?: string;
+};
+
+export type EstablishmentProfile = {
+  id: number;
+  cnes: string;
+  nome_estabelecimento?: string;
+  municipio?: string;
+  uf?: string;
+  quantidade_leitos?: number;
+  quantidade_leitos_uti?: number;
+  data_ultima_atualizacao_cnes?: string;
+  fonte?: string;
+  erro_ultima_atualizacao?: string;
+};
+
+export type AnvisaClosure = {
+  id: number;
+  tipo_unidade: string;
+  periodo: string;
+  paciente_dia: number;
+  cvc_dia: number;
+  vm_dia: number;
+  cvd_dia: number;
+  casos_ipcsl: number;
+  casos_pav: number;
+  casos_itu_cvd: number;
+  densidade_ipcsl: number;
+  densidade_pav: number;
+  densidade_itu_cvd: number;
+  status: string;
+  validado_por?: number;
+  data_hora_validacao?: string;
+};

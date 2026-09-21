@@ -63,18 +63,14 @@ const chartItems = [
 ];
 
 export default function EpidemiologyReports() {
-  const [consumptionRows, setConsumptionRows] = useState<ConsumptionRow[]>(fallbackConsumptionRows);
-  const [pathogenCards, setPathogenCards] = useState(fallbackPathogenCards);
+  const [consumptionRows, setConsumptionRows] = useState<ConsumptionRow[]>([]);
+  const [pathogenCards, setPathogenCards] = useState<{ label: string; value: string; rate: string }[]>([]);
   const [summary, setSummary] = useState({ totalDays: 0, patientDays: 0, therapyDuration: 0 });
 
   useEffect(() => {
     api.get('/epidemiology/summary').then(({ data }) => {
-      if (data.consumptionRows?.length) {
-        setConsumptionRows(data.consumptionRows);
-      }
-      if (data.pathogenCards?.length) {
-        setPathogenCards(data.pathogenCards);
-      }
+      setConsumptionRows(data.consumptionRows || []);
+      setPathogenCards(data.pathogenCards || []);
       setSummary({
         totalDays: Number(data.totalDays || 0),
         patientDays: Number(data.patientDays || 0),
@@ -116,10 +112,10 @@ export default function EpidemiologyReports() {
 
       <Grid container spacing={2}>
         <Grid item xs={12} lg={6}>
-          <ChartPanel title="DDD (Dose diaria definida) (g/1000 pacientes-dia)" metric="ddd" />
+          <ChartPanel title="DDD (aguardando dose padrão oficial)" metric="ddd" rows={consumptionRows} />
         </Grid>
         <Grid item xs={12} lg={6}>
-          <ChartPanel title="DOT (Dose total) (g/1000 pacientes-dia)" metric="dot" />
+          <ChartPanel title="Dias de terapia por antimicrobiano" metric="dot" rows={consumptionRows} />
         </Grid>
       </Grid>
 
@@ -201,22 +197,21 @@ function ConsumptionTable({ rows }: { rows: ConsumptionRow[] }) {
   );
 }
 
-function ChartPanel({ title, metric }: { title: string; metric: 'ddd' | 'dot' }) {
+function ChartPanel({ title, metric, rows }: { title: string; metric: 'ddd' | 'dot'; rows: ConsumptionRow[] }) {
   return (
     <Paper sx={{ p: 2.5, borderRadius: 2, height: '100%' }}>
       <Typography fontWeight={800} textAlign="center" color="#00a6c8" sx={{ mb: 2 }}>{title}</Typography>
-      <BarChart metric={metric} />
-      <LineChart />
-      <TrendTable metric={metric} />
+      {rows.length ? <BarChart metric={metric} rows={rows} /> : <Typography color="text.secondary">Sem dados recebidos para o período.</Typography>}
     </Paper>
   );
 }
 
-function BarChart({ metric }: { metric: 'ddd' | 'dot' }) {
-  const max = Math.max(...chartItems.map((item) => item[metric]));
+function BarChart({ metric, rows }: { metric: 'ddd' | 'dot'; rows: ConsumptionRow[] }) {
+  const items = [...rows].sort((a, b) => b[metric] - a[metric]).slice(0, 8).map((row) => ({ label: row.antimicrobial, ddd: row.ddd, dot: row.dot }));
+  const max = Math.max(...items.map((item) => item[metric]), 1);
   return (
     <Stack spacing={0.75} sx={{ maxWidth: 440, mx: 'auto', mb: 4 }}>
-      {chartItems.map((item) => {
+      {items.map((item) => {
         const value = item[metric];
         return (
           <Stack key={item.label} direction="row" alignItems="center" spacing={1}>

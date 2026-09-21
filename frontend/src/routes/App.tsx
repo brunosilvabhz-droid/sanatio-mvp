@@ -4,8 +4,12 @@ import AlertAudit from '../pages/AlertAudit/AlertAudit';
 import AlertRules from '../pages/AlertRules/AlertRules';
 import Alerts from '../pages/Alerts/Alerts';
 import AntimicrobialAudits from '../pages/AntimicrobialAudits/AntimicrobialAudits';
+import AnvisaClosure from '../pages/AnvisaClosure/AnvisaClosure';
 import Dashboard from '../pages/Dashboard/Dashboard';
+import EpidemiologyBenchmark from '../pages/EpidemiologyBenchmark/EpidemiologyBenchmark';
+import EpidemiologyReferences from '../pages/EpidemiologyReferences/EpidemiologyReferences';
 import EpidemiologyReports from '../pages/EpidemiologyReports/EpidemiologyReports';
+import EstablishmentProfile from '../pages/EstablishmentProfile/EstablishmentProfile';
 import Login from '../pages/Login/Login';
 import Interventions from '../pages/Interventions/Interventions';
 import MonitoringRuns from '../pages/MonitoringRuns/MonitoringRuns';
@@ -40,6 +44,10 @@ export default function App() {
           <Route path="interventions" element={<Interventions />} />
           <Route path="antimicrobial-audits" element={<AntimicrobialAudits />} />
           <Route path="epidemiology-reports" element={<EpidemiologyReports />} />
+          <Route path="epidemiology-benchmark" element={<EpidemiologyBenchmark />} />
+          <Route path="anvisa-closure" element={<AnvisaClosure />} />
+          <Route path="epidemiology-references" element={<EpidemiologyReferences />} />
+          <Route path="establishment-profile" element={<EstablishmentProfile />} />
           <Route path="alert-rules" element={<AlertRules />} />
           <Route path="monitoring-runs" element={<MonitoringRuns />} />
           <Route path="alert-audit" element={<AlertAudit />} />

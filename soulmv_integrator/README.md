@@ -44,13 +44,13 @@ docs/especificacao_views_soulmv_sanatio.md
 
 ## Configuração HML
 
-O arquivo `config.hml.json` já vem com:
+O arquivo local `config.hml.json` não é versionado. Crie-o a partir de `config.example.json` e informe a URL e o token gerado para o hospital:
 
 ```json
 {
   "sanatio": {
     "ingest_url": "http://192.168.18.175:8000/ingest/snapshots",
-    "token": "rCB9mZfJ_CV9r3nqXUUDo-0VLFje1diwvt1Z56_k8gg"
+    "token": "TOKEN_GERADO_PARA_O_HOSPITAL"
   }
 }
 ```
@@ -145,4 +145,4 @@ No Agendador de Tarefas:
 
 ## Observação de segurança
 
-O token de HML está preenchido para facilitar os testes. Em produção, gere um token por hospital na tela `Configurações` do SANATIO e use o token daquele hospital.
+Nunca grave tokens reais no Git. Gere um token por hospital na tela `Configurações` do SANATIO e mantenha-o apenas no arquivo local protegido ou em variável de ambiente.
