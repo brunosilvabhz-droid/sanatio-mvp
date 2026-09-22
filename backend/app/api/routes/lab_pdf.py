@@ -9,7 +9,7 @@ from sqlalchemy.orm import Session
 
 from app.api.deps import get_current_user
 from app.core.database import get_db
-from app.models.clinical import Atendimento, CulturaAtendimento
+from app.models.clinical import Atendimento, CulturaAtendimento, SolicitacaoExameAtendimento
 from app.models.lab_pdf_import import ImportacaoPdfLaboratorio, ResultadoPdfLaboratorio
 from app.models.user import User
 from app.services.lab_pdf_parser import parse_lab_pdf
@@ -29,12 +29,19 @@ class LinkRequest(BaseModel):
 
 
 def _candidate_attendances(db: Session, os_pedido: str) -> list[Atendimento]:
-    return list(db.scalars(
+    cultures = list(db.scalars(
         select(Atendimento)
         .join(CulturaAtendimento, CulturaAtendimento.atendimento_id == Atendimento.id)
         .where(CulturaAtendimento.id_origem_pedido.in_([os_pedido, f"750.{os_pedido}"]))
         .distinct()
     ))
+    requests = list(db.scalars(
+        select(Atendimento)
+        .join(SolicitacaoExameAtendimento, SolicitacaoExameAtendimento.atendimento_id == Atendimento.id)
+        .where(SolicitacaoExameAtendimento.id_origem_pedido.in_([os_pedido, f"750.{os_pedido}"]))
+        .distinct()
+    ))
+    return list({attendance.id: attendance for attendance in cultures + requests}.values())
 
 
 def _row_read(row: ResultadoPdfLaboratorio, user: User, db: Session) -> dict:
@@ -107,7 +114,15 @@ def list_results(import_id: int, db: Session = Depends(get_db), user: User = Dep
     if not db.get(ImportacaoPdfLaboratorio, import_id):
         raise HTTPException(status_code=404, detail="Importação não encontrada")
     rows = db.scalars(select(ResultadoPdfLaboratorio).where(ResultadoPdfLaboratorio.importacao_id == import_id).order_by(ResultadoPdfLaboratorio.ordem)).all()
-    return [_row_read(row, user, db) for row in rows]
+    response = []
+    for row in rows:
+        item = _row_read(row, user, db)
+        if not row.atendimento_id and not row.atendimento_sugerido_id:
+            candidates = _candidate_attendances(db, row.os_pedido)
+            if len(candidates) == 1:
+                item["cd_atendimento_sugerido"] = candidates[0].id_origem_atendimento
+        response.append(item)
+    return response
 
 
 @router.post("/imports/{import_id}/confirm-suggestions")
@@ -117,14 +132,14 @@ def confirm_suggestions(import_id: int, db: Session = Depends(get_db), user: Use
     rows = db.scalars(select(ResultadoPdfLaboratorio).where(
         ResultadoPdfLaboratorio.importacao_id == import_id,
         ResultadoPdfLaboratorio.atendimento_id.is_(None),
-        ResultadoPdfLaboratorio.atendimento_sugerido_id.is_not(None),
     )).all()
     linked = 0
     for row in rows:
         candidates = _candidate_attendances(db, row.os_pedido)
-        if len(candidates) != 1 or candidates[0].id != row.atendimento_sugerido_id:
+        if len(candidates) != 1:
             continue
         row.atendimento_id = candidates[0].id
+        row.atendimento_sugerido_id = candidates[0].id
         row.vinculado_por_id = user.id
         row.vinculado_em = datetime.now(timezone.utc)
         linked += 1

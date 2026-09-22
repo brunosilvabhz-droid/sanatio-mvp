@@ -135,6 +135,15 @@ class CulturaAtendimento(Base):
     data_hora_resultado: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
 
+class SolicitacaoExameAtendimento(Base):
+    __tablename__ = "solicitacoes_exames_atendimento"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    atendimento_id: Mapped[int] = mapped_column(ForeignKey("atendimentos.id"), index=True, nullable=False)
+    id_origem_pedido: Mapped[str] = mapped_column(String(60), unique=True, index=True, nullable=False)
+    data_hora_solicitacao: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+
+
 class ProcedimentoInvasivoAtendimento(Base):
     __tablename__ = "procedimentos_invasivos_atendimento"
     __table_args__ = (

@@ -9,9 +9,9 @@ from sqlalchemy import create_engine, select
 from sqlalchemy.orm import Session
 
 import app.models  # noqa: F401
-from app.api.routes.lab_pdf import LinkRequest, confirm_suggestions, import_pdf, link_result, patient_results
+from app.api.routes.lab_pdf import LinkRequest, confirm_suggestions, import_pdf, link_result, list_results, patient_results
 from app.models.base import Base
-from app.models.clinical import Atendimento, CulturaAtendimento, Paciente
+from app.models.clinical import Atendimento, CulturaAtendimento, Paciente, SolicitacaoExameAtendimento
 from app.models.lab_pdf_import import ResultadoPdfLaboratorio
 from app.models.user import Role, User
 
@@ -71,6 +71,24 @@ class LabPdfImportTest(unittest.TestCase):
         self.assertEqual(error.exception.status_code, 422)
         linked = link_result(row.id, LinkRequest(cd_atendimento="200", confirmar_sem_os=True), self.db, self.user)
         self.assertEqual(linked["cd_atendimento"], "200")
+
+    def test_request_arriving_after_pdf_creates_safe_suggestion(self):
+        from app.models.lab_pdf_import import ImportacaoPdfLaboratorio
+        batch = ImportacaoPdfLaboratorio(nome_arquivo="x.pdf", sha256="b" * 64, paginas=1, total_resultados=1, usuario_id=self.user.id)
+        self.db.add(batch)
+        self.db.flush()
+        row = ResultadoPdfLaboratorio(
+            importacao_id=batch.id, ordem=1, pagina=1, os_pedido="123456",
+            data_coleta=datetime(2026, 9, 3), data_resultado=datetime(2026, 9, 7),
+            exame_amostra="Cultura", resultado="Negativo até o momento", situacao="PARCIAL",
+        )
+        self.db.add(row)
+        self.db.commit()
+        self.assertIsNone(list_results(batch.id, self.db, self.user)[0]["cd_atendimento_sugerido"])
+        self.db.add(SolicitacaoExameAtendimento(atendimento_id=self.attendance.id, id_origem_pedido="123456"))
+        self.db.commit()
+        self.assertEqual(list_results(batch.id, self.db, self.user)[0]["cd_atendimento_sugerido"], "200")
+        self.assertEqual(confirm_suggestions(batch.id, self.db, self.user)["vinculados"], 1)
 
 
 if __name__ == "__main__":

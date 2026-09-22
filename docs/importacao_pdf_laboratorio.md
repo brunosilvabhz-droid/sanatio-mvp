@@ -1,6 +1,8 @@
 # Importação do PDF diário do laboratório
 
-Na área **Operação clínica > Resultados do laboratório**, a equipe SCIH importa o PDF textual de andamento de culturas. O SANATIO lê a OS no formato `750.271993` e usa somente a parte após `750.` (`271993`) para procurar o `cd_pedido` de `SANATIO.VW_CULTURAS` já recebido do SOUL.
+Na área **Operação clínica > Resultados do laboratório**, a equipe SCIH importa o PDF textual de andamento de culturas. O SANATIO lê a OS no formato `750.271993` e usa somente a parte após `750.` (`271993`) para procurar o `cd_pedido` recebido do SOUL.
+
+Para vincular automaticamente sem resultado laboratorial no SOUL, crie a view opcional `SANATIO.VW_SOLICITACOES_EXAMES`, com **uma linha por pedido** e estes aliases: `cd_pedido` (número da solicitação, sem `750.`), `cd_atendimento`, `cd_paciente` e `dt_solicitacao` (data/hora, pode ser nula). Adicione `"exam_requests": "SANATIO.VW_SOLICITACOES_EXAMES"` em `views` no JSON do integrador e execute-o novamente. A view só contém o vínculo da solicitação com o atendimento; não precisa trazer laudo ou resultado. Se `SANATIO.VW_CULTURAS` ainda não existir, remova a chave `cultures` do JSON; ela passou a ser opcional. Enquanto a view de solicitações não estiver disponível, o SANATIO permite conferência manual.
 
 - O PDF bruto não é armazenado. O SANATIO guarda os resultados extraídos, a página, a OS, a data, o status, o hash do arquivo e quem confirmou o vínculo.
 - Reimportar exatamente o mesmo arquivo é bloqueado pelo hash. Um relatório diário novo pode conter OS já vista; cada importação continua rastreável.

@@ -21,6 +21,7 @@ LEGACY_VIEW_NAMES = {
     "VW_SANATIO_MOVIMENTACOES_LEITO": "SANATIO.VW_MOVIMENTACOES_LEITO",
     "VW_SANATIO_ANTIMICROBIANOS": "SANATIO.VW_ANTIMICROBIANOS",
     "VW_SANATIO_CULTURAS": "SANATIO.VW_CULTURAS",
+    "VW_SANATIO_SOLICITACOES_EXAMES": "SANATIO.VW_SOLICITACOES_EXAMES",
     "VW_SANATIO_PROCEDIMENTOS_INVASIVOS": "SANATIO.VW_PROCEDIMENTOS_INVASIVOS",
     "VW_SANATIO_ISOLAMENTOS": "SANATIO.VW_ISOLAMENTOS",
 }
@@ -117,11 +118,11 @@ def query_specs(views: dict[str, str]) -> list[QuerySpec]:
     patients = quote_view(views["patients"])
     bed_movements = quote_view(views["bed_movements"])
     antimicrobials = quote_view(views["antimicrobials"])
-    cultures = quote_view(views["cultures"])
+    cultures = quote_view(views["cultures"]) if views.get("cultures") else None
     invasive = quote_view(views["invasive_procedures"])
     isolations = quote_view(views["isolations"])
 
-    return [
+    specs = [
         QuerySpec(
             key="patients",
             required_columns=("cd_atendimento", "cd_paciente", "dt_atendimento", "dt_alta", "ds_unidade", "ds_leito"),
@@ -169,25 +170,6 @@ def query_specs(views: dict[str, str]) -> list[QuerySpec]:
             """,
         ),
         QuerySpec(
-            key="cultures",
-            required_columns=("cd_atendimento", "cd_paciente", "cd_pedido", "cd_exame", "ds_exame", "dt_coleta"),
-            sql=f"""
-                SELECT
-                    cd_atendimento,
-                    cd_paciente,
-                    cd_pedido,
-                    cd_exame,
-                    ds_exame,
-                    dt_coleta,
-                    dt_resultado,
-                    ds_material,
-                    ds_resultado,
-                    ds_microorganismo,
-                    sn_positivo
-                FROM {cultures}
-            """,
-        ),
-        QuerySpec(
             key="invasive_procedures",
             required_columns=("cd_atendimento", "cd_paciente", "cd_procedimento", "ds_procedimento", "dt_inicio"),
             sql=f"""
@@ -219,6 +201,25 @@ def query_specs(views: dict[str, str]) -> list[QuerySpec]:
             """,
         ),
     ]
+    if cultures:
+        specs.append(QuerySpec(
+            key="cultures",
+            required_columns=("cd_atendimento", "cd_paciente", "cd_pedido", "cd_exame", "ds_exame", "dt_coleta"),
+            sql=f"""
+                SELECT cd_atendimento, cd_paciente, cd_pedido, cd_exame,
+                       ds_exame, dt_coleta, dt_resultado, ds_material,
+                       ds_resultado, ds_microorganismo, sn_positivo
+                FROM {cultures}
+            """,
+        ))
+    if views.get("exam_requests"):
+        requests = quote_view(views["exam_requests"])
+        specs.append(QuerySpec(
+            key="exam_requests",
+            required_columns=("cd_atendimento", "cd_paciente", "cd_pedido"),
+            sql=f"SELECT cd_atendimento, cd_paciente, cd_pedido, dt_solicitacao FROM {requests}",
+        ))
+    return specs
 
 
 def connect(engine: str, dsn: str):
@@ -255,7 +256,7 @@ def fetch_rows(conn, engine: str, spec: QuerySpec) -> list[dict[str, Any]]:
 
 def calculate_risk(patient: dict[str, Any], rows: dict[str, list[dict[str, Any]]], thresholds: dict[str, int]) -> dict[str, Any]:
     cd_atendimento = str(patient["cd_atendimento"])
-    cultures = [row for row in rows["cultures"] if str(row["cd_atendimento"]) == cd_atendimento]
+    cultures = [row for row in rows.get("cultures", []) if str(row["cd_atendimento"]) == cd_atendimento]
     antimicrobials = [row for row in rows["antimicrobials"] if str(row["cd_atendimento"]) == cd_atendimento]
     invasive = [row for row in rows["invasive_procedures"] if str(row["cd_atendimento"]) == cd_atendimento]
     isolations = [row for row in rows["isolations"] if str(row["cd_atendimento"]) == cd_atendimento]
@@ -353,7 +354,16 @@ def build_payload(rows: dict[str, list[dict[str, Any]]], thresholds: dict[str, i
                 "ds_resultado": row.get("ds_resultado"),
                 "sn_positivo": "S" if parse_bool(row.get("sn_positivo")) else "N",
             }
-            for row in rows["cultures"]
+            for row in rows.get("cultures", [])
+        ],
+        "exam_requests": [
+            {
+                "cd_atendimento": str(row["cd_atendimento"]),
+                "cd_paciente": str(row["cd_paciente"]),
+                "cd_pedido": str(row["cd_pedido"]),
+                "dt_solicitacao": iso(row.get("dt_solicitacao")),
+            }
+            for row in rows.get("exam_requests", [])
         ],
         "invasive_procedures": [
             {

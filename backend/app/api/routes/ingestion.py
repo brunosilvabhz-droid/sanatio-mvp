@@ -19,6 +19,7 @@ from app.models.clinical import (
     Paciente,
     ProcedimentoInvasivoAtendimento,
     SnapshotAtendimento,
+    SolicitacaoExameAtendimento,
 )
 from app.models.hospital_integration import HospitalIntegration
 from app.models.monitoring_run import MonitoringRun
@@ -522,6 +523,16 @@ def ingest_snapshots(
             }
         )
 
+    for item in payload.exam_requests:
+        attendance = _attendance_for_detail(db, item.cd_paciente, item.cd_atendimento)
+        request = db.scalar(select(SolicitacaoExameAtendimento).where(SolicitacaoExameAtendimento.id_origem_pedido == item.cd_pedido))
+        if request and request.atendimento_id != attendance.id:
+            raise HTTPException(status_code=422, detail=f"Pedido {item.cd_pedido} vinculado a outro atendimento")
+        if not request:
+            request = SolicitacaoExameAtendimento(atendimento_id=attendance.id, id_origem_pedido=item.cd_pedido)
+            db.add(request)
+        request.data_hora_solicitacao = item.dt_solicitacao
+
     for item in payload.cultures:
         attendance = _attendance_for_detail(db, item.cd_paciente, item.cd_atendimento)
         culture = db.scalar(
@@ -609,6 +620,7 @@ def ingest_snapshots(
         "bed_movements_received": created_movements,
         "antimicrobials_received": len(payload.antimicrobials),
         "cultures_received": len(payload.cultures),
+        "exam_requests_received": len(payload.exam_requests),
         "invasive_procedures_received": len(payload.invasive_procedures),
         "isolations_received": len(payload.isolations),
         "alerts_created": created_alerts,

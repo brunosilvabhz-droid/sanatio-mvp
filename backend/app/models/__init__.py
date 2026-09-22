@@ -10,6 +10,7 @@ from app.models.clinical import (
     Paciente,
     ProcedimentoInvasivoAtendimento,
     SnapshotAtendimento,
+    SolicitacaoExameAtendimento,
 )
 from app.models.epidemiology_reference import (
     FechamentoAnvisa,
@@ -61,6 +62,7 @@ __all__ = [
     "Role",
     "Setting",
     "SnapshotAtendimento",
+    "SolicitacaoExameAtendimento",
     "SupportTicket",
     "User",
 ]

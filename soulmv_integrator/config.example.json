@@ -12,6 +12,7 @@
     "bed_movements": "SANATIO.VW_MOVIMENTACOES_LEITO",
     "antimicrobials": "SANATIO.VW_ANTIMICROBIANOS",
     "cultures": "SANATIO.VW_CULTURAS",
+    "exam_requests": "SANATIO.VW_SOLICITACOES_EXAMES",
     "invasive_procedures": "SANATIO.VW_PROCEDIMENTOS_INVASIVOS",
     "isolations": "SANATIO.VW_ISOLAMENTOS"
   },

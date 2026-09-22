@@ -69,6 +69,8 @@ A view precisa trazer itens ativos e também os encerrados recentemente. Isso é
 
 ### SANATIO.VW_CULTURAS
 
+Esta view pode ficar fora da configuração do integrador enquanto não houver resultado laboratorial no SOUL. Para associar os PDFs diários pelo número da OS, use a view de solicitações abaixo.
+
 Uma linha por exame microbiológico. Se um exame tiver mais de um microrganismo, pode haver uma linha por microrganismo, mas a combinação dos identificadores precisa continuar única.
 
 | Campo | Precisa? | O que trazer |
@@ -84,6 +86,19 @@ Uma linha por exame microbiológico. Se um exame tiver mais de um microrganismo,
 | `ds_resultado` | Recomendado | Resultado textual liberado pelo laboratório. |
 | `ds_microorganismo` | Recomendado | Microrganismo identificado. |
 | `sn_positivo` | Sim | `S` para cultura positiva e `N` para negativa. |
+
+### SANATIO.VW_SOLICITACOES_EXAMES
+
+Uma linha por solicitação de exame no SOUL, mesmo sem laudo do laboratório. O número impresso no PDF como `OS: 750.271993` corresponde a `cd_pedido = 271993`.
+
+| Campo | Precisa? | O que trazer |
+| --- | --- | --- |
+| `cd_pedido` | Sim | Número da solicitação no SOUL, sem o prefixo `750.`. |
+| `cd_atendimento` | Sim | Atendimento ao qual a solicitação pertence. |
+| `cd_paciente` | Sim | Paciente do atendimento. |
+| `dt_solicitacao` | Sim | Data e hora da solicitação; pode ser nula. |
+
+Inclua `"exam_requests": "SANATIO.VW_SOLICITACOES_EXAMES"` em `views` no JSON do integrador. A configuração antiga continua válida sem esta chave, mas o vínculo automático do PDF dependerá de `VW_CULTURAS` ou de conferência manual.
 
 ### SANATIO.VW_PROCEDIMENTOS_INVASIVOS
 

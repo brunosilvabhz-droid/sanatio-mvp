@@ -76,6 +76,13 @@ class IngestCulture(BaseModel):
     sn_positivo: str = "N"
 
 
+class IngestExamRequest(BaseModel):
+    cd_atendimento: str
+    cd_paciente: str
+    cd_pedido: str
+    dt_solicitacao: datetime | None = None
+
+
 class IngestInvasiveProcedure(BaseModel):
     cd_atendimento: str
     cd_paciente: str
@@ -103,5 +110,6 @@ class IngestPayload(BaseModel):
     bed_movements: list[IngestBedMovement] = []
     antimicrobials: list[IngestAntimicrobial] = []
     cultures: list[IngestCulture] = []
+    exam_requests: list[IngestExamRequest] = []
     invasive_procedures: list[IngestInvasiveProcedure] = []
     isolations: list[IngestIsolation] = []
