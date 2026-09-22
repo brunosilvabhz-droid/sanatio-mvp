@@ -19,6 +19,7 @@ from app.models.epidemiology_reference import (
     ReferenciaEpidemiologica,
 )
 from app.models.hospital_integration import HospitalIntegration
+from app.models.lab_pdf_import import ImportacaoPdfLaboratorio, ResultadoPdfLaboratorio
 from app.models.intervention import InterventionRecipient, InterventionRequest
 from app.models.monitoring_run import MonitoringRun
 from app.models.monitoring_rule import MonitoringRule
@@ -40,6 +41,8 @@ __all__ = [
     "ExecucaoIntegracao",
     "FechamentoAnvisa",
     "HospitalIntegration",
+    "ImportacaoPdfLaboratorio",
+    "ResultadoPdfLaboratorio",
     "ImportacaoReferenciaEpidemiologica",
     "InterventionRecipient",
     "InterventionRequest",

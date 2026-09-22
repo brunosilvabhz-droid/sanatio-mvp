@@ -29,6 +29,7 @@ import { api } from '../../api/client';
 import InterventionDialog from '../../components/InterventionDialog';
 import PageHeader from '../../components/PageHeader';
 import PatientName from '../../components/PatientName';
+import { LabPdfResult } from '../LabPdfImport/LabPdfImport';
 import { RiskChip, SeverityChip } from '../../components/StatusChip';
 import { Alert, Antimicrobial, Culture, InvasiveProcedure, Isolation, Patient, TimelineEvent } from '../../types';
 
@@ -67,6 +68,7 @@ export default function PatientDetail() {
   const [selectedAttendance, setSelectedAttendance] = useState('');
   const [alerts, setAlerts] = useState<Alert[]>([]);
   const [timeline, setTimeline] = useState<TimelineEvent[]>([]);
+  const [labResults, setLabResults] = useState<LabPdfResult[]>([]);
   const [noteOpen, setNoteOpen] = useState(false);
   const [note, setNote] = useState('');
   const [interventionOpen, setInterventionOpen] = useState(false);
@@ -118,13 +120,14 @@ export default function PatientDetail() {
 
     setDetail({ patient: selected.patient, antimicrobials: [], cultures: [], invasive_procedures: [], isolations: [] });
 
-    const [antimicrobials, cultures, invasiveProcedures, isolations, alertsResponse, timelineResponse] = await Promise.allSettled([
+    const [antimicrobials, cultures, invasiveProcedures, isolations, alertsResponse, timelineResponse, labResponse] = await Promise.allSettled([
       api.get(`/patients/${attendance}/antimicrobials`),
       api.get(`/patients/${attendance}/cultures`),
       api.get(`/patients/${attendance}/invasive-procedures`),
       api.get(`/patients/${attendance}/isolations`),
       api.get(`/patients/${attendance}/alerts`),
-      api.get(`/patients/${attendance}/timeline`)
+      api.get(`/patients/${attendance}/timeline`),
+      api.get(`/lab-pdf/patients/${attendance}/results`)
     ]);
 
     setDetail({
@@ -136,6 +139,7 @@ export default function PatientDetail() {
     });
     setAlerts(alertsResponse.status === 'fulfilled' ? alertsResponse.value.data : []);
     setTimeline(timelineResponse.status === 'fulfilled' ? timelineResponse.value.data : []);
+    setLabResults(labResponse.status === 'fulfilled' ? labResponse.value.data : []);
   }
 
   useEffect(() => {
@@ -257,7 +261,12 @@ export default function PatientDetail() {
             </Grid>
           )}
           {tab === 1 && <SimpleRows rows={detail.antimicrobials} columns={['ds_antimicrobiano', 'ds_principio_ativo', 'dt_aplicacao', 'dt_inicio', 'dt_fim', 'dias_uso', 'sn_ativo', 'ds_dose', 'ds_via', 'ds_frequencia']} />}
-          {tab === 2 && <SimpleRows rows={detail.cultures} columns={['ds_exame', 'ds_material', 'dt_coleta', 'dt_resultado', 'ds_resultado', 'ds_microorganismo', 'sn_positivo']} />}
+          {tab === 2 && <Stack spacing={2}>
+            <Typography variant="subtitle2">Culturas recebidas do SOUL</Typography>
+            <SimpleRows rows={detail.cultures} columns={['ds_exame', 'ds_material', 'dt_coleta', 'dt_resultado', 'ds_resultado', 'ds_microorganismo', 'sn_positivo']} />
+            <Typography variant="subtitle2">Resultados do PDF do laboratório</Typography>
+            <SimpleRows rows={labResults} columns={['os_pedido', 'data_coleta', 'data_resultado', 'exame_amostra', 'resultado', 'situacao']} />
+          </Stack>}
           {tab === 3 && <SimpleRows rows={detail.invasive_procedures} columns={['ds_procedimento', 'dt_inicio', 'dt_fim', 'dias_permanencia', 'sn_ativo', 'ds_local_instalacao']} />}
           {tab === 4 && <SimpleRows rows={detail.isolations} columns={['ds_isolamento', 'dt_inicio', 'dt_fim', 'sn_ativo']} />}
           {tab === 5 && <AlertsTable alerts={alerts} />}

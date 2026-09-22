@@ -46,7 +46,8 @@ const groups = [
       { label: 'Pacientes', path: '/patients', icon: <SickIcon /> },
       { label: 'Alertas', path: '/alerts', icon: <NotificationsActiveIcon /> },
       { label: 'Intervenções', path: '/interventions', icon: <ReplyIcon /> },
-      { label: 'Antimicrobianos', path: '/antimicrobial-audits', icon: <MedicationIcon /> }
+      { label: 'Antimicrobianos', path: '/antimicrobial-audits', icon: <MedicationIcon /> },
+      { label: 'Resultados do laboratório', path: '/lab-pdf', icon: <UploadFileIcon /> }
     ]
   },
   {

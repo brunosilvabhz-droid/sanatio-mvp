@@ -12,6 +12,7 @@ import EpidemiologyReports from '../pages/EpidemiologyReports/EpidemiologyReport
 import EstablishmentProfile from '../pages/EstablishmentProfile/EstablishmentProfile';
 import Login from '../pages/Login/Login';
 import Interventions from '../pages/Interventions/Interventions';
+import LabPdfImport from '../pages/LabPdfImport/LabPdfImport';
 import MonitoringRuns from '../pages/MonitoringRuns/MonitoringRuns';
 import PatientDetail from '../pages/PatientDetail/PatientDetail';
 import Patients from '../pages/Patients/Patients';
@@ -42,6 +43,7 @@ export default function App() {
           <Route path="patients/:cdAtendimento" element={<PatientDetail />} />
           <Route path="alerts" element={<Alerts />} />
           <Route path="interventions" element={<Interventions />} />
+          <Route path="lab-pdf" element={<LabPdfImport />} />
           <Route path="antimicrobial-audits" element={<AntimicrobialAudits />} />
           <Route path="epidemiology-reports" element={<EpidemiologyReports />} />
           <Route path="epidemiology-benchmark" element={<EpidemiologyBenchmark />} />
