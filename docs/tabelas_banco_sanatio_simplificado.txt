@@ -1,0 +1,598 @@
+TABELAS DO BANCO DE DADOS DO SANATIO - DICIONÁRIO SIMPLIFICADO
+================================================================
+
+Banco principal: PostgreSQL.
+Este documento descreve o esquema atual até a migração 0021.
+Campos terminados em _id normalmente apontam para o campo id de outra tabela.
+Campos criado_em/created_at registram criação; atualizado_em/updated_at registram alteração.
+Campos booleanos guardam verdadeiro ou falso.
+
+
+1. pacientes
+------------
+Cadastro técnico e anonimizado do paciente. Não guarda o nome.
+
+id                    Identificador interno do paciente no SANATIO.
+id_origem_paciente    Código do paciente recebido do MV SOUL; deve ser único.
+criado_em             Data e hora em que o paciente foi criado no SANATIO.
+atualizado_em         Data e hora da última atualização.
+
+
+2. atendimentos
+---------------
+Internações ou atendimentos hospitalares vinculados ao paciente.
+
+id                    Identificador interno do atendimento.
+paciente_id           Paciente relacionado; aponta para pacientes.id.
+id_origem_atendimento Código do atendimento recebido do MV SOUL; deve ser único.
+ativo                 Indica se o atendimento ainda está ativo.
+unidade_atual         Unidade assistencial atual.
+leito_atual           Leito atual.
+data_hora_entrada     Data e hora da entrada/internação.
+data_hora_saida       Data e hora da alta ou saída; nulo enquanto estiver internado.
+criado_em             Data e hora da criação no SANATIO.
+atualizado_em         Data e hora da última atualização.
+
+
+3. movimentacoes_leito
+----------------------
+Histórico clínico de transferências recebido pela integração atual.
+
+id                     Identificador interno da movimentação.
+atendimento_id         Atendimento relacionado; aponta para atendimentos.id.
+unidade_origem         Unidade anterior.
+leito_origem           Leito anterior.
+unidade_destino        Unidade de destino.
+leito_destino          Leito de destino.
+data_hora_movimentacao Data e hora da transferência.
+criado_em              Data e hora em que o registro foi recebido.
+
+
+4. antimicrobianos_atendimento
+-------------------------------
+Prescrições e aplicações de antimicrobianos do atendimento.
+
+id                         Identificador interno.
+atendimento_id             Atendimento relacionado.
+id_origem_prescricao       Código da prescrição no MV SOUL.
+id_origem_item_prescricao  Código do item da prescrição.
+id_origem_produto          Código do medicamento/produto.
+nome_antimicrobiano        Nome apresentado na prescrição.
+principio_ativo            Princípio ativo usado para agrupamentos e análises.
+data_hora_inicio           Início do uso/prescrição.
+data_hora_aplicacao        Data e hora real da administração.
+data_hora_fim              Encerramento do uso; nulo quando ativo.
+ativo                      Indica se o item continua ativo.
+dose                       Dose e unidade.
+via                        Via de administração.
+frequencia                 Frequência prescrita.
+dias_uso                   Total calculado de dias de uso.
+atualizado_em              Data e hora da última atualização.
+
+
+5. culturas_atendimento
+------------------------
+Culturas e exames microbiológicos recebidos diretamente da integração hospitalar.
+
+id                    Identificador interno.
+atendimento_id        Atendimento relacionado.
+id_origem_pedido      Número da solicitação/pedido no MV SOUL.
+id_origem_exame       Código do exame ou item do pedido.
+exame                 Nome do exame.
+material              Material coletado, como sangue ou urina.
+microorganismo        Microrganismo identificado.
+resultado             Resultado textual liberado.
+positivo              Indica se a cultura é positiva.
+data_hora_coleta      Data e hora da coleta.
+data_hora_resultado   Data e hora da liberação do resultado.
+
+
+6. solicitacoes_exames_atendimento
+----------------------------------
+Relação entre a solicitação do SOUL e o atendimento, mesmo sem resultado laboratorial integrado.
+
+id                    Identificador interno.
+atendimento_id        Atendimento relacionado.
+id_origem_pedido      Número da solicitação no SOUL, sem o prefixo 750; deve ser único.
+data_hora_solicitacao Data e hora em que o exame foi solicitado.
+
+
+7. procedimentos_invasivos_atendimento
+---------------------------------------
+Períodos de uso de CVC, SVD/CVD, ventilação mecânica e outros dispositivos.
+
+id                       Identificador interno.
+atendimento_id           Atendimento relacionado.
+id_origem_procedimento   Código do procedimento/dispositivo no sistema de origem.
+procedimento             Descrição do procedimento ou dispositivo.
+local_instalacao         Local anatômico ou observação de instalação.
+data_hora_inicio         Data e hora da instalação/início.
+data_hora_fim            Data e hora da retirada; nulo enquanto ativo.
+ativo                    Indica se o dispositivo continua em uso.
+dias_permanencia         Total calculado de dias de permanência.
+
+
+8. isolamentos_atendimento
+--------------------------
+Períodos de isolamento e precauções do paciente.
+
+id                   Identificador interno.
+atendimento_id       Atendimento relacionado.
+id_origem_isolamento Código do isolamento no sistema de origem.
+isolamento           Tipo de precaução: contato, gotículas, aerossóis etc.
+data_hora_inicio     Data e hora de início.
+data_hora_fim        Data e hora de encerramento; nulo enquanto ativo.
+ativo                Indica se o isolamento continua ativo.
+
+
+9. execucoes_integracao
+-----------------------
+Resumo técnico de cada carga enviada pelo integrador hospitalar.
+
+id                            Identificador da execução.
+hospital_integracao_id        Integração/hospital que enviou a carga.
+status                        Estado da execução, como EM_EXECUCAO, CONCLUIDO ou ERRO.
+total_pacientes_recebidos     Quantidade de pacientes recebidos.
+total_snapshots_recebidos     Quantidade de snapshots recebidos/criados.
+total_movimentacoes_recebidas Quantidade de movimentações recebidas.
+total_alertas_gerados         Quantidade de alertas criados na carga.
+mensagem_erro                 Detalhe do erro, quando houver.
+data_hora_inicio              Início do processamento.
+data_hora_fim                 Fim do processamento.
+
+
+10. snapshots_atendimento
+-------------------------
+Fotografia clínica calculada para um atendimento em uma execução.
+
+id                              Identificador interno.
+atendimento_id                  Atendimento relacionado.
+execucao_integracao_id          Execução que originou o snapshot.
+status_risco                    Risco calculado: baixo, médio ou alto.
+dias_internacao                 Dias de internação na coleta.
+possui_cultura_positiva         Indica presença de cultura positiva.
+maior_dias_antimicrobiano       Maior duração de antimicrobiano ativo.
+maior_dias_dispositivo_invasivo Maior duração de dispositivo invasivo ativo.
+possui_isolamento_ativo         Indica isolamento ativo.
+data_hora_coleta                Momento de referência do snapshot.
+
+
+11. hospital_integrations
+-------------------------
+Cadastro de hospitais/integradores autorizados a enviar dados.
+
+id            Identificador interno.
+hospital_name Nome do hospital ou integração.
+token         Token secreto usado para autenticar a ingestão.
+active        Indica se a integração está autorizada.
+created_at    Data e hora da criação.
+updated_at    Data e hora da última atualização.
+
+
+12. monitoring_runs
+-------------------
+Execuções do mecanismo de monitoramento e avaliação de regras.
+
+id                   Identificador da execução.
+triggered_by_user_id Usuário que iniciou a execução; nulo quando automática.
+status               Estado, como RUNNING, SUCCESS ou ERROR.
+patients_processed   Quantidade de pacientes processados.
+alerts_created       Quantidade de alertas criados.
+duration_ms          Duração total em milissegundos.
+error_message        Mensagem de erro, quando houver.
+started_at           Data e hora de início.
+finished_at          Data e hora de término.
+
+
+13. patient_monitoring_snapshots
+--------------------------------
+Snapshot operacional legado/em inglês, mantido para histórico e compatibilidade.
+
+id                       Identificador interno.
+monitoring_run_id        Execução de monitoramento relacionada.
+cd_atendimento           Código do atendimento no sistema de origem.
+cd_paciente              Código do paciente no sistema de origem.
+unit                     Unidade assistencial.
+bed                      Leito.
+active                   Indica atendimento ativo.
+admitted_at              Data e hora da entrada.
+discharged_at            Data e hora da alta.
+risk_status              Risco calculado.
+days_in_hospital         Dias de internação.
+has_positive_culture     Indica cultura positiva.
+max_antimicrobial_days   Maior duração de antimicrobiano.
+max_invasive_device_days Maior duração de dispositivo invasivo.
+has_active_isolation     Indica isolamento ativo.
+collected_at             Momento da coleta do snapshot.
+
+
+14. patient_bed_movements
+-------------------------
+Movimentações operacionais legadas/em inglês, mantidas para histórico e compatibilidade.
+
+id             Identificador interno.
+cd_atendimento Código do atendimento.
+cd_paciente    Código do paciente.
+moved_at       Data e hora da movimentação.
+from_unit      Unidade anterior.
+from_bed       Leito anterior.
+to_unit        Unidade de destino.
+to_bed         Leito de destino.
+created_at     Data e hora da criação no SANATIO.
+
+
+15. monitoring_rules
+--------------------
+Regras configuráveis utilizadas na busca ativa e geração de alertas.
+
+id              Identificador da regra.
+name            Nome apresentado ao usuário.
+description     Explicação da regra.
+rule_type       Tipo interno da regra.
+parameter_key   Campo/sinal clínico avaliado.
+parameter_value Valor ou configuração usada na comparação; pode ser texto estruturado.
+severity        Severidade gerada quando a regra é atendida.
+active          Indica se a regra está habilitada.
+created_at      Data e hora da criação.
+updated_at      Data e hora da última alteração.
+
+
+16. alerts
+----------
+Alertas clínicos gerados pelo monitoramento ou pela integração.
+
+id              Identificador do alerta.
+cd_atendimento  Atendimento relacionado.
+cd_paciente     Paciente relacionado.
+unit            Unidade do paciente quando o alerta foi criado.
+rule_id         Regra que originou o alerta; pode ser nulo para alertas internos.
+alert_type      Tipo técnico do alerta.
+severity        Severidade, como BAIXA, MEDIA ou ALTA.
+title           Título exibido na tela.
+description     Descrição e motivo do alerta.
+recommendation  Recomendação assistencial sugerida.
+status          Situação, como ABERTO, EM_ANALISE ou RESOLVIDO.
+source          Origem, por exemplo monitoring ou client_ingestion.
+created_at      Data e hora da criação.
+updated_at      Data e hora da última atualização.
+resolved_at     Data e hora da resolução.
+
+
+17. alert_actions
+-----------------
+Histórico de ações realizadas em um alerta.
+
+id         Identificador da ação.
+alert_id   Alerta relacionado.
+user_id    Usuário que executou a ação.
+action     Tipo da ação, como análise, comentário ou resolução.
+comment    Comentário registrado pelo usuário.
+created_at Data e hora da ação.
+
+
+18. antimicrobial_audits
+-------------------------
+Fila e resultado das auditorias de antimicrobianos.
+
+id                      Identificador da auditoria.
+monitoring_run_id       Execução que gerou/atualizou a auditoria.
+cd_atendimento          Atendimento relacionado.
+cd_paciente             Paciente relacionado.
+unit                    Unidade assistencial.
+cd_prescricao           Código da prescrição.
+cd_item_prescricao      Código do item da prescrição.
+cd_produto              Código do produto.
+antimicrobial_name      Nome do antimicrobiano.
+started_at              Data e hora de início.
+ended_at                Data e hora de encerramento.
+days_in_use             Dias de uso.
+active                  Indica se o medicamento continua ativo.
+dose                    Dose.
+route                   Via de administração.
+frequency               Frequência.
+status                  Situação da auditoria, como PENDENTE ou REVISADA.
+priority                Prioridade da análise.
+decision                Decisão registrada pela equipe.
+justification           Justificativa da decisão.
+reviewed_by_user_id     Usuário que revisou.
+reviewed_at             Data e hora da revisão.
+created_at              Data e hora da criação.
+updated_at              Data e hora da última atualização.
+
+
+19. antimicrobial_audit_actions
+--------------------------------
+Histórico de alterações e ações de cada auditoria de antimicrobiano.
+
+id         Identificador da ação.
+audit_id   Auditoria relacionada.
+user_id    Usuário que realizou a ação.
+action     Tipo da ação realizada.
+status     Status resultante da ação.
+decision   Decisão registrada nessa ação.
+comment    Comentário ou justificativa.
+created_at Data e hora da ação.
+
+
+20. intervention_requests
+-------------------------
+Solicitações de intervenção enviadas pela equipe SCIH.
+
+id                         Identificador da intervenção.
+cd_atendimento             Atendimento relacionado.
+cd_paciente                Paciente relacionado.
+source_type                Origem: paciente, alerta, auditoria etc.
+source_id                  Identificador do registro de origem.
+reason                     Motivo da intervenção.
+message                    Mensagem enviada ao destinatário.
+status                     Situação, como ENVIADA ou RESPONDIDA.
+requested_by_user_id       Usuário solicitante.
+responded_by_user_id       Usuário que registrou/processou a resposta.
+response                   Resposta, como aceita ou recusada.
+response_justification     Justificativa da resposta.
+created_at                 Data e hora do envio.
+responded_at               Data e hora da resposta.
+updated_at                 Data e hora da última atualização.
+
+
+21. intervention_recipients
+---------------------------
+Destinatários de cada solicitação de intervenção.
+
+id              Identificador interno.
+intervention_id Intervenção relacionada.
+user_id         Usuário destinatário.
+email           Endereço usado no envio.
+status          Situação do envio para esse destinatário.
+created_at      Data e hora da criação/envio.
+
+
+22. patient_timeline_notes
+--------------------------
+Evoluções e anotações manuais da equipe na linha do tempo do paciente.
+
+id             Identificador da anotação.
+cd_atendimento Atendimento relacionado.
+cd_paciente    Paciente relacionado.
+note_type      Tipo da anotação, normalmente EVOLUCAO.
+note           Texto registrado.
+user_id        Usuário autor.
+created_at     Data e hora do registro.
+
+
+23. importacoes_pdf_laboratorio
+--------------------------------
+Controle dos PDFs diários de culturas importados pela equipe SCIH.
+
+id               Identificador da importação.
+nome_arquivo     Nome original do PDF.
+sha256           Hash do conteúdo; impede importar exatamente o mesmo arquivo duas vezes.
+paginas          Quantidade de páginas processadas.
+total_resultados Quantidade de linhas de resultado extraídas.
+usuario_id       Usuário que fez a importação.
+importado_em     Data e hora da importação.
+
+
+24. resultados_pdf_laboratorio
+-------------------------------
+Resultados extraídos do PDF e seus vínculos revisados com o atendimento.
+
+id                       Identificador do resultado extraído.
+importacao_id             Importação/PDF de origem.
+ordem                     Ordem da linha dentro da importação.
+pagina                    Página do PDF onde o resultado foi encontrado.
+os_pedido                 Número após o prefixo 750 da OS.
+nome_relatorio            Nome impresso no relatório; acesso restrito por permissão.
+data_coleta               Data e hora da coleta.
+data_resultado            Data e hora da diligência/atualização do resultado.
+exame_amostra             Texto extraído com exame e material/amostra.
+resultado                 Observação/resultado completo extraído.
+situacao                  PARCIAL, NEGATIVA, POSITIVA ou INDETERMINADA.
+atendimento_sugerido_id   Atendimento sugerido automaticamente pela OS.
+atendimento_id            Atendimento confirmado pela equipe.
+vinculado_por_id          Usuário que confirmou o vínculo.
+vinculado_em              Data e hora da confirmação.
+
+
+25. referencias_epidemiologicas
+--------------------------------
+Referências públicas versionadas usadas no Benchmark Epidemiológico.
+
+id                    Identificador da referência.
+codigo_indicador      Código padronizado do indicador.
+nome_indicador        Nome legível do indicador.
+tipo_unidade          Tipo de unidade, como UTI_ADULTO.
+populacao_referencia  População/serviços usados na comparação.
+regiao                Região brasileira da referência.
+uf                    Estado da referência; nulo no consolidado nacional.
+ano_referencia        Ano dos dados.
+periodo_referencia    Período adicional, quando aplicável.
+p10                   Percentil 10.
+p25                   Percentil 25.
+p50                   Percentil 50/mediana.
+p75                   Percentil 75.
+p90                   Percentil 90.
+unidade_medida        Unidade do indicador.
+fonte                 Instituição/publicação de origem.
+descricao_fonte       Detalhes complementares da fonte.
+url_fonte             Link da publicação oficial.
+versao_referencia     Versão interna da carga/importação.
+data_publicacao       Data de publicação pela fonte.
+data_importacao       Data em que entrou no SANATIO.
+ativo                 Indica se pode ser usada no benchmark.
+data_criacao          Data da criação.
+data_atualizacao      Data da última alteração.
+
+
+26. importacoes_referencias_epidemiologicas
+--------------------------------------------
+Histórico das importações de referências epidemiológicas.
+
+id                    Identificador da importação.
+nome_arquivo          Nome do CSV ou Excel importado.
+fonte                 Tipo/origem declarada da importação.
+ano_referencia        Ano encontrado no arquivo.
+quantidade_registros  Registros gravados com sucesso.
+quantidade_erros      Linhas rejeitadas ou com erro.
+status                Estado final da importação.
+usuario_id            Usuário que importou.
+data_hora_inicio      Início do processamento.
+data_hora_fim         Fim do processamento.
+mensagem_erro         Resumo dos erros encontrados.
+
+
+27. perfis_estabelecimento
+---------------------------
+Dados cadastrais e públicos do hospital.
+
+id                          Identificador interno.
+cnes                        Código CNES do estabelecimento; deve ser único.
+nome_estabelecimento        Nome oficial.
+municipio                   Município.
+uf                          Estado.
+quantidade_leitos           Total de leitos.
+quantidade_leitos_uti       Total de leitos de UTI.
+data_ultima_atualizacao_cnes Data da última consulta/atualização pública.
+fonte                       Fonte dos dados cadastrais.
+erro_ultima_atualizacao     Erro da última tentativa de atualização.
+data_criacao                Data da criação.
+data_atualizacao            Data da última alteração.
+
+
+28. fechamentos_anvisa
+----------------------
+Rascunhos e validações mensais dos indicadores enviados/avaliados para Anvisa.
+
+id                    Identificador do fechamento.
+tipo_unidade          Tipo de unidade assistencial.
+periodo               Competência no formato AAAA-MM.
+paciente_dia          Total de paciente-dia.
+cvc_dia               Total de CVC-dia.
+vm_dia                Total de ventilador mecânico-dia.
+cvd_dia               Total de cateter vesical de demora-dia.
+casos_ipcsl           Quantidade de casos de IPCSL.
+casos_pav             Quantidade de casos de PAV.
+casos_itu_cvd         Quantidade de casos de ITU associada a CVD.
+densidade_ipcsl       Densidade calculada de IPCSL.
+densidade_pav         Densidade calculada de PAV.
+densidade_itu_cvd     Densidade calculada de ITU-CVD.
+status                Situação do fechamento, como rascunho ou validado.
+validado_por          Usuário que validou.
+data_hora_validacao   Data e hora da validação.
+data_criacao          Data da criação.
+data_atualizacao      Data da última atualização.
+
+
+29. users
+---------
+Usuários autorizados a acessar o SANATIO.
+
+id                    Identificador do usuário.
+email                 E-mail usado no login e nas comunicações.
+full_name             Nome completo.
+hashed_password       Hash seguro da senha; nunca guarda senha em texto aberto.
+role_id               Perfil de acesso; aponta para roles.id.
+active                Indica se o usuário pode acessar.
+can_view_patient_name Indica permissão especial para visualizar nomes de pacientes.
+created_at            Data da criação.
+updated_at            Data da última atualização.
+
+
+30. roles
+---------
+Perfis de acesso do sistema.
+
+id          Identificador do perfil.
+name        Nome único, por exemplo ADMIN ou SCIH.
+description Explicação das permissões/finalidade do perfil.
+
+
+31. settings
+------------
+Configurações internas e parâmetros ajustáveis do SANATIO.
+
+id          Identificador da configuração.
+key         Chave única usada pelo código.
+value       Valor armazenado como texto.
+description Explicação do parâmetro.
+updated_at  Data da última alteração.
+
+
+32. support_tickets
+-------------------
+Chamados de suporte abertos pelos usuários.
+
+id                Identificador do chamado.
+category          Categoria do problema ou solicitação.
+title             Título resumido.
+description       Descrição detalhada.
+status            Situação, como ABERTO, EM_ATENDIMENTO ou RESPONDIDO.
+requester_user_id Usuário solicitante.
+responder_user_id Usuário administrador que respondeu.
+admin_response    Resposta do suporte.
+created_at        Data de abertura.
+updated_at        Data da última atualização.
+responded_at      Data da resposta.
+
+
+33. logs_auditoria
+------------------
+Trilha de auditoria para alterações importantes.
+
+id             Identificador do evento.
+usuario_id     Usuário responsável; pode ser nulo em ação automática.
+data_hora      Data e hora da ação.
+acao           Nome/tipo da ação executada.
+registro       Identificação do objeto alterado.
+valor_anterior Conteúdo anterior, normalmente em JSON.
+valor_novo     Conteúdo novo, normalmente em JSON.
+
+
+34. alembic_version
+-------------------
+Tabela técnica mantida pelo Alembic para controlar a versão do banco. Não deve ser editada manualmente.
+
+version_num Versão da última migração aplicada, por exemplo 0021.
+
+
+RELACIONAMENTOS PRINCIPAIS
+==========================
+
+pacientes
+  -> atendimentos
+     -> movimentacoes_leito
+     -> antimicrobianos_atendimento
+     -> culturas_atendimento
+     -> solicitacoes_exames_atendimento
+     -> procedimentos_invasivos_atendimento
+     -> isolamentos_atendimento
+     -> snapshots_atendimento
+     -> resultados_pdf_laboratorio (após confirmação)
+
+monitoring_runs
+  -> patient_monitoring_snapshots
+  -> antimicrobial_audits
+
+monitoring_rules
+  -> alerts
+     -> alert_actions
+
+intervention_requests
+  -> intervention_recipients
+
+importacoes_pdf_laboratorio
+  -> resultados_pdf_laboratorio
+
+users / roles
+  -> ações, validações, intervenções, chamados, importações e auditoria
+
+
+OBSERVAÇÕES DE SEGURANÇA
+========================
+
+1. O núcleo pacientes/atendimentos não guarda o nome do paciente.
+2. nome_relatorio em resultados_pdf_laboratorio veio do PDF e exige permissão específica na API.
+3. hashed_password nunca deve ser convertido ou exibido como senha.
+4. hospital_integrations.token é segredo de integração e não deve aparecer em logs/documentos públicos.
+5. logs_auditoria devem ser preservados conforme a política de retenção do hospital.
+6. alembic_version é técnica e só deve ser alterada pelas migrações da aplicação.
