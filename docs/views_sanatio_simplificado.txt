@@ -1,0 +1,240 @@
+VIEWS DO MV SOUL PARA O SANATIO - GUIA SIMPLIFICADO
+===================================================
+
+Todas as views devem ser criadas no owner SANATIO.
+Os nomes das views e das colunas devem ser exatamente os descritos abaixo.
+Datas devem ser retornadas como DATE ou TIMESTAMP, nunca como texto formatado.
+Campos iniciados por sn_ devem retornar S ou N.
+Não enviar o nome do paciente nas views de integração. O SANATIO usa cd_paciente e cd_atendimento.
+Não retornar apenas dados ativos. Enviar também encerramentos e histórico recente.
+
+
+1. SANATIO.VW_PACIENTES_ATENDIMENTOS
+------------------------------------
+Uma linha por atendimento hospitalar.
+
+cd_atendimento       O código único do atendimento no MV. Obrigatório.
+cd_paciente          O código único do paciente no MV. Obrigatório. Não retornar o nome.
+dt_nascimento        Data de nascimento do paciente.
+tp_sexo              Sexo cadastrado: M, F ou I.
+dt_atendimento       Data e hora da entrada/internação. Obrigatório.
+dt_alta              Data e hora da alta. Nulo enquanto o atendimento estiver ativo.
+cd_unidade           Código da unidade atual.
+ds_unidade           Nome da unidade atual, por exemplo UTI Adulto. Obrigatório.
+cd_leito             Código do leito atual.
+ds_leito             Nome ou descrição do leito atual. Obrigatório.
+cd_prestador         Código do médico responsável.
+nm_prestador         Nome do médico responsável.
+cd_convenio          Código do convênio.
+nm_convenio          Nome do convênio.
+
+
+2. SANATIO.VW_MOVIMENTACOES_LEITO
+---------------------------------
+Uma linha por entrada, transferência ou mudança de leito.
+
+cd_atendimento       Atendimento relacionado. Obrigatório.
+cd_paciente          Paciente relacionado. Obrigatório.
+dt_movimentacao      Data e hora da movimentação. Obrigatório.
+ds_unidade_origem    Unidade anterior. Pode ser nula na primeira entrada.
+ds_leito_origem      Leito anterior. Pode ser nulo na primeira entrada.
+ds_unidade_destino   Unidade para a qual o paciente foi movimentado. Obrigatório.
+ds_leito_destino     Leito para o qual o paciente foi movimentado. Obrigatório.
+
+
+3. SANATIO.VW_ANTIMICROBIANOS
+-----------------------------
+Preferencialmente uma linha por aplicação do medicamento.
+
+cd_atendimento       Atendimento do paciente. Obrigatório.
+cd_paciente          Paciente relacionado. Obrigatório.
+cd_prescricao        Código da prescrição. Obrigatório.
+cd_item_prescricao   Código único do item da prescrição. Obrigatório.
+cd_produto           Código do medicamento/produto.
+ds_antimicrobiano    Nome do medicamento na prescrição. Obrigatório.
+ds_principio_ativo   Princípio ativo do medicamento. Obrigatório; será usado nos agrupamentos.
+dt_inicio            Data e hora de início do item. Obrigatório.
+dt_aplicacao         Data e hora real da administração. Obrigatório e não pode ser nulo.
+dt_fim               Data e hora do encerramento. Nulo enquanto estiver ativo.
+sn_ativo             S quando ativo e N quando encerrado. Obrigatório.
+ds_dose              Dose e unidade, por exemplo 1 g ou 500 mg.
+ds_via               Via de administração, por exemplo EV, VO ou IM.
+ds_frequencia        Frequência, por exemplo 8/8h ou 24/24h.
+dias_uso             Quantidade de dias de uso até o fim ou até a data atual.
+
+
+4. SANATIO.VW_SOLICITACOES_EXAMES
+---------------------------------
+Uma linha por solicitação de exame. Esta view é necessária para associar o PDF do laboratório ao paciente.
+
+cd_pedido            Número da solicitação no SOUL, sem o prefixo 750. Obrigatório.
+                     Exemplo: no PDF, OS 750.271993 deve retornar cd_pedido = 271993.
+cd_atendimento       Atendimento ao qual a solicitação pertence. Obrigatório.
+cd_paciente          Paciente ao qual a solicitação pertence. Obrigatório.
+dt_solicitacao       Data e hora da solicitação. Pode ser nula quando não estiver disponível.
+
+Esta view não precisa trazer resultado, laudo ou nome do paciente.
+
+
+5. SANATIO.VW_CULTURAS - OPCIONAL NESTA FASE
+--------------------------------------------
+Uma linha por exame microbiológico ou por microrganismo identificado.
+Pode ficar fora da configuração enquanto o laboratório não estiver integrado ao SOUL.
+
+cd_atendimento       Atendimento relacionado. Obrigatório.
+cd_paciente          Paciente relacionado. Obrigatório.
+cd_pedido            Número da solicitação, igual ao usado em VW_SOLICITACOES_EXAMES. Obrigatório.
+cd_exame             Código do exame ou do item do pedido. Obrigatório.
+ds_exame             Nome do exame, por exemplo hemocultura ou urocultura. Obrigatório.
+dt_coleta            Data e hora da coleta. Obrigatório.
+dt_resultado         Data e hora da liberação do resultado.
+ds_material          Material coletado, por exemplo sangue, urina ou secreção traqueal.
+ds_resultado         Texto do resultado liberado pelo laboratório.
+ds_microorganismo    Microrganismo identificado.
+sn_positivo          S para positivo e N para negativo. Obrigatório.
+
+
+6. SANATIO.VW_PROCEDIMENTOS_INVASIVOS
+-------------------------------------
+Uma linha por instalação ou período de uso de dispositivo invasivo.
+
+cd_atendimento       Atendimento relacionado. Obrigatório.
+cd_paciente          Paciente relacionado. Obrigatório.
+cd_procedimento      Identificador único do dispositivo instalado. Obrigatório.
+ds_procedimento      Descrição que permita reconhecer CVC, SVD/CVD e ventilação mecânica. Obrigatório.
+dt_inicio            Data e hora da instalação ou início do uso. Obrigatório.
+dt_fim               Data e hora da retirada. Nulo enquanto estiver ativo.
+sn_ativo             S para ativo e N para encerrado. Obrigatório.
+ds_local_instalacao  Local anatômico ou observação da instalação.
+dias_permanencia     Total de dias de permanência do dispositivo.
+
+
+7. SANATIO.VW_ISOLAMENTOS
+-------------------------
+Uma linha por período de isolamento ou precaução.
+
+cd_atendimento       Atendimento relacionado. Obrigatório.
+cd_paciente          Paciente relacionado. Obrigatório.
+cd_isolamento        Identificador único do isolamento. Obrigatório.
+ds_isolamento        Tipo: contato, gotículas, aerossóis etc. Obrigatório.
+dt_inicio            Data e hora do início. Obrigatório.
+dt_fim               Data e hora do encerramento. Nulo enquanto estiver ativo.
+sn_ativo             S para ativo e N para encerrado. Obrigatório.
+
+
+VIEWS PREVISTAS PARA A PRÓXIMA ETAPA
+====================================
+
+8. SANATIO.VW_IRAS
+------------------
+Uma linha por evento de infecção avaliado pelo SCIH.
+
+cd_iras              Identificador único do evento. Obrigatório.
+cd_atendimento       Atendimento relacionado. Obrigatório.
+cd_paciente          Paciente relacionado. Obrigatório.
+tp_iras              IPCSL, PAV, ITU_CVD ou ISC. Obrigatório.
+dt_evento            Data epidemiológica do evento. Obrigatório.
+ds_unidade           Unidade à qual o caso foi atribuído. Obrigatório.
+cd_cirurgia          Cirurgia relacionada; obrigatório quando tp_iras for ISC.
+status_validacao     SUSPEITO, CONFIRMADO ou DESCARTADO. Obrigatório.
+dt_validacao         Data da validação pelo SCIH.
+
+
+9. SANATIO.VW_CIRURGIAS
+-----------------------
+Uma linha por cirurgia realizada.
+
+cd_atendimento          Atendimento relacionado. Obrigatório.
+cd_paciente             Paciente relacionado. Obrigatório.
+cd_cirurgia             Identificador único da cirurgia. Obrigatório.
+cd_procedimento         Código do procedimento principal. Obrigatório.
+ds_procedimento         Descrição do procedimento principal. Obrigatório.
+dt_inicio_cirurgia      Data e hora do início. Obrigatório.
+dt_fim_cirurgia         Data e hora do término.
+ds_unidade              Bloco ou unidade onde ocorreu. Obrigatório.
+potencial_contaminacao  LIMPA, POTENCIALMENTE_CONTAMINADA, CONTAMINADA ou INFECTADA. Obrigatório.
+asa                     Classificação ASA.
+sn_urgencia             S ou N.
+sn_reoperacao           S ou N.
+dt_alta                 Data da alta para acompanhamento do egresso.
+
+
+10. SANATIO.VW_ANTIBIOGRAMA
+---------------------------
+Uma linha por antimicrobiano testado para cada microrganismo da cultura.
+
+cd_pedido               Mesmo número usado em VW_CULTURAS. Obrigatório.
+cd_exame                Mesmo código usado em VW_CULTURAS. Obrigatório.
+cd_microorganismo       Código do microrganismo. Obrigatório.
+ds_microorganismo       Nome do microrganismo. Obrigatório.
+cd_antimicrobiano       Código do antimicrobiano testado. Obrigatório.
+ds_antimicrobiano       Nome do antimicrobiano testado. Obrigatório.
+resultado_sensibilidade S, I ou R. Obrigatório.
+valor_mic               Valor da concentração inibitória mínima, se disponível.
+dt_resultado            Data e hora da liberação. Obrigatório.
+
+
+11. SANATIO.VW_NOTIFICACOES
+---------------------------
+Uma linha por suspeita ou confirmação de doença notificável.
+
+cd_notificacao       Identificador único. Obrigatório.
+cd_atendimento       Atendimento relacionado. Obrigatório.
+cd_paciente          Paciente relacionado. Obrigatório.
+cd_diagnostico       CID ou código local.
+ds_diagnostico       Diagnóstico ou suspeita. Obrigatório.
+dt_identificacao     Data e hora da identificação. Obrigatório.
+sn_exige_sinan       S quando exigir ficha SINAN; caso contrário N. Obrigatório.
+status_ficha         PENDENTE, SOLICITADA, PREENCHIDA ou DESCARTADA. Obrigatório.
+sn_exige_isolamento  S ou N.
+
+
+12. SANATIO.VW_LINHA_SEPSE
+--------------------------
+Uma linha por abertura de protocolo de sepse.
+
+cd_protocolo         Identificador único do protocolo. Obrigatório.
+cd_atendimento       Atendimento relacionado. Obrigatório.
+cd_paciente          Paciente relacionado. Obrigatório.
+dt_abertura          Data e hora da abertura. Obrigatório.
+dt_encerramento      Data e hora do encerramento.
+status_protocolo     ABERTO, CONFIRMADO, DESCARTADO ou ENCERRADO. Obrigatório.
+ds_unidade           Unidade do paciente na abertura. Obrigatório.
+
+
+13. SANATIO.VW_CONSUMO_HIGIENE
+------------------------------
+Uma linha por mês, unidade e tipo de produto.
+
+competencia          Primeiro dia do mês de referência. Obrigatório.
+ds_unidade           Unidade assistencial. Obrigatório.
+tp_produto           SABAO ou PREPARACAO_ALCOOLICA. Obrigatório.
+quantidade_ml        Quantidade consumida no mês em mililitros. Obrigatório.
+paciente_dia         Total de paciente-dia da mesma unidade e mês. Obrigatório.
+
+
+VIEW LOCAL OPCIONAL - NÃO ENVIAR PARA A NUVEM
+=============================================
+
+14. SANATIO.VW_RESOLVE_PACIENTE
+-------------------------------
+Usada somente dentro da rede do hospital para mostrar o nome a usuários autorizados.
+
+cd_paciente          Código do paciente. Obrigatório.
+nm_paciente          Nome completo. Obrigatório.
+dt_nascimento        Data de nascimento para conferência.
+
+
+CHECKLIST PARA ENTREGA
+======================
+
+1. Criar as views no owner SANATIO.
+2. Manter exatamente os nomes de views e aliases deste arquivo.
+3. Retornar datas como DATE/TIMESTAMP.
+4. Retornar S ou N nos campos sn_*.
+5. Não enviar nm_paciente nas views de integração.
+6. Não limitar tudo aos registros ativos; incluir encerramentos e histórico recente.
+7. Criar usuário técnico com permissão somente de SELECT nas views.
+8. Testar ao menos um atendimento completo.
+9. Confirmar que a OS 750.XXXXXX do PDF encontra cd_pedido = XXXXXX em VW_SOLICITACOES_EXAMES.
+
