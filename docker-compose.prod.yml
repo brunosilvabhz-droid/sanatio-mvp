@@ -1,0 +1,87 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: sanatio
+      POSTGRES_USER: sanatio
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD obrigatoria}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U sanatio -d sanatio"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+    networks:
+      - database
+
+  backend:
+    build: ./backend
+    restart: unless-stopped
+    environment:
+      DATABASE_URL: postgresql+psycopg://sanatio:${POSTGRES_PASSWORD}@postgres:5432/sanatio
+      APP_PUBLIC_URL: https://${SANATIO_DOMAIN}
+      SECRET_KEY: ${SECRET_KEY:?SECRET_KEY obrigatoria}
+      ACCESS_TOKEN_EXPIRE_MINUTES: 720
+      INITIAL_ADMIN_PASSWORD: ${INITIAL_ADMIN_PASSWORD:?INITIAL_ADMIN_PASSWORD obrigatoria}
+      USE_MOCK_SOULMV: "false"
+      EXPOSE_PATIENT_NAMES_IN_API: "false"
+      SMTP_HOST: ${SMTP_HOST:-smtp-relay.brevo.com}
+      SMTP_PORT: ${SMTP_PORT:-587}
+      SMTP_USERNAME: ${SMTP_USERNAME:-}
+      SMTP_PASSWORD: ${SMTP_PASSWORD:-}
+      SMTP_FROM_EMAIL: ${SMTP_FROM_EMAIL:-sanatio@impactocg.com}
+      SMTP_FROM_NAME: ${SMTP_FROM_NAME:-SANATIO}
+      SUPPORT_CONTACT_EMAIL: ${SUPPORT_CONTACT_EMAIL:-contato@impactocg.com}
+      CORS_ORIGINS: https://${SANATIO_DOMAIN}
+    depends_on:
+      postgres:
+        condition: service_healthy
+    expose:
+      - "8000"
+    networks:
+      - database
+      - web
+
+  frontend:
+    build: ./frontend
+    restart: unless-stopped
+    environment:
+      VITE_API_URL: /api
+      VITE_PATIENT_NAME_RESOLVER_URL: ""
+    depends_on:
+      - backend
+    expose:
+      - "5173"
+    networks:
+      - web
+
+  caddy:
+    image: caddy:2.10-alpine
+    restart: unless-stopped
+    environment:
+      SANATIO_DOMAIN: ${SANATIO_DOMAIN}
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"
+    volumes:
+      - ./deploy/production/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      - frontend
+      - backend
+    networks:
+      - web
+
+volumes:
+  postgres_data:
+  caddy_data:
+  caddy_config:
+
+networks:
+  database:
+    internal: true
+  web:

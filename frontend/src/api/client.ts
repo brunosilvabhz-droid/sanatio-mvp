@@ -6,6 +6,7 @@ function resolveApiBaseUrl() {
   const isBrowserLocalhost = browserHost === 'localhost' || browserHost === '127.0.0.1';
 
   if (configuredUrl) {
+    if (configuredUrl.startsWith('/')) return configuredUrl;
     const configured = new URL(configuredUrl);
     const configuredIsLocalhost = configured.hostname === 'localhost' || configured.hostname === '127.0.0.1';
     if (!configuredIsLocalhost || isBrowserLocalhost) return configuredUrl;

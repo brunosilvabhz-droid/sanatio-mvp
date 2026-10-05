@@ -1,3 +1,5 @@
+import os
+
 from sqlalchemy import select
 
 from app.core.database import SessionLocal
@@ -47,6 +49,7 @@ SETTINGS = [
 ]
 
 def main() -> None:
+    initial_admin_password = os.getenv("INITIAL_ADMIN_PASSWORD", "123456")
     db = SessionLocal()
     try:
         role_by_name = {}
@@ -64,7 +67,7 @@ def main() -> None:
                     User(
                         email=email,
                         full_name=full_name,
-                        hashed_password=get_password_hash("123456"),
+                        hashed_password=get_password_hash(initial_admin_password),
                         role_id=role_by_name[role_name].id,
                         active=True,
                         can_view_patient_name=can_view_patient_name,
