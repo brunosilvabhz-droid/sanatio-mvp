@@ -45,15 +45,16 @@ services:
       - web
 
   frontend:
-    build: ./frontend
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile.prod
+      args:
+        VITE_API_URL: /api
     restart: unless-stopped
-    environment:
-      VITE_API_URL: /api
-      VITE_PATIENT_NAME_RESOLVER_URL: ""
     depends_on:
       - backend
     expose:
-      - "5173"
+      - "80"
     networks:
       - web
 
