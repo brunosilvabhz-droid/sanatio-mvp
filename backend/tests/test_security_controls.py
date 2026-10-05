@@ -9,6 +9,7 @@ from app.api.routes.auth import (
 )
 from app.core.config import Settings
 from app.core.security import create_access_token, decode_access_token
+from app.schemas.auth import LoginRequest
 
 
 def test_access_token_validates_issuer_audience_and_signature() -> None:
@@ -39,3 +40,8 @@ def test_login_failures_are_limited() -> None:
 def test_production_rejects_weak_secret() -> None:
     with pytest.raises(ValueError):
         Settings(environment="production", secret_key="change-me", _env_file=None)
+
+
+def test_login_accepts_existing_local_account() -> None:
+    payload = LoginRequest(email="admin@sanatio.local", password="senha-de-teste")
+    assert payload.email == "admin@sanatio.local"
