@@ -1,15 +1,24 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from starlette.middleware.trustedhost import TrustedHostMiddleware
 
 from app.api.routes import admin, alerts, antimicrobial_audits, auth, dashboard, epidemiology, epidemiology_reference, ingestion, interventions, lab_pdf, monitoring, patients, support_tickets
 from app.core.config import settings
 
-app = FastAPI(title=settings.app_name, version="0.1.0")
+app = FastAPI(
+    title=settings.app_name,
+    version="0.1.0",
+    docs_url=None if settings.is_production else "/docs",
+    redoc_url=None if settings.is_production else "/redoc",
+    openapi_url=None if settings.is_production else "/openapi.json",
+)
+
+app.add_middleware(TrustedHostMiddleware, allowed_hosts=settings.trusted_host_list)
 
 app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.cors_origin_list,
-    allow_origin_regex=settings.cors_origin_regex,
+    allow_origin_regex=settings.cors_origin_regex or None,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -32,4 +41,4 @@ app.include_router(admin.router)
 
 @app.get("/health")
 def health() -> dict:
-    return {"status": "ok", "mock_soulmv": settings.use_mock_soulmv}
+    return {"status": "ok"}

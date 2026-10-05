@@ -22,6 +22,8 @@ services:
     environment:
       DATABASE_URL: postgresql+psycopg://sanatio:${POSTGRES_PASSWORD}@postgres:5432/sanatio
       APP_PUBLIC_URL: https://${SANATIO_DOMAIN}
+      ENVIRONMENT: production
+      TRUSTED_HOSTS: ${SANATIO_DOMAIN}
       SECRET_KEY: ${SECRET_KEY:?SECRET_KEY obrigatoria}
       ACCESS_TOKEN_EXPIRE_MINUTES: 720
       INITIAL_ADMIN_PASSWORD: ${INITIAL_ADMIN_PASSWORD:?INITIAL_ADMIN_PASSWORD obrigatoria}
@@ -35,6 +37,7 @@ services:
       SMTP_FROM_NAME: ${SMTP_FROM_NAME:-SANATIO}
       SUPPORT_CONTACT_EMAIL: ${SUPPORT_CONTACT_EMAIL:-contato@impactocg.com}
       CORS_ORIGINS: https://${SANATIO_DOMAIN}
+      CORS_ORIGIN_REGEX: ""
     depends_on:
       postgres:
         condition: service_healthy

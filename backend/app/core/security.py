@@ -1,7 +1,8 @@
 from datetime import datetime, timedelta, timezone
 from typing import Any
 
-from jose import JWTError, jwt
+import jwt
+from jwt import InvalidTokenError
 from passlib.context import CryptContext
 
 from app.core.config import settings
@@ -19,7 +20,14 @@ def get_password_hash(password: str) -> str:
 
 def create_access_token(subject: str, extra: dict[str, Any] | None = None) -> str:
     expire = datetime.now(timezone.utc) + timedelta(minutes=settings.access_token_expire_minutes)
-    payload: dict[str, Any] = {"sub": subject, "exp": expire}
+    now = datetime.now(timezone.utc)
+    payload: dict[str, Any] = {
+        "sub": subject,
+        "exp": expire,
+        "iat": now,
+        "iss": "sanatio",
+        "aud": "sanatio-web",
+    }
     if extra:
         payload.update(extra)
     return jwt.encode(payload, settings.secret_key, algorithm=settings.algorithm)
@@ -27,6 +35,12 @@ def create_access_token(subject: str, extra: dict[str, Any] | None = None) -> st
 
 def decode_access_token(token: str) -> dict[str, Any] | None:
     try:
-        return jwt.decode(token, settings.secret_key, algorithms=[settings.algorithm])
-    except JWTError:
+        return jwt.decode(
+            token,
+            settings.secret_key,
+            algorithms=[settings.algorithm],
+            issuer="sanatio",
+            audience="sanatio-web",
+        )
+    except InvalidTokenError:
         return None

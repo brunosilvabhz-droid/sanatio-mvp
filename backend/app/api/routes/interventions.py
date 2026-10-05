@@ -218,6 +218,11 @@ def respond_intervention(
     )
     if not item:
         raise HTTPException(status_code=404, detail="Intervencao nao encontrada")
+    is_recipient = any(recipient.user_id == current_user.id for recipient in item.recipients)
+    if not is_recipient and current_user.role.name != "ADMIN":
+        raise HTTPException(status_code=403, detail="Somente um destinatario pode responder esta intervencao")
+    if item.status in {"ACEITA", "RECUSADA"}:
+        raise HTTPException(status_code=409, detail="Esta intervencao ja foi respondida")
     item.status = payload.response
     item.response = payload.response
     item.response_justification = payload.justification

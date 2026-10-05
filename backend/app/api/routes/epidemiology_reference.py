@@ -237,7 +237,9 @@ def set_reference_active(reference_id: int, active: bool, db: Session = Depends(
 async def import_csv(file: UploadFile = File(...), db: Session = Depends(get_db), user: User = Depends(get_current_user)) -> ImportacaoReferenciaEpidemiologica:
     original_filename = file.filename or "referencias_epidemiologicas"
     filename = original_filename.lower()
-    raw_content = await file.read()
+    raw_content = await file.read(10 * 1024 * 1024 + 1)
+    if len(raw_content) > 10 * 1024 * 1024:
+        raise HTTPException(status_code=413, detail="O arquivo excede 10 MB")
     if filename.endswith(".csv"):
         rows = _read_csv(raw_content)
     elif filename.endswith(".xlsx"):
@@ -324,7 +326,11 @@ def _read_xlsx(raw_content: bytes) -> list[dict]:
         raise HTTPException(status_code=500, detail="Dependência openpyxl não instalada no backend") from exc
     workbook = load_workbook(io.BytesIO(raw_content), read_only=True, data_only=True)
     sheet = workbook.active
+    if sheet.max_row > 20_000 or sheet.max_column > 100:
+        workbook.close()
+        raise HTTPException(status_code=422, detail="A planilha excede 20.000 linhas ou 100 colunas")
     rows = list(sheet.iter_rows(values_only=True))
+    workbook.close()
     if not rows:
         return []
     headers = [str(value).strip() if value is not None else "" for value in rows[0]]

@@ -27,7 +27,8 @@ class CNESAdapter:
         if not cnes:
             raise ValueError("CNES inválido")
         try:
-            with urlopen(f"https://apidadosabertos.saude.gov.br/cnes/estabelecimentos/{cnes}", timeout=8) as response:
+            # The scheme and host are fixed; only the digits-only CNES identifier is interpolated.
+            with urlopen(f"https://apidadosabertos.saude.gov.br/cnes/estabelecimentos/{cnes}", timeout=8) as response:  # nosec B310
                 payload = json.loads(response.read().decode("utf-8"))
         except (OSError, URLError, TimeoutError, json.JSONDecodeError) as exc:
             raise RuntimeError(f"Não foi possível consultar a fonte pública do CNES: {exc}") from exc

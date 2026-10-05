@@ -1,6 +1,6 @@
 from functools import lru_cache
 
-from pydantic import Field
+from pydantic import Field, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -8,12 +8,14 @@ class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 
     app_name: str = "SANATIO"
+    environment: str = "development"
     app_public_url: str = ""
     database_url: str = "postgresql+psycopg://sanatio:sanatio@localhost:5432/sanatio"
-    secret_key: str = "change-me"
+    secret_key: str = "development-only-key-change-before-production"
     algorithm: str = "HS256"
     access_token_expire_minutes: int = 720
     cors_origins: str = "http://localhost:5173,http://127.0.0.1:5173"
+    trusted_hosts: str = "localhost,127.0.0.1,192.168.18.175"
     use_mock_soulmv: bool = True
     expose_patient_names_in_api: bool = False
 
@@ -35,6 +37,23 @@ class Settings(BaseSettings):
     @property
     def cors_origin_list(self) -> list[str]:
         return [origin.strip() for origin in self.cors_origins.split(",") if origin.strip()]
+
+    @property
+    def trusted_host_list(self) -> list[str]:
+        return [host.strip() for host in self.trusted_hosts.split(",") if host.strip()]
+
+    @property
+    def is_production(self) -> bool:
+        return self.environment.lower() == "production"
+
+    @model_validator(mode="after")
+    def validate_production_secrets(self):
+        if self.is_production and (
+            self.secret_key in {"change-me", "change-me-in-production", "development-only-key-change-before-production"}
+            or len(self.secret_key) < 32
+        ):
+            raise ValueError("SECRET_KEY de producao deve ter pelo menos 32 caracteres e nao pode usar o valor padrao")
+        return self
 
 
 @lru_cache
