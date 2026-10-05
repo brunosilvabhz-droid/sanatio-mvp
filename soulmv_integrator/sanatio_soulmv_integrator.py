@@ -6,7 +6,7 @@ import logging
 import os
 import sys
 from dataclasses import dataclass
-from datetime import date, datetime, timezone
+from datetime import date, datetime, time, timezone
 from typing import Any
 from urllib import error, request
 
@@ -65,7 +65,20 @@ def safe_int(value: Any, default: int = 0) -> int:
         return default
 
 
-def days_between(start: Any, end: Any | None = None) -> int:
+def as_date(value: Any) -> date | None:
+    if value is None or value == "":
+        return None
+    if isinstance(value, datetime):
+        return value.date()
+    if isinstance(value, date):
+        return value
+    try:
+        return datetime.fromisoformat(str(value)).date()
+    except ValueError:
+        return None
+
+
+def days_between(start: Any, end: Any | None = None, reference_date: date | None = None) -> int:
     if not start:
         return 0
     if isinstance(start, datetime):
@@ -89,8 +102,14 @@ def days_between(start: Any, end: Any | None = None) -> int:
             except ValueError:
                 end_date = datetime.now().date()
     else:
-        end_date = datetime.now().date()
+        end_date = reference_date or datetime.now().date()
     return max((end_date - start_date).days, 0)
+
+
+def active_on(start: Any, end: Any | None, reference_date: date) -> bool:
+    start_date = as_date(start)
+    end_date = as_date(end)
+    return bool(start_date and start_date <= reference_date and (end_date is None or end_date > reference_date))
 
 
 def load_config(path: str) -> dict[str, Any]:
@@ -254,20 +273,34 @@ def fetch_rows(conn, engine: str, spec: QuerySpec) -> list[dict[str, Any]]:
     return normalized
 
 
-def calculate_risk(patient: dict[str, Any], rows: dict[str, list[dict[str, Any]]], thresholds: dict[str, int]) -> dict[str, Any]:
+def calculate_risk(
+    patient: dict[str, Any],
+    rows: dict[str, list[dict[str, Any]]],
+    thresholds: dict[str, int],
+    reference_date: date | None = None,
+) -> dict[str, Any]:
     cd_atendimento = str(patient["cd_atendimento"])
     cultures = [row for row in rows.get("cultures", []) if str(row["cd_atendimento"]) == cd_atendimento]
     antimicrobials = [row for row in rows["antimicrobials"] if str(row["cd_atendimento"]) == cd_atendimento]
     invasive = [row for row in rows["invasive_procedures"] if str(row["cd_atendimento"]) == cd_atendimento]
     isolations = [row for row in rows["isolations"] if str(row["cd_atendimento"]) == cd_atendimento]
 
-    active_antimicrobials = [row for row in antimicrobials if parse_bool(row.get("sn_ativo")) and not row.get("dt_fim")]
-    active_invasive = [row for row in invasive if parse_bool(row.get("sn_ativo")) and not row.get("dt_fim")]
-    active_isolations = [row for row in isolations if parse_bool(row.get("sn_ativo")) and not row.get("dt_fim")]
+    if reference_date:
+        active_antimicrobials = [row for row in antimicrobials if active_on(row.get("dt_inicio"), row.get("dt_fim"), reference_date)]
+        active_invasive = [row for row in invasive if active_on(row.get("dt_inicio"), row.get("dt_fim"), reference_date)]
+        active_isolations = [row for row in isolations if active_on(row.get("dt_inicio"), row.get("dt_fim"), reference_date)]
+        cultures = [row for row in cultures if (as_date(row.get("dt_coleta")) or reference_date) <= reference_date]
+    else:
+        active_antimicrobials = [row for row in antimicrobials if parse_bool(row.get("sn_ativo")) and not row.get("dt_fim")]
+        active_invasive = [row for row in invasive if parse_bool(row.get("sn_ativo")) and not row.get("dt_fim")]
+        active_isolations = [row for row in isolations if parse_bool(row.get("sn_ativo")) and not row.get("dt_fim")]
 
-    max_antimicrobial_days = max([safe_int(row.get("dias_uso"), days_between(row.get("dt_inicio"), row.get("dt_fim"))) for row in active_antimicrobials] or [0])
-    max_invasive_device_days = max([safe_int(row.get("dias_permanencia"), days_between(row.get("dt_inicio"), row.get("dt_fim"))) for row in active_invasive] or [0])
-    days_in_hospital = days_between(patient.get("dt_atendimento"), patient.get("dt_alta"))
+    max_antimicrobial_days = max([days_between(row.get("dt_inicio"), None, reference_date) if reference_date else safe_int(row.get("dias_uso"), days_between(row.get("dt_inicio"), row.get("dt_fim"))) for row in active_antimicrobials] or [0])
+    max_invasive_device_days = max([days_between(row.get("dt_inicio"), None, reference_date) if reference_date else safe_int(row.get("dias_permanencia"), days_between(row.get("dt_inicio"), row.get("dt_fim"))) for row in active_invasive] or [0])
+    discharge = patient.get("dt_alta")
+    if reference_date and as_date(discharge) and as_date(discharge) > reference_date:
+        discharge = None
+    days_in_hospital = days_between(patient.get("dt_atendimento"), discharge, reference_date)
     has_positive_culture = any(parse_bool(row.get("sn_positivo")) for row in cultures)
     has_active_isolation = bool(active_isolations)
 
@@ -291,20 +324,37 @@ def calculate_risk(patient: dict[str, Any], rows: dict[str, list[dict[str, Any]]
     }
 
 
-def build_payload(rows: dict[str, list[dict[str, Any]]], thresholds: dict[str, int]) -> dict[str, Any]:
+def build_payload(
+    rows: dict[str, list[dict[str, Any]]],
+    thresholds: dict[str, int],
+    reference_date: date | None = None,
+) -> dict[str, Any]:
     patients = []
     for row in rows["patients"]:
-        patients.append(
-            {
-                "cd_atendimento": str(row["cd_atendimento"]),
-                "cd_paciente": str(row["cd_paciente"]),
-                "unit": row.get("ds_unidade"),
-                "bed": row.get("ds_leito"),
-                "active": row.get("dt_alta") is None,
-                "admitted_at": iso(row.get("dt_atendimento")),
-                "discharged_at": iso(row.get("dt_alta")),
-            }
-        )
+        unit = row.get("ds_unidade")
+        bed = row.get("ds_leito")
+        if reference_date:
+            movements = [
+                movement for movement in rows.get("bed_movements", [])
+                if str(movement.get("cd_atendimento")) == str(row["cd_atendimento"])
+                and as_date(movement.get("dt_movimentacao"))
+                and as_date(movement.get("dt_movimentacao")) <= reference_date
+            ]
+            if movements:
+                latest_movement = max(movements, key=lambda item: str(item.get("dt_movimentacao")))
+                unit = latest_movement.get("ds_unidade_destino") or unit
+                bed = latest_movement.get("ds_leito_destino") or bed
+        patient = {
+            "cd_atendimento": str(row["cd_atendimento"]),
+            "cd_paciente": str(row["cd_paciente"]),
+            "unit": unit,
+            "bed": bed,
+            "active": active_on(row.get("dt_atendimento"), row.get("dt_alta"), reference_date) if reference_date else row.get("dt_alta") is None,
+            "admitted_at": iso(row.get("dt_atendimento")),
+            "discharged_at": iso(row.get("dt_alta")),
+        }
+        patient.update(calculate_risk(row, rows, thresholds, reference_date))
+        patients.append(patient)
 
     return {
         "patients": patients,
@@ -332,11 +382,11 @@ def build_payload(rows: dict[str, list[dict[str, Any]]], thresholds: dict[str, i
                 "dt_inicio": iso(row["dt_inicio"]),
                 "dt_aplicacao": iso(row["dt_aplicacao"]),
                 "dt_fim": iso(row.get("dt_fim")),
-                "sn_ativo": "S" if parse_bool(row.get("sn_ativo", "S")) else "N",
+                "sn_ativo": "S" if (active_on(row.get("dt_inicio"), row.get("dt_fim"), reference_date) if reference_date else parse_bool(row.get("sn_ativo", "S"))) else "N",
                 "ds_frequencia": row.get("ds_frequencia"),
                 "ds_via": row.get("ds_via"),
                 "ds_dose": row.get("ds_dose"),
-                "dias_uso": safe_int(row.get("dias_uso"), days_between(row.get("dt_inicio"), row.get("dt_fim"))),
+                "dias_uso": days_between(row.get("dt_inicio"), None, reference_date) if reference_date and active_on(row.get("dt_inicio"), row.get("dt_fim"), reference_date) else safe_int(row.get("dias_uso"), days_between(row.get("dt_inicio"), row.get("dt_fim"))),
             }
             for row in rows["antimicrobials"]
         ],
@@ -373,9 +423,9 @@ def build_payload(rows: dict[str, list[dict[str, Any]]], thresholds: dict[str, i
                 "ds_procedimento": row["ds_procedimento"],
                 "dt_inicio": iso(row["dt_inicio"]),
                 "dt_fim": iso(row.get("dt_fim")),
-                "sn_ativo": "S" if parse_bool(row.get("sn_ativo", "S")) else "N",
+                "sn_ativo": "S" if (active_on(row.get("dt_inicio"), row.get("dt_fim"), reference_date) if reference_date else parse_bool(row.get("sn_ativo", "S"))) else "N",
                 "ds_local_instalacao": row.get("ds_local_instalacao"),
-                "dias_permanencia": safe_int(row.get("dias_permanencia"), days_between(row.get("dt_inicio"), row.get("dt_fim"))),
+                "dias_permanencia": days_between(row.get("dt_inicio"), None, reference_date) if reference_date and active_on(row.get("dt_inicio"), row.get("dt_fim"), reference_date) else safe_int(row.get("dias_permanencia"), days_between(row.get("dt_inicio"), row.get("dt_fim"))),
             }
             for row in rows["invasive_procedures"]
         ],
@@ -387,11 +437,60 @@ def build_payload(rows: dict[str, list[dict[str, Any]]], thresholds: dict[str, i
                 "ds_isolamento": row["ds_isolamento"],
                 "dt_inicio": iso(row["dt_inicio"]),
                 "dt_fim": iso(row.get("dt_fim")),
-                "sn_ativo": "S" if parse_bool(row.get("sn_ativo", "S")) else "N",
+                "sn_ativo": "S" if (active_on(row.get("dt_inicio"), row.get("dt_fim"), reference_date) if reference_date else parse_bool(row.get("sn_ativo", "S"))) else "N",
             }
             for row in rows["isolations"]
         ],
     }
+
+
+def filter_historical_rows(
+    rows: dict[str, list[dict[str, Any]]],
+    start_date: date,
+    end_date: date,
+) -> dict[str, list[dict[str, Any]]]:
+    patients = []
+    attendance_ids: set[str] = set()
+    for row in rows["patients"]:
+        admitted_at = as_date(row.get("dt_atendimento"))
+        discharged_at = as_date(row.get("dt_alta"))
+        if admitted_at and admitted_at <= end_date and (discharged_at is None or discharged_at >= start_date):
+            patients.append(row)
+            attendance_ids.add(str(row["cd_atendimento"]))
+
+    filtered = {"patients": patients}
+    for key, items in rows.items():
+        if key == "patients":
+            continue
+        filtered[key] = [item for item in items if str(item.get("cd_atendimento")) in attendance_ids]
+    return filtered
+
+
+def split_payload(
+    payload: dict[str, Any],
+    batch_size: int,
+    batch_prefix: str,
+    reference_at: datetime,
+) -> list[dict[str, Any]]:
+    patients = payload["patients"]
+    if batch_size < 1:
+        raise ValueError("batch_size deve ser maior que zero")
+    total = max((len(patients) + batch_size - 1) // batch_size, 1)
+    batches = []
+    detail_keys = ("bed_movements", "antimicrobials", "cultures", "exam_requests", "invasive_procedures", "isolations")
+    for index in range(total):
+        selected = patients[index * batch_size:(index + 1) * batch_size]
+        attendance_ids = {item["cd_atendimento"] for item in selected}
+        batch = {
+            "modo_carga": "HISTORICA",
+            "data_referencia": reference_at.isoformat(),
+            "chave_lote": f"{batch_prefix}:parte-{index + 1:04d}-de-{total:04d}",
+            "patients": selected,
+        }
+        for key in detail_keys:
+            batch[key] = [item for item in payload.get(key, []) if item["cd_atendimento"] in attendance_ids]
+        batches.append(batch)
+    return batches
 
 
 def post_payload(ingest_url: str, token: str, payload: dict[str, Any]) -> dict[str, Any]:
@@ -417,8 +516,28 @@ def main() -> int:
     parser.add_argument("--config", default=DEFAULT_CONFIG, help="Arquivo JSON de configuracao.")
     parser.add_argument("--dry-run", action="store_true", help="Monta o payload e imprime no console sem enviar.")
     parser.add_argument("--output", help="Arquivo para salvar o payload JSON montado.")
+    parser.add_argument("--historical-start", help="Inicio da carga historica no formato AAAA-MM-DD.")
+    parser.add_argument("--historical-end", help="Fim da carga historica no formato AAAA-MM-DD.")
+    parser.add_argument("--batch-size", type=int, default=500, help="Pacientes por lote na carga historica.")
     parser.add_argument("--log-level", default=os.getenv("LOG_LEVEL", "INFO"), help="Nivel de log.")
     args = parser.parse_args()
+
+    historical = bool(args.historical_start or args.historical_end)
+    if historical and not (args.historical_start and args.historical_end):
+        parser.error("--historical-start e --historical-end devem ser informados juntos")
+    if args.batch_size < 1:
+        parser.error("--batch-size deve ser maior que zero")
+
+    historical_start = None
+    historical_end = None
+    if historical:
+        try:
+            historical_start = date.fromisoformat(args.historical_start)
+            historical_end = date.fromisoformat(args.historical_end)
+        except ValueError:
+            parser.error("As datas historicas devem usar o formato AAAA-MM-DD")
+        if historical_start > historical_end:
+            parser.error("A data inicial nao pode ser posterior a data final")
 
     logging.basicConfig(level=args.log_level.upper(), format="%(asctime)s %(levelname)s %(message)s")
     config = load_config(args.config)
@@ -440,27 +559,53 @@ def main() -> int:
         LOG.exception("Falha ao ler views do MV SOUL.")
         return 1
 
-    payload = build_payload(rows, config["risk_thresholds"])
-    counts = {key: len(value) for key, value in payload.items()}
+    if historical:
+        rows = filter_historical_rows(rows, historical_start, historical_end)
+        if not rows["patients"]:
+            LOG.warning("Nenhum atendimento encontrado no periodo historico informado.")
+            return 0
+        reference_at = datetime.combine(historical_end, time.max, tzinfo=timezone.utc)
+        payload = build_payload(rows, config["risk_thresholds"], historical_end)
+        batches = split_payload(
+            payload,
+            args.batch_size,
+            f"historica:{historical_start.isoformat()}:{historical_end.isoformat()}",
+            reference_at,
+        )
+    else:
+        payload = build_payload(rows, config["risk_thresholds"])
+        batches = [payload]
+
+    counts = {key: len(value) for key, value in payload.items() if isinstance(value, list)}
     LOG.info("Payload montado: %s", counts)
+    if historical:
+        LOG.info("Carga historica preparada em %s lote(s).", len(batches))
 
     if args.output:
         with open(args.output, "w", encoding="utf-8") as file:
-            json.dump(payload, file, ensure_ascii=False, indent=2)
+            json.dump(batches[0] if len(batches) == 1 else {"batches": batches}, file, ensure_ascii=False, indent=2)
         LOG.info("Payload salvo em %s", args.output)
 
     if args.dry_run:
-        print(json.dumps(payload, ensure_ascii=False, indent=2))
+        print(json.dumps(batches[0] if len(batches) == 1 else {"batches": batches}, ensure_ascii=False, indent=2))
         return 0
 
-    try:
-        result = post_payload(config["sanatio"]["ingest_url"], config["sanatio"]["token"], payload)
-    except Exception:
-        LOG.exception("Falha ao enviar dados ao SANATIO.")
-        return 1
+    results = []
+    for index, batch in enumerate(batches, start=1):
+        try:
+            result = post_payload(config["sanatio"]["ingest_url"], config["sanatio"]["token"], batch)
+        except Exception:
+            LOG.exception("Falha ao enviar lote %s de %s ao SANATIO.", index, len(batches))
+            return 1
+        results.append(result)
+        LOG.info("Lote %s de %s enviado: %s", index, len(batches), json.dumps(result, ensure_ascii=False))
 
-    LOG.info("Resposta SANATIO: %s", json.dumps(result, ensure_ascii=False))
-    print(json.dumps(result, ensure_ascii=False, indent=2))
+    response = {
+        "modo_carga": "HISTORICA" if historical else "INCREMENTAL",
+        "lotes_enviados": len(results),
+        "resultados": results,
+    }
+    print(json.dumps(response, ensure_ascii=False, indent=2))
     return 0
 
 

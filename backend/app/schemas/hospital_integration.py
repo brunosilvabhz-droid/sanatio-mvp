@@ -1,6 +1,7 @@
 from datetime import datetime
+from typing import Literal
 
-from pydantic import BaseModel
+from pydantic import BaseModel, model_validator
 
 
 class HospitalIntegrationCreate(BaseModel):
@@ -106,6 +107,9 @@ class IngestIsolation(BaseModel):
 
 
 class IngestPayload(BaseModel):
+    modo_carga: Literal["INCREMENTAL", "HISTORICA"] = "INCREMENTAL"
+    data_referencia: datetime | None = None
+    chave_lote: str | None = None
     patients: list[IngestPatientSnapshot]
     bed_movements: list[IngestBedMovement] = []
     antimicrobials: list[IngestAntimicrobial] = []
@@ -113,3 +117,9 @@ class IngestPayload(BaseModel):
     exam_requests: list[IngestExamRequest] = []
     invasive_procedures: list[IngestInvasiveProcedure] = []
     isolations: list[IngestIsolation] = []
+
+    @model_validator(mode="after")
+    def validate_historical_metadata(self):
+        if self.modo_carga == "HISTORICA" and (not self.data_referencia or not self.chave_lote):
+            raise ValueError("Carga historica exige data_referencia e chave_lote")
+        return self

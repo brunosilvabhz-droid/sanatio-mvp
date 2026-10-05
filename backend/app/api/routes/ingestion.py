@@ -116,10 +116,15 @@ def _antimicrobial_key(item) -> str:
     return str(item.ds_principio_ativo or "Principio ativo nao identificado").strip()
 
 
-def _days_between(start: datetime | None, end: datetime | None = None) -> int:
+def _days_between(start: datetime | None, end: datetime | None = None, reference_date: date | None = None) -> int:
     if not start:
         return 0
-    final = end or datetime.now(timezone.utc)
+    if end:
+        final = end
+    elif reference_date:
+        final = datetime.combine(reference_date, datetime.min.time(), tzinfo=timezone.utc)
+    else:
+        final = datetime.now(timezone.utc)
     return max((final.date() - start.date()).days, 0)
 
 
@@ -159,21 +164,42 @@ def _calculate_snapshot_from_details(
     invasive_device_days: int,
     hospital_stay_days: int,
     reference_date: date,
+    historical: bool = False,
 ) -> dict:
-    active_antimicrobials = [antimicrobial for antimicrobial in antimicrobials if _is_active(antimicrobial.sn_ativo) and not antimicrobial.dt_fim]
-    active_invasive = [procedure for procedure in invasive_procedures if _is_active(procedure.sn_ativo) and not procedure.dt_fim]
-    active_isolations = [isolation for isolation in isolations if _is_active(isolation.sn_ativo) and not isolation.dt_fim]
+    if historical:
+        active_antimicrobials = [
+            item for item in antimicrobials
+            if item.dt_inicio.date() <= reference_date and (not item.dt_fim or item.dt_fim.date() > reference_date)
+        ]
+        active_invasive = [
+            item for item in invasive_procedures
+            if item.dt_inicio.date() <= reference_date and (not item.dt_fim or item.dt_fim.date() > reference_date)
+        ]
+        active_isolations = [
+            item for item in isolations
+            if item.dt_inicio.date() <= reference_date and (not item.dt_fim or item.dt_fim.date() > reference_date)
+        ]
+    else:
+        active_antimicrobials = [antimicrobial for antimicrobial in antimicrobials if _is_active(antimicrobial.sn_ativo) and not antimicrobial.dt_fim]
+        active_invasive = [procedure for procedure in invasive_procedures if _is_active(procedure.sn_ativo) and not procedure.dt_fim]
+        active_isolations = [isolation for isolation in isolations if _is_active(isolation.sn_ativo) and not isolation.dt_fim]
 
     max_antimicrobial_days = max(
-        [(antimicrobial.dias_uso or _days_between(antimicrobial.dt_inicio, antimicrobial.dt_fim)) for antimicrobial in active_antimicrobials]
+        [(_days_between(antimicrobial.dt_inicio, None, reference_date) if historical else antimicrobial.dias_uso or _days_between(antimicrobial.dt_inicio, antimicrobial.dt_fim)) for antimicrobial in active_antimicrobials]
         or [0]
     )
     max_invasive_device_days = max(
-        [(procedure.dias_permanencia or _days_between(procedure.dt_inicio, procedure.dt_fim)) for procedure in active_invasive]
+        [(_days_between(procedure.dt_inicio, None, reference_date) if historical else procedure.dias_permanencia or _days_between(procedure.dt_inicio, procedure.dt_fim)) for procedure in active_invasive]
         or [0]
     )
-    days_in_hospital = _days_between(item.admitted_at, item.discharged_at)
-    has_positive_culture = any(_is_active(culture.sn_positivo) for culture in cultures)
+    discharge = item.discharged_at
+    if historical and discharge and discharge.date() > reference_date:
+        discharge = None
+    days_in_hospital = _days_between(item.admitted_at, discharge, reference_date if historical else None)
+    has_positive_culture = any(
+        _is_active(culture.sn_positivo) and (not historical or culture.dt_coleta.date() <= reference_date)
+        for culture in cultures
+    )
     has_active_isolation = bool(active_isolations)
 
     high = (
@@ -328,6 +354,25 @@ def ingest_snapshots(
     if not integration:
         raise HTTPException(status_code=401, detail="Token hospitalar invalido")
 
+    historical = payload.modo_carga == "HISTORICA"
+    if historical:
+        existing_run = db.scalar(
+            select(ExecucaoIntegracao).where(
+                ExecucaoIntegracao.hospital_integracao_id == integration.id,
+                ExecucaoIntegracao.chave_lote == payload.chave_lote,
+            )
+        )
+        if existing_run:
+            return {
+                "hospital": integration.hospital_name,
+                "integration_run_id": existing_run.id,
+                "modo_carga": existing_run.modo_carga,
+                "chave_lote": existing_run.chave_lote,
+                "duplicate": True,
+                "snapshots_received": existing_run.total_snapshots_recebidos,
+                "alerts_created": existing_run.total_alertas_gerados,
+            }
+
     antimicrobial_days = _threshold(db, "alerts.threshold.antimicrobial_days", 7)
     same_antimicrobial_days = _threshold(db, "alerts.threshold.same_antimicrobial_days", antimicrobial_days)
     antimicrobial_exposure_days = _threshold(db, "alerts.threshold.antimicrobial_exposure_days", 14)
@@ -337,11 +382,17 @@ def ingest_snapshots(
     hospital_stay_days = _threshold(db, "alerts.threshold.hospital_stay_days", 10)
 
     started_at = datetime.now(timezone.utc)
+    reference_at = payload.data_referencia or started_at
+    if reference_at.tzinfo is None:
+        reference_at = reference_at.replace(tzinfo=timezone.utc)
     monitoring_run = MonitoringRun(status="RUNNING", started_at=started_at)
     db.add(monitoring_run)
     integration_run = ExecucaoIntegracao(
         hospital_integracao_id=integration.id,
         status="EM_EXECUCAO",
+        modo_carga=payload.modo_carga,
+        chave_lote=payload.chave_lote,
+        data_referencia=reference_at if historical else None,
         data_hora_inicio=started_at,
     )
     db.add(integration_run)
@@ -372,24 +423,51 @@ def ingest_snapshots(
             antimicrobial_days=antimicrobial_days,
             invasive_device_days=invasive_device_days,
             hospital_stay_days=hospital_stay_days,
-            reference_date=started_at.date(),
+            reference_date=reference_at.date(),
+            historical=historical,
         )
-        db.add(
-            SnapshotAtendimento(
-                atendimento_id=attendance.id,
-                execucao_integracao_id=integration_run.id,
-                status_risco=calculated_snapshot["risk_status"],
-                dias_internacao=calculated_snapshot["days_in_hospital"],
-                possui_cultura_positiva=calculated_snapshot["has_positive_culture"],
-                maior_dias_antimicrobiano=calculated_snapshot["max_antimicrobial_days"],
-                maior_dias_dispositivo_invasivo=calculated_snapshot["max_invasive_device_days"],
-                possui_isolamento_ativo=calculated_snapshot["has_active_isolation"],
-                data_hora_coleta=started_at,
+        snapshot = None
+        if historical:
+            snapshot = db.scalar(
+                select(SnapshotAtendimento).where(
+                    SnapshotAtendimento.atendimento_id == attendance.id,
+                    SnapshotAtendimento.data_hora_coleta == reference_at,
+                )
             )
-        )
+        if not snapshot:
+            snapshot = SnapshotAtendimento(
+                atendimento_id=attendance.id,
+            )
+            db.add(snapshot)
+        snapshot.execucao_integracao_id = integration_run.id
+        snapshot.status_risco = calculated_snapshot["risk_status"]
+        snapshot.dias_internacao = calculated_snapshot["days_in_hospital"]
+        snapshot.possui_cultura_positiva = calculated_snapshot["has_positive_culture"]
+        snapshot.maior_dias_antimicrobiano = calculated_snapshot["max_antimicrobial_days"]
+        snapshot.maior_dias_dispositivo_invasivo = calculated_snapshot["max_invasive_device_days"]
+        snapshot.possui_isolamento_ativo = calculated_snapshot["has_active_isolation"]
+        snapshot.data_hora_coleta = reference_at
+
         monitoring_snapshot = item.model_dump()
         monitoring_snapshot.update(calculated_snapshot)
-        db.add(PatientMonitoringSnapshot(**monitoring_snapshot, monitoring_run_id=monitoring_run.id))
+        operational_snapshot = None
+        if historical:
+            operational_snapshot = db.scalar(
+                select(PatientMonitoringSnapshot).where(
+                    PatientMonitoringSnapshot.cd_atendimento == item.cd_atendimento,
+                    PatientMonitoringSnapshot.collected_at == reference_at,
+                )
+            )
+        if operational_snapshot:
+            for key, value in monitoring_snapshot.items():
+                setattr(operational_snapshot, key, value)
+            operational_snapshot.monitoring_run_id = monitoring_run.id
+        else:
+            db.add(PatientMonitoringSnapshot(
+                **monitoring_snapshot,
+                monitoring_run_id=monitoring_run.id,
+                collected_at=reference_at,
+            ))
         reasons = []
         if calculated_snapshot["risk_status"] == "alto":
             reasons.append("risco alto")
@@ -399,16 +477,19 @@ def ingest_snapshots(
             reasons.append(f"procedimento invasivo por {calculated_snapshot['max_invasive_device_days']} dias")
         if calculated_snapshot["days_in_hospital"] >= hospital_stay_days:
             reasons.append(f"{calculated_snapshot['days_in_hospital']} dias de internacao")
-        created_alerts += _create_antimicrobial_alerts(
-            db,
-            item=item,
-            antimicrobials=antimicrobials_by_attendance.get(item.cd_atendimento, []),
-            same_antimicrobial_days=same_antimicrobial_days,
-            exposure_days=antimicrobial_exposure_days,
-            scheme_changes_count=antimicrobial_scheme_changes_count,
-            scheme_changes_window_days=antimicrobial_scheme_changes_window_days,
-            reference_date=started_at.date(),
-        )
+        if not historical:
+            created_alerts += _create_antimicrobial_alerts(
+                db,
+                item=item,
+                antimicrobials=antimicrobials_by_attendance.get(item.cd_atendimento, []),
+                same_antimicrobial_days=same_antimicrobial_days,
+                exposure_days=antimicrobial_exposure_days,
+                scheme_changes_count=antimicrobial_scheme_changes_count,
+                scheme_changes_window_days=antimicrobial_scheme_changes_window_days,
+                reference_date=started_at.date(),
+            )
+        if historical:
+            continue
         if not reasons:
             continue
         existing = db.scalar(
@@ -595,9 +676,10 @@ def ingest_snapshots(
         isolation.data_hora_fim = item.dt_fim
         isolation.ativo = _is_active(item.sn_ativo)
 
-    for item in payload.patients:
-        patient_payload = {"cd_atendimento": item.cd_atendimento, "cd_paciente": item.cd_paciente, "ds_unidade": item.unit}
-        antimicrobial_audit_service.sync_for_patient(db, patient_payload, antimicrobials_by_patient.get(item.cd_atendimento, []), monitoring_run.id)
+    if not historical:
+        for item in payload.patients:
+            patient_payload = {"cd_atendimento": item.cd_atendimento, "cd_paciente": item.cd_paciente, "ds_unidade": item.unit}
+            antimicrobial_audit_service.sync_for_patient(db, patient_payload, antimicrobials_by_patient.get(item.cd_atendimento, []), monitoring_run.id)
 
     finished_at = datetime.now(timezone.utc)
     monitoring_run.status = "SUCCESS"
@@ -616,6 +698,10 @@ def ingest_snapshots(
         "hospital": integration.hospital_name,
         "run_id": monitoring_run.id,
         "integration_run_id": integration_run.id,
+        "modo_carga": payload.modo_carga,
+        "chave_lote": payload.chave_lote,
+        "data_referencia": reference_at.isoformat() if historical else None,
+        "duplicate": False,
         "snapshots_received": len(payload.patients),
         "bed_movements_received": created_movements,
         "antimicrobials_received": len(payload.antimicrobials),

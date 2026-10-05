@@ -37,6 +37,9 @@ class Atendimento(Base):
 
 class ExecucaoIntegracao(Base):
     __tablename__ = "execucoes_integracao"
+    __table_args__ = (
+        UniqueConstraint("hospital_integracao_id", "chave_lote", name="uq_execucao_integracao_hospital_lote"),
+    )
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     hospital_integracao_id: Mapped[int | None] = mapped_column(ForeignKey("hospital_integrations.id"), nullable=True, index=True)
@@ -45,6 +48,9 @@ class ExecucaoIntegracao(Base):
     total_snapshots_recebidos: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
     total_movimentacoes_recebidas: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
     total_alertas_gerados: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    modo_carga: Mapped[str] = mapped_column(String(40), default="INCREMENTAL", nullable=False, index=True)
+    chave_lote: Mapped[str | None] = mapped_column(String(160), nullable=True, index=True)
+    data_referencia: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True, index=True)
     mensagem_erro: Mapped[str | None] = mapped_column(Text, nullable=True)
     data_hora_inicio: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
     data_hora_fim: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
