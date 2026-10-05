@@ -16,6 +16,7 @@ router = APIRouter(prefix="/auth", tags=["Autenticação"])
 
 LOGIN_WINDOW_SECONDS = 15 * 60
 LOGIN_MAX_FAILURES = 5
+LOGIN_MAX_TRACKED_KEYS = 10_000
 _login_failures: dict[str, deque[float]] = defaultdict(deque)
 _login_lock = Lock()
 _dummy_password_hash = get_password_hash("sanatio-dummy-password")
@@ -50,6 +51,16 @@ def _check_login_limit(key: str) -> None:
 def _record_login_failure(key: str) -> None:
     now = monotonic()
     with _login_lock:
+        if key not in _login_failures and len(_login_failures) >= LOGIN_MAX_TRACKED_KEYS:
+            stale_keys = [
+                tracked_key for tracked_key, failures in _login_failures.items()
+                if not failures or now - failures[-1] >= LOGIN_WINDOW_SECONDS
+            ]
+            for stale_key in stale_keys:
+                _login_failures.pop(stale_key, None)
+            if len(_login_failures) >= LOGIN_MAX_TRACKED_KEYS:
+                oldest_key = min(_login_failures, key=lambda tracked_key: _login_failures[tracked_key][-1])
+                _login_failures.pop(oldest_key, None)
         _prune_failures(key, now).append(now)
 
 
