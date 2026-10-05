@@ -7,6 +7,9 @@
     "ingest_url": "https://sanatio.seu-dominio.com.br/ingest/snapshots",
     "token": "COLE_AQUI_O_TOKEN_DO_HOSPITAL"
   },
+  "query": {
+    "lookback_days": 2
+  },
   "views": {
     "patients": "SANATIO.VW_PACIENTES_ATENDIMENTOS",
     "bed_movements": "SANATIO.VW_MOVIMENTACOES_LEITO",

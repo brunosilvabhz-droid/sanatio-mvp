@@ -9,6 +9,7 @@ sys.path.insert(0, str(ROOT))
 from soulmv_integrator.sanatio_soulmv_integrator import (  # noqa: E402
     build_payload,
     filter_historical_rows,
+    query_specs,
     split_payload,
 )
 
@@ -60,3 +61,37 @@ def test_historical_filter_state_and_batches() -> None:
     assert len(batches) == 1
     assert batches[0]["modo_carga"] == "HISTORICA"
     assert batches[0]["chave_lote"].endswith("parte-0001-de-0001")
+
+
+def test_incremental_queries_use_safe_date_parameters() -> None:
+    views = {
+        "patients": "SANATIO.VW_PACIENTES_ATENDIMENTOS",
+        "bed_movements": "SANATIO.VW_MOVIMENTACOES_LEITO",
+        "antimicrobials": "SANATIO.VW_ANTIMICROBIANOS",
+        "cultures": "SANATIO.VW_CULTURAS",
+        "exam_requests": "SANATIO.VW_SOLICITACOES_EXAMES",
+        "invasive_procedures": "SANATIO.VW_PROCEDIMENTOS_INVASIVOS",
+        "isolations": "SANATIO.VW_ISOLAMENTOS",
+    }
+    specs = {spec.key: spec for spec in query_specs(views, "oracle", 2)}
+
+    assert "dt_alta IS NULL" in specs["patients"].sql
+    assert "dt_fim IS NULL" in specs["antimicrobials"].sql
+    assert "SYSDATE - :lookback_days" in specs["cultures"].sql
+    assert specs["patients"].params == {"lookback_days": 2}
+
+
+def test_historical_queries_apply_period_in_database() -> None:
+    views = {
+        "patients": "SANATIO.VW_PACIENTES_ATENDIMENTOS",
+        "bed_movements": "SANATIO.VW_MOVIMENTACOES_LEITO",
+        "antimicrobials": "SANATIO.VW_ANTIMICROBIANOS",
+        "cultures": "SANATIO.VW_CULTURAS",
+        "exam_requests": "SANATIO.VW_SOLICITACOES_EXAMES",
+        "invasive_procedures": "SANATIO.VW_PROCEDIMENTOS_INVASIVOS",
+        "isolations": "SANATIO.VW_ISOLAMENTOS",
+    }
+    specs = query_specs(views, "postgres", 2, date(2025, 1, 1), date(2025, 1, 31))
+
+    assert all("%(window_start)s" in spec.sql for spec in specs)
+    assert all(spec.params["window_end"] == datetime(2025, 2, 1) for spec in specs)

@@ -131,9 +131,32 @@ $env:SOULMV_DB_ENGINE="oracle"
 $env:SOULMV_DSN="usuario/senha@host:1521/service_name"
 $env:SANATIO_INGEST_URL="http://192.168.18.175:8000/ingest/snapshots"
 $env:SANATIO_TOKEN="TOKEN_DO_HOSPITAL"
+$env:SOULMV_LOOKBACK_DAYS="2"
 
 .\.venv\Scripts\python.exe .\sanatio_soulmv_integrator.py --config .\config.hml.json
 ```
+
+No Linux, o integrador carrega automaticamente o arquivo `.env.integrador` do
+diretorio atual. `SOULMV_LOOKBACK_DAYS=2` limita a rotina incremental aos dois
+ultimos dias e preserva atendimentos, antimicrobianos, dispositivos e isolamentos
+ainda ativos. O valor `0` desativa o filtro e consulta as views integralmente.
+
+O modo historico ignora essa janela e aplica `--historical-start` e
+`--historical-end` diretamente nas consultas ao banco.
+
+## Filtros aplicados nas views
+
+Na rotina incremental Oracle, o integrador usa `SYSDATE - :lookback_days`. Cada
+view recebe um predicado fixo adequado a suas datas. Atendimentos sem alta e
+itens sem fim continuam sendo retornados mesmo quando começaram antes da janela.
+
+Na carga historica, o integrador usa os binds `:window_start` e `:window_end`. A
+data final e tratada como inclusiva, convertendo internamente o limite superior
+para o inicio do dia seguinte. Os valores nunca sao concatenados no SQL.
+
+Definir `SOULMV_LOOKBACK_DAYS=0` remove o `WHERE` apenas da rotina incremental e
+faz uma leitura integral das views. Use esse valor somente para diagnostico ou
+quando houver outra limitacao segura dentro das proprias views.
 
 ## Agendamento no Windows
 

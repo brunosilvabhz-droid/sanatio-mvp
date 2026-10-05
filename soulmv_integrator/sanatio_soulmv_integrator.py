@@ -6,9 +6,11 @@ import logging
 import os
 import sys
 from dataclasses import dataclass
-from datetime import date, datetime, time, timezone
+from datetime import date, datetime, time, timedelta, timezone
 from typing import Any
 from urllib import error, request
+
+from dotenv import load_dotenv
 
 
 LOG = logging.getLogger("sanatio_soulmv_integrator")
@@ -32,6 +34,7 @@ class QuerySpec:
     key: str
     required_columns: tuple[str, ...]
     sql: str
+    params: dict[str, Any]
 
 
 def normalize_row(row: dict[str, Any]) -> dict[str, Any]:
@@ -120,6 +123,13 @@ def load_config(path: str) -> dict[str, Any]:
     config["database"]["dsn"] = os.getenv("SOULMV_DSN", config["database"].get("dsn", ""))
     config["sanatio"]["ingest_url"] = os.getenv("SANATIO_INGEST_URL", config["sanatio"].get("ingest_url", ""))
     config["sanatio"]["token"] = os.getenv("SANATIO_TOKEN", config["sanatio"].get("token", ""))
+    try:
+        lookback_days = int(os.getenv("SOULMV_LOOKBACK_DAYS", config.get("query", {}).get("lookback_days", 2)))
+    except (TypeError, ValueError) as exc:
+        raise ValueError("SOULMV_LOOKBACK_DAYS deve ser um numero inteiro") from exc
+    if not 0 <= lookback_days <= 90:
+        raise ValueError("SOULMV_LOOKBACK_DAYS deve ficar entre 0 e 90")
+    config.setdefault("query", {})["lookback_days"] = lookback_days
     config["views"] = {
         key: LEGACY_VIEW_NAMES.get(value, value)
         for key, value in config["views"].items()
@@ -133,13 +143,64 @@ def quote_view(view_name: str) -> str:
     return view_name
 
 
-def query_specs(views: dict[str, str]) -> list[QuerySpec]:
+def _bind(engine: str, name: str) -> str:
+    return f":{name}" if engine == "oracle" else f"%({name})s"
+
+
+def _query_window(
+    engine: str,
+    lookback_days: int,
+    historical_start: date | None = None,
+    historical_end: date | None = None,
+) -> tuple[dict[str, str], dict[str, Any]]:
+    if historical_start and historical_end:
+        start_at = datetime.combine(historical_start, time.min)
+        end_at = datetime.combine(historical_end + timedelta(days=1), time.min)
+        start = _bind(engine, "window_start")
+        end = _bind(engine, "window_end")
+        return {
+            "patients": f"dt_atendimento < {end} AND (dt_alta IS NULL OR dt_alta >= {start})",
+            "bed_movements": f"dt_movimentacao >= {start} AND dt_movimentacao < {end}",
+            "antimicrobials": f"dt_inicio < {end} AND (dt_fim IS NULL OR dt_fim >= {start})",
+            "cultures": f"(dt_coleta >= {start} AND dt_coleta < {end}) OR (dt_resultado >= {start} AND dt_resultado < {end})",
+            "exam_requests": f"dt_solicitacao >= {start} AND dt_solicitacao < {end}",
+            "invasive_procedures": f"dt_inicio < {end} AND (dt_fim IS NULL OR dt_fim >= {start})",
+            "isolations": f"dt_inicio < {end} AND (dt_fim IS NULL OR dt_fim >= {start})",
+        }, {"window_start": start_at, "window_end": end_at}
+
+    if lookback_days == 0:
+        return {}, {}
+
+    days = _bind(engine, "lookback_days")
+    start = f"SYSDATE - {days}" if engine == "oracle" else f"CURRENT_TIMESTAMP - ({days} * INTERVAL '1 day')"
+    return {
+        "patients": f"dt_alta IS NULL OR dt_alta >= {start} OR dt_atendimento >= {start}",
+        "bed_movements": f"dt_movimentacao >= {start}",
+        "antimicrobials": f"dt_fim IS NULL OR dt_fim >= {start} OR dt_inicio >= {start} OR dt_aplicacao >= {start}",
+        "cultures": f"dt_coleta >= {start} OR dt_resultado >= {start}",
+        "exam_requests": f"dt_solicitacao >= {start}",
+        "invasive_procedures": f"dt_fim IS NULL OR dt_fim >= {start} OR dt_inicio >= {start}",
+        "isolations": f"dt_fim IS NULL OR dt_fim >= {start} OR dt_inicio >= {start}",
+    }, {"lookback_days": lookback_days}
+
+
+def query_specs(
+    views: dict[str, str],
+    engine: str,
+    lookback_days: int,
+    historical_start: date | None = None,
+    historical_end: date | None = None,
+) -> list[QuerySpec]:
     patients = quote_view(views["patients"])
     bed_movements = quote_view(views["bed_movements"])
     antimicrobials = quote_view(views["antimicrobials"])
     cultures = quote_view(views["cultures"]) if views.get("cultures") else None
     invasive = quote_view(views["invasive_procedures"])
     isolations = quote_view(views["isolations"])
+    filters, params = _query_window(engine, lookback_days, historical_start, historical_end)
+
+    def where(key: str) -> str:
+        return f"WHERE ({filters[key]})" if key in filters else ""
 
     specs = [
         QuerySpec(
@@ -154,7 +215,9 @@ def query_specs(views: dict[str, str]) -> list[QuerySpec]:
                     ds_unidade,
                     ds_leito
                 FROM {patients}
+                {where("patients")}
             """,
+            params=params,
         ),
         QuerySpec(
             key="bed_movements",
@@ -169,7 +232,9 @@ def query_specs(views: dict[str, str]) -> list[QuerySpec]:
                     ds_unidade_destino,
                     ds_leito_destino
                 FROM {bed_movements}
+                {where("bed_movements")}
             """,
+            params=params,
         ),
         QuerySpec(
             key="antimicrobials",
@@ -186,7 +251,9 @@ def query_specs(views: dict[str, str]) -> list[QuerySpec]:
             sql=f"""
                 SELECT *
                 FROM {antimicrobials}
+                {where("antimicrobials")}
             """,
+            params=params,
         ),
         QuerySpec(
             key="invasive_procedures",
@@ -202,7 +269,9 @@ def query_specs(views: dict[str, str]) -> list[QuerySpec]:
                     sn_ativo,
                     ds_local_instalacao
                 FROM {invasive}
+                {where("invasive_procedures")}
             """,
+            params=params,
         ),
         QuerySpec(
             key="isolations",
@@ -217,7 +286,9 @@ def query_specs(views: dict[str, str]) -> list[QuerySpec]:
                     dt_fim,
                     sn_ativo
                 FROM {isolations}
+                {where("isolations")}
             """,
+            params=params,
         ),
     ]
     if cultures:
@@ -229,14 +300,17 @@ def query_specs(views: dict[str, str]) -> list[QuerySpec]:
                        ds_exame, dt_coleta, dt_resultado, ds_material,
                        ds_resultado, ds_microorganismo, sn_positivo
                 FROM {cultures}
+                {where("cultures")}
             """,
+            params=params,
         ))
     if views.get("exam_requests"):
         requests = quote_view(views["exam_requests"])
         specs.append(QuerySpec(
             key="exam_requests",
             required_columns=("cd_atendimento", "cd_paciente", "cd_pedido"),
-            sql=f"SELECT cd_atendimento, cd_paciente, cd_pedido, dt_solicitacao FROM {requests}",
+            sql=f"SELECT cd_atendimento, cd_paciente, cd_pedido, dt_solicitacao FROM {requests} {where('exam_requests')}",
+            params=params,
         ))
     return specs
 
@@ -257,11 +331,11 @@ def connect(engine: str, dsn: str):
 def fetch_rows(conn, engine: str, spec: QuerySpec) -> list[dict[str, Any]]:
     LOG.info("Lendo %s", spec.key)
     if engine == "postgres":
-        rows = conn.execute(spec.sql).fetchall()
+        rows = conn.execute(spec.sql, spec.params).fetchall()
         normalized = [normalize_row(dict(row)) for row in rows]
     else:
         cursor = conn.cursor()
-        cursor.execute(spec.sql)
+        cursor.execute(spec.sql, spec.params)
         columns = [column[0].lower() for column in cursor.description]
         normalized = [dict(zip(columns, row)) for row in cursor.fetchall()]
         cursor.close()
@@ -522,6 +596,8 @@ def main() -> int:
     parser.add_argument("--log-level", default=os.getenv("LOG_LEVEL", "INFO"), help="Nivel de log.")
     args = parser.parse_args()
 
+    load_dotenv(os.getenv("SANATIO_ENV_FILE", ".env.integrador"))
+
     historical = bool(args.historical_start or args.historical_end)
     if historical and not (args.historical_start and args.historical_end):
         parser.error("--historical-start e --historical-end devem ser informados juntos")
@@ -543,7 +619,14 @@ def main() -> int:
     config = load_config(args.config)
     engine = config["database"]["engine"]
     dsn = config["database"]["dsn"]
-    specs = query_specs(config["views"])
+    lookback_days = config["query"]["lookback_days"]
+    specs = query_specs(config["views"], engine, lookback_days, historical_start, historical_end)
+    if historical:
+        LOG.info("Consultas limitadas no banco ao periodo historico de %s a %s.", historical_start, historical_end)
+    elif lookback_days:
+        LOG.info("Consultas incrementais limitadas aos ultimos %s dia(s), preservando registros ativos.", lookback_days)
+    else:
+        LOG.warning("Filtro incremental desativado: as views serao consultadas integralmente.")
 
     if not dsn:
         LOG.error("DSN do banco nao informado.")
