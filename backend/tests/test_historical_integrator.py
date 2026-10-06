@@ -98,6 +98,27 @@ def test_incremental_queries_use_safe_date_parameters() -> None:
     assert specs["patients"].params == {"lookback_days": 2}
 
 
+def test_optional_views_can_be_disabled() -> None:
+    views = {
+        "patients": "SANATIO.VW_SANATIO_PACIENTES_ATENDIMENTOS",
+        "bed_movements": "SANATIO.VW_SANATIO_MOVIMENTACOES_LEITO",
+        "antimicrobials": "SANATIO.VW_SANATIO_ANTIMICROBIANOS",
+        "cultures": "",
+        "exam_requests": "SANATIO.VW_SOLICITACOES_EXAMES",
+        "invasive_procedures": "",
+        "isolations": "",
+    }
+
+    specs = query_specs(views, "oracle", 2)
+
+    assert {spec.key for spec in specs} == {
+        "patients",
+        "bed_movements",
+        "antimicrobials",
+        "exam_requests",
+    }
+
+
 def test_historical_queries_apply_period_in_database() -> None:
     views = {
         "patients": "SANATIO.VW_PACIENTES_ATENDIMENTOS",

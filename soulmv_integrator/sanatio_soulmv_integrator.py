@@ -195,8 +195,8 @@ def query_specs(
     bed_movements = quote_view(views["bed_movements"])
     antimicrobials = quote_view(views["antimicrobials"])
     cultures = quote_view(views["cultures"]) if views.get("cultures") else None
-    invasive = quote_view(views["invasive_procedures"])
-    isolations = quote_view(views["isolations"])
+    invasive = quote_view(views["invasive_procedures"]) if views.get("invasive_procedures") else None
+    isolations = quote_view(views["isolations"]) if views.get("isolations") else None
     filters, params = _query_window(engine, lookback_days, historical_start, historical_end)
 
     def where(key: str) -> str:
@@ -255,7 +255,9 @@ def query_specs(
             """,
             params=params,
         ),
-        QuerySpec(
+    ]
+    if invasive:
+        specs.append(QuerySpec(
             key="invasive_procedures",
             required_columns=("cd_atendimento", "cd_paciente", "cd_procedimento", "ds_procedimento", "dt_inicio"),
             sql=f"""
@@ -272,8 +274,9 @@ def query_specs(
                 {where("invasive_procedures")}
             """,
             params=params,
-        ),
-        QuerySpec(
+        ))
+    if isolations:
+        specs.append(QuerySpec(
             key="isolations",
             required_columns=("cd_atendimento", "cd_paciente", "cd_isolamento", "ds_isolamento", "dt_inicio"),
             sql=f"""
@@ -289,8 +292,7 @@ def query_specs(
                 {where("isolations")}
             """,
             params=params,
-        ),
-    ]
+        ))
     if cultures:
         specs.append(QuerySpec(
             key="cultures",
@@ -359,8 +361,8 @@ def calculate_risk(
     cd_atendimento = str(patient["cd_atendimento"])
     cultures = [row for row in rows.get("cultures", []) if str(row["cd_atendimento"]) == cd_atendimento]
     antimicrobials = [row for row in rows["antimicrobials"] if str(row["cd_atendimento"]) == cd_atendimento]
-    invasive = [row for row in rows["invasive_procedures"] if str(row["cd_atendimento"]) == cd_atendimento]
-    isolations = [row for row in rows["isolations"] if str(row["cd_atendimento"]) == cd_atendimento]
+    invasive = [row for row in rows.get("invasive_procedures", []) if str(row["cd_atendimento"]) == cd_atendimento]
+    isolations = [row for row in rows.get("isolations", []) if str(row["cd_atendimento"]) == cd_atendimento]
 
     if reference_date:
         active_antimicrobials = [row for row in antimicrobials if active_on(row.get("dt_inicio"), row.get("dt_fim"), reference_date)]
@@ -504,7 +506,7 @@ def build_payload(
                 "ds_local_instalacao": row.get("ds_local_instalacao"),
                 "dias_permanencia": days_between(row.get("dt_inicio"), None, reference_date) if reference_date and active_on(row.get("dt_inicio"), row.get("dt_fim"), reference_date) else safe_int(row.get("dias_permanencia"), days_between(row.get("dt_inicio"), row.get("dt_fim"))),
             }
-            for row in rows["invasive_procedures"]
+            for row in rows.get("invasive_procedures", [])
         ],
         "isolations": [
             {
@@ -516,7 +518,7 @@ def build_payload(
                 "dt_fim": iso(row.get("dt_fim")),
                 "sn_ativo": "S" if (active_on(row.get("dt_inicio"), row.get("dt_fim"), reference_date) if reference_date else parse_bool(row.get("sn_ativo", "S"))) else "N",
             }
-            for row in rows["isolations"]
+            for row in rows.get("isolations", [])
         ],
     }
 
