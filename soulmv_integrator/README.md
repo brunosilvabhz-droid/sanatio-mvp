@@ -129,6 +129,7 @@ Mesmo com o token no arquivo, qualquer valor pode ser sobrescrito:
 ```powershell
 $env:SOULMV_DB_ENGINE="oracle"
 $env:SOULMV_DSN="usuario/senha@host:1521/service_name"
+$env:SOULMV_ORACLE_THICK="false"
 $env:SANATIO_INGEST_URL="http://192.168.18.175:8000/ingest/snapshots"
 $env:SANATIO_TOKEN="TOKEN_DO_HOSPITAL"
 $env:SOULMV_LOOKBACK_DAYS="2"
@@ -143,6 +144,18 @@ ainda ativos. O valor `0` desativa o filtro e consulta as views integralmente.
 
 O modo historico ignora essa janela e aplica `--historical-start` e
 `--historical-end` diretamente nas consultas ao banco.
+
+### Oracle com verificador de senha antigo
+
+Quando o Oracle retornar `DPY-3015`, instale o Oracle Instant Client no Linux,
+registre suas bibliotecas com `ldconfig` e acrescente ao `.env.integrador`:
+
+```dotenv
+SOULMV_ORACLE_THICK=true
+```
+
+O integrador inicializara o `python-oracledb` em modo Thick antes da conexao.
+Deixe a opcao ausente ou como `false` nas instalacoes que usam o modo Thin.
 
 ## Filtros aplicados nas views
 

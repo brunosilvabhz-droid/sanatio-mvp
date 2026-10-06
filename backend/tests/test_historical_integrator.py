@@ -1,6 +1,7 @@
 from datetime import date, datetime, timezone
 from pathlib import Path
 import sys
+from types import SimpleNamespace
 
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -8,10 +9,26 @@ sys.path.insert(0, str(ROOT))
 
 from soulmv_integrator.sanatio_soulmv_integrator import (  # noqa: E402
     build_payload,
+    connect,
     filter_historical_rows,
     query_specs,
     split_payload,
 )
+
+
+def test_oracle_thick_mode_is_enabled_by_environment(monkeypatch) -> None:
+    calls = []
+    fake_connection = object()
+    fake_oracledb = SimpleNamespace(
+        init_oracle_client=lambda: calls.append("init"),
+        clientversion=lambda: (19, 32, 0, 0, 0),
+        connect=lambda dsn: calls.append(("connect", dsn)) or fake_connection,
+    )
+    monkeypatch.setitem(sys.modules, "oracledb", fake_oracledb)
+    monkeypatch.setenv("SOULMV_ORACLE_THICK", "true")
+
+    assert connect("oracle", "dsn-seguro") is fake_connection
+    assert calls == ["init", ("connect", "dsn-seguro")]
 
 
 def _rows():

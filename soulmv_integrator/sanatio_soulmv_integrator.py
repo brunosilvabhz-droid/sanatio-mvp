@@ -324,6 +324,9 @@ def connect(engine: str, dsn: str):
     if engine == "oracle":
         import oracledb
 
+        if os.getenv("SOULMV_ORACLE_THICK", "false").strip().lower() in {"1", "true", "yes", "sim"}:
+            oracledb.init_oracle_client()
+            LOG.info("Oracle Client inicializado em modo Thick: %s", oracledb.clientversion())
         return oracledb.connect(dsn)
     raise ValueError("database.engine deve ser 'oracle' ou 'postgres'")
 
