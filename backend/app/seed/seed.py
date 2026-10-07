@@ -1,4 +1,5 @@
 import os
+import logging
 
 from sqlalchemy import select
 
@@ -48,8 +49,10 @@ SETTINGS = [
     ("monitoring.schedule.timezone", "America/Sao_Paulo", "Fuso horario da agenda automatica"),
 ]
 
+LOG = logging.getLogger(__name__)
+
 def main() -> None:
-    initial_admin_password = os.getenv("INITIAL_ADMIN_PASSWORD", "123456")
+    initial_admin_password = os.getenv("INITIAL_ADMIN_PASSWORD", "")
     db = SessionLocal()
     try:
         role_by_name = {}
@@ -61,8 +64,10 @@ def main() -> None:
                 db.flush()
             role_by_name[name] = role
 
+        if initial_admin_password and len(initial_admin_password) < 12:
+            raise ValueError("INITIAL_ADMIN_PASSWORD deve ter pelo menos 12 caracteres")
         for email, full_name, role_name, can_view_patient_name in USERS:
-            if not db.scalar(select(User).where(User.email == email)):
+            if initial_admin_password and not db.scalar(select(User).where(User.email == email)):
                 db.add(
                     User(
                         email=email,
@@ -73,6 +78,8 @@ def main() -> None:
                         can_view_patient_name=can_view_patient_name,
                     )
                 )
+        if not initial_admin_password:
+            LOG.warning("INITIAL_ADMIN_PASSWORD ausente; usuarios iniciais nao foram criados")
 
         for name, rule_type, key, value, severity in RULES:
             if not db.scalar(select(MonitoringRule).where(MonitoringRule.rule_type == rule_type)):

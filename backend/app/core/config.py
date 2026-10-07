@@ -31,6 +31,11 @@ class Settings(BaseSettings):
     smtp_password: str = Field(default="", repr=False)
     smtp_from_email: str = "sanatio@impactocg.com"
     smtp_from_name: str = "SANATIO"
+    smtp_use_tls: bool = True
+    password_reset_token_expire_minutes: int = 30
+    alert_email_enabled: bool = True
+    alert_notification_emails: str = ""
+    alert_notification_roles: str = "SCIH,INFECTO"
     support_contact_email: str = "contato@impactocg.com"
     cors_origin_regex: str = r"https?://(localhost|127\.0\.0\.1|10\..+|192\.168\..+|172\.(1[6-9]|2[0-9]|3[0-1])\..+):5173"
 
@@ -41,6 +46,14 @@ class Settings(BaseSettings):
     @property
     def trusted_host_list(self) -> list[str]:
         return [host.strip() for host in self.trusted_hosts.split(",") if host.strip()]
+
+    @property
+    def alert_notification_email_list(self) -> list[str]:
+        return [email.strip().lower() for email in self.alert_notification_emails.split(",") if email.strip()]
+
+    @property
+    def alert_notification_role_list(self) -> list[str]:
+        return [role.strip().upper() for role in self.alert_notification_roles.split(",") if role.strip()]
 
     @property
     def is_production(self) -> bool:

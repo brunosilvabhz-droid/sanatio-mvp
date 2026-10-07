@@ -27,7 +27,7 @@ from app.models.patient_bed_movement import PatientBedMovement
 from app.models.patient_monitoring_snapshot import PatientMonitoringSnapshot
 from app.models.setting import Setting
 from app.schemas.hospital_integration import HospitalIntegrationCreate, HospitalIntegrationRead, IngestPayload
-from app.services import antimicrobial_audit_service
+from app.services import alert_service, antimicrobial_audit_service
 
 router = APIRouter(tags=["Integracao hospitalar"])
 
@@ -257,8 +257,7 @@ def _create_ingested_alert(
     )
     if existing:
         return False
-    db.add(
-        Alert(
+    alert = Alert(
             cd_atendimento=item.cd_atendimento,
             cd_paciente=item.cd_paciente,
             unit=item.unit,
@@ -271,7 +270,9 @@ def _create_ingested_alert(
             status="ABERTO",
             source="client_ingestion",
         )
-    )
+    db.add(alert)
+    db.flush()
+    alert_service.notify_alert_created(db, alert)
     return True
 
 

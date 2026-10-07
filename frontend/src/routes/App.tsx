@@ -11,6 +11,8 @@ import EpidemiologyReferences from '../pages/EpidemiologyReferences/Epidemiology
 import EpidemiologyReports from '../pages/EpidemiologyReports/EpidemiologyReports';
 import EstablishmentProfile from '../pages/EstablishmentProfile/EstablishmentProfile';
 import Login from '../pages/Login/Login';
+import ForgotPassword from '../pages/Login/ForgotPassword';
+import ResetPassword from '../pages/Login/ResetPassword';
 import Interventions from '../pages/Interventions/Interventions';
 import LabPdfImport from '../pages/LabPdfImport/LabPdfImport';
 import MonitoringRuns from '../pages/MonitoringRuns/MonitoringRuns';
@@ -29,6 +31,8 @@ export default function App() {
     <BrowserRouter>
       <Routes>
         <Route path="/login" element={<Login />} />
+        <Route path="/forgot-password" element={<ForgotPassword />} />
+        <Route path="/reset-password" element={<ResetPassword />} />
         <Route
           path="/"
           element={

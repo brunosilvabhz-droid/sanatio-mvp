@@ -1,5 +1,5 @@
 import PersonAddIcon from '@mui/icons-material/PersonAdd';
-import { Box, Button, FormControlLabel, MenuItem, Paper, Stack, Switch, Table, TableBody, TableCell, TableHead, TableRow, TextField, Typography } from '@mui/material';
+import { Alert, Box, Button, FormControlLabel, MenuItem, Paper, Stack, Switch, Table, TableBody, TableCell, TableHead, TableRow, TextField, Typography } from '@mui/material';
 import { useEffect, useState } from 'react';
 import { api } from '../../api/client';
 import { Role, User } from '../../types';
@@ -7,7 +7,8 @@ import { Role, User } from '../../types';
 export default function Users() {
   const [users, setUsers] = useState<User[]>([]);
   const [roles, setRoles] = useState<Role[]>([]);
-  const [form, setForm] = useState({ email: '', full_name: '', password: '123456', role_name: 'SCIH', can_view_patient_name: false });
+  const [form, setForm] = useState({ email: '', full_name: '', password: '', role_name: 'SCIH', can_view_patient_name: false });
+  const [error, setError] = useState('');
 
   async function load() {
     const [usersResponse, rolesResponse] = await Promise.all([api.get('/users'), api.get('/roles')]);
@@ -16,9 +17,18 @@ export default function Users() {
   }
 
   async function create() {
-    await api.post('/users', form);
-    setForm({ email: '', full_name: '', password: '123456', role_name: 'SCIH', can_view_patient_name: false });
-    await load();
+    setError('');
+    if (form.password.length < 12) {
+      setError('A senha inicial deve ter pelo menos 12 caracteres.');
+      return;
+    }
+    try {
+      await api.post('/users', form);
+      setForm({ email: '', full_name: '', password: '', role_name: 'SCIH', can_view_patient_name: false });
+      await load();
+    } catch (requestError: any) {
+      setError(requestError.response?.data?.detail || 'Não foi possível criar o usuário.');
+    }
   }
 
   async function toggle(user: User) {
@@ -42,10 +52,12 @@ export default function Users() {
         <Typography color="text.secondary">Perfis ADMIN, SCIH, FARMACIA, DIRETORIA, MEDICO e INFECTO</Typography>
       </Box>
       <Paper sx={{ p: 2 }}>
-        <Stack direction="row" gap={1.5} flexWrap="wrap">
+        <Stack gap={1.5}>
+          {error && <Alert severity="error">{error}</Alert>}
+          <Stack direction="row" gap={1.5} flexWrap="wrap">
           <TextField size="small" label="e-mail" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} />
           <TextField size="small" label="nome" value={form.full_name} onChange={(e) => setForm({ ...form, full_name: e.target.value })} />
-          <TextField size="small" label="senha" value={form.password} onChange={(e) => setForm({ ...form, password: e.target.value })} />
+          <TextField size="small" label="senha inicial" type="password" value={form.password} onChange={(e) => setForm({ ...form, password: e.target.value })} autoComplete="new-password" helperText="Mínimo de 12 caracteres" />
           <TextField select size="small" label="perfil" value={form.role_name} sx={{ minWidth: 150 }} onChange={(e) => setForm({ ...form, role_name: e.target.value })}>
             {roles.map((role) => <MenuItem key={role.id} value={role.name}>{role.name}</MenuItem>)}
           </TextField>
@@ -54,6 +66,7 @@ export default function Users() {
             label="Pode ver nome do paciente"
           />
           <Button startIcon={<PersonAddIcon />} variant="contained" onClick={create}>Criar</Button>
+          </Stack>
         </Stack>
       </Paper>
       <Paper>

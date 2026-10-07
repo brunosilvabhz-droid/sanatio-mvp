@@ -1,14 +1,14 @@
 import LockOutlinedIcon from '@mui/icons-material/LockOutlined';
 import { Alert, Box, Button, Divider, Paper, Stack, TextField, Typography } from '@mui/material';
 import { FormEvent, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { api } from '../../api/client';
 import BrandLogo from '../../components/BrandLogo';
 
 export default function Login() {
   const navigate = useNavigate();
-  const [email, setEmail] = useState('admin@sanatio.local');
-  const [password, setPassword] = useState('123456');
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
   const [error, setError] = useState('');
 
   async function submit(event: FormEvent) {
@@ -88,6 +88,9 @@ export default function Login() {
             <TextField label="Senha" type="password" value={password} onChange={(e) => setPassword(e.target.value)} fullWidth autoComplete="current-password" />
             <Button type="submit" variant="contained" size="large">
               Entrar
+            </Button>
+            <Button component={Link} to="/forgot-password" size="small">
+              Esqueci minha senha
             </Button>
           </Stack>
         </Paper>

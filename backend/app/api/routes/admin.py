@@ -26,13 +26,14 @@ def users(db: Session = Depends(get_db)) -> list[User]:
 
 @router.post("/users", response_model=UserRead)
 def create_user(payload: UserCreate, db: Session = Depends(get_db)) -> User:
+    normalized_email = str(payload.email).strip().lower()
     role = db.scalar(select(Role).where(Role.name == payload.role_name))
     if not role:
         raise HTTPException(status_code=422, detail="Perfil inválido")
-    if db.scalar(select(User).where(User.email == payload.email)):
+    if db.scalar(select(User).where(User.email == normalized_email)):
         raise HTTPException(status_code=409, detail="E-mail já cadastrado")
     user = User(
-        email=payload.email,
+        email=normalized_email,
         full_name=payload.full_name,
         hashed_password=get_password_hash(payload.password),
         role_id=role.id,
