@@ -356,6 +356,22 @@ def fetch_rows(conn, engine: str, spec: QuerySpec) -> list[dict[str, Any]]:
     return normalized
 
 
+def restrict_details_to_patients(rows: dict[str, list[dict[str, Any]]]) -> dict[str, list[dict[str, Any]]]:
+    attendance_ids = {str(row["cd_atendimento"]) for row in rows.get("patients", [])}
+    restricted = dict(rows)
+    for key, values in rows.items():
+        if key == "patients":
+            continue
+        restricted[key] = [
+            row for row in values
+            if str(row.get("cd_atendimento") or "") in attendance_ids
+        ]
+        removed = len(values) - len(restricted[key])
+        if removed:
+            LOG.info("%s: %s linha(s) fora dos atendimentos da janela foram descartadas.", key, removed)
+    return restricted
+
+
 def calculate_risk(
     patient: dict[str, Any],
     rows: dict[str, list[dict[str, Any]]],
@@ -666,6 +682,7 @@ def main() -> int:
             reference_at,
         )
     else:
+        rows = restrict_details_to_patients(rows)
         payload = build_payload(rows, config["risk_thresholds"])
         batches = [payload]
 

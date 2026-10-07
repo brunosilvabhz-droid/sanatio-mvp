@@ -12,6 +12,7 @@ from soulmv_integrator.sanatio_soulmv_integrator import (  # noqa: E402
     connect,
     filter_historical_rows,
     query_specs,
+    restrict_details_to_patients,
     split_payload,
 )
 
@@ -133,3 +134,20 @@ def test_historical_queries_apply_period_in_database() -> None:
 
     assert all("%(window_start)s" in spec.sql for spec in specs)
     assert all(spec.params["window_end"] == datetime(2025, 2, 1) for spec in specs)
+
+
+def test_incremental_details_are_restricted_to_returned_attendances() -> None:
+    rows = {
+        "patients": [{"cd_atendimento": "10"}],
+        "antimicrobials": [
+            {"cd_atendimento": "10", "cd_prescricao": "1"},
+            {"cd_atendimento": "99", "cd_prescricao": "2"},
+        ],
+        "isolations": [{"cd_atendimento": 10}, {"cd_atendimento": 20}],
+    }
+
+    restricted = restrict_details_to_patients(rows)
+
+    assert restricted["patients"] == rows["patients"]
+    assert [row["cd_prescricao"] for row in restricted["antimicrobials"]] == ["1"]
+    assert len(restricted["isolations"]) == 1
