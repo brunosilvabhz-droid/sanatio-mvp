@@ -179,11 +179,11 @@ def _query_window(
     return {
         "patients": f"dt_alta IS NULL OR dt_alta >= {start} OR dt_atendimento >= {start}",
         "bed_movements": f"dt_movimentacao >= {start}",
-        "antimicrobials": f"dt_fim IS NULL OR dt_fim >= {start} OR dt_inicio >= {start} OR dt_aplicacao >= {start}",
+        "antimicrobials": f"dt_aplicacao >= {start} OR dt_inicio >= {start} OR dt_fim >= {start}",
         "cultures": f"dt_coleta >= {start} OR dt_resultado >= {start}",
         "exam_requests": f"dt_solicitacao >= {start}",
-        "invasive_procedures": f"dt_fim IS NULL OR dt_fim >= {start} OR dt_inicio >= {start}",
-        "isolations": f"dt_fim IS NULL OR dt_fim >= {start} OR dt_inicio >= {start}",
+        "invasive_procedures": f"dt_inicio >= {start} OR dt_fim >= {start}",
+        "isolations": f"dt_inicio >= {start} OR dt_fim >= {start}",
     }, {"lookback_days": lookback_days}
 
 

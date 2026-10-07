@@ -94,7 +94,7 @@ def test_incremental_queries_use_safe_date_parameters() -> None:
     specs = {spec.key: spec for spec in query_specs(views, "oracle", 2)}
 
     assert "dt_alta IS NULL" in specs["patients"].sql
-    assert "dt_fim IS NULL" in specs["antimicrobials"].sql
+    assert "dt_aplicacao >= SYSDATE - :lookback_days" in specs["antimicrobials"].sql
     assert "SYSDATE - :lookback_days" in specs["cultures"].sql
     assert specs["patients"].params == {"lookback_days": 2}
 
@@ -151,3 +151,21 @@ def test_incremental_details_are_restricted_to_returned_attendances() -> None:
     assert restricted["patients"] == rows["patients"]
     assert [row["cd_prescricao"] for row in restricted["antimicrobials"]] == ["1"]
     assert len(restricted["isolations"]) == 1
+
+
+def test_incremental_antimicrobials_do_not_include_old_open_rows() -> None:
+    views = {
+        "patients": "SANATIO.VW_PACIENTES_ATENDIMENTOS",
+        "bed_movements": "SANATIO.VW_MOVIMENTACOES_LEITO",
+        "antimicrobials": "SANATIO.VW_ANTIMICROBIANOS",
+        "cultures": "",
+        "exam_requests": "",
+        "invasive_procedures": "",
+        "isolations": "SANATIO.VW_ISOLAMENTOS",
+    }
+
+    specs = {spec.key: spec for spec in query_specs(views, "oracle", 2)}
+
+    assert "dt_aplicacao >= SYSDATE - :lookback_days" in specs["antimicrobials"].sql
+    assert "dt_fim IS NULL" not in specs["antimicrobials"].sql
+    assert "dt_fim IS NULL" not in specs["isolations"].sql
