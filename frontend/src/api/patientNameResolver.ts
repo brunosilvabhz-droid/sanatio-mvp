@@ -15,7 +15,13 @@ export async function resolvePatientName(cdPaciente: string, cdAtendimento?: str
   }
 
   try {
-    const response = await fetch(url.toString(), { method: 'GET', mode: 'cors' });
+    const token = localStorage.getItem('sanatio_token');
+    if (!token) return null;
+    const response = await fetch(url.toString(), {
+      method: 'GET',
+      mode: 'cors',
+      headers: { Authorization: `Bearer ${token}` }
+    });
     if (!response.ok) return null;
     const data = (await response.json()) as ResolverResponse;
     return data.name || data.nm_paciente || null;

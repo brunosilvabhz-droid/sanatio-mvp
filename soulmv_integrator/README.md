@@ -182,3 +182,53 @@ No Agendador de Tarefas:
 ## Observação de segurança
 
 Nunca grave tokens reais no Git. Gere um token por hospital na tela `Configurações` do SANATIO e mantenha-o apenas no arquivo local protegido ou em variável de ambiente.
+
+## Resolvedor local de nomes de pacientes
+
+O resolvedor roda no servidor do integrador e consulta somente
+`SANATIO.VW_RESOLVE_PACIENTE`. O nome não é enviado nem armazenado no servidor
+SANATIO. Cada consulta valida o token de login em `SANATIO_API_URL/auth/me` e
+exige que o usuário tenha a permissão `can_view_patient_name`.
+
+Acrescente ao `.env.integrador`:
+
+```dotenv
+SANATIO_API_URL=https://sanatio.impactocg.com/api
+PATIENT_RESOLVER_VIEW=SANATIO.VW_RESOLVE_PACIENTE
+PATIENT_RESOLVER_ALLOWED_ORIGINS=https://sanatio.impactocg.com
+PATIENT_RESOLVER_HOST=127.0.0.1
+PATIENT_RESOLVER_PORT=5191
+```
+
+O `SOULMV_DSN` e o `SOULMV_ORACLE_THICK` são os mesmos já usados pelo
+integrador. Instale e teste:
+
+```bash
+cd /opt/sanatio-integrador/soulmv_integrator
+source .venv/bin/activate
+pip install -r requirements.txt
+chmod 750 run_patient_name_resolver.sh
+./run_patient_name_resolver.sh
+curl http://127.0.0.1:5191/health
+```
+
+Para iniciar automaticamente:
+
+```bash
+sudo cp sanatio-patient-resolver.service.example /etc/systemd/system/sanatio-patient-resolver.service
+sudo systemctl daemon-reload
+sudo systemctl enable --now sanatio-patient-resolver
+sudo systemctl status sanatio-patient-resolver --no-pager
+```
+
+O navegador abre o SANATIO em HTTPS, portanto o resolvedor precisa ser publicado
+por um proxy HTTPS local com certificado confiável pelos computadores do
+hospital. O proxy deve encaminhar ao endereço `http://127.0.0.1:5191` e não deve
+ficar acessível fora da rede do hospital.
+
+Depois de definir o endereço local, configure na produção:
+
+```dotenv
+PATIENT_NAME_RESOLVER_URL=https://resolvedor-local-do-hospital
+PATIENT_NAME_RESOLVER_ORIGIN=https://resolvedor-local-do-hospital
+```

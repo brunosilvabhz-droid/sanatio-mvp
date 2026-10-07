@@ -1,0 +1,18 @@
+[Unit]
+Description=SANATIO - resolvedor local de nomes de pacientes
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=socor
+Group=socor
+WorkingDirectory=/opt/sanatio-integrador/soulmv_integrator
+ExecStart=/opt/sanatio-integrador/soulmv_integrator/run_patient_name_resolver.sh
+Restart=on-failure
+RestartSec=5
+PrivateTmp=true
+NoNewPrivileges=true
+
+[Install]
+WantedBy=multi-user.target

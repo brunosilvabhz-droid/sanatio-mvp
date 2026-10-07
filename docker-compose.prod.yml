@@ -58,6 +58,7 @@ services:
       dockerfile: Dockerfile.prod
       args:
         VITE_API_URL: /api
+        VITE_PATIENT_NAME_RESOLVER_URL: ${PATIENT_NAME_RESOLVER_URL:-}
     restart: unless-stopped
     depends_on:
       - backend
@@ -71,6 +72,7 @@ services:
     restart: unless-stopped
     environment:
       SANATIO_DOMAIN: ${SANATIO_DOMAIN}
+      PATIENT_NAME_RESOLVER_ORIGIN: ${PATIENT_NAME_RESOLVER_ORIGIN:-}
     ports:
       - "80:80"
       - "443:443"
