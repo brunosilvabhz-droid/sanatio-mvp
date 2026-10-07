@@ -57,24 +57,26 @@ def _clinical_snapshot_to_patient(snapshot: SnapshotAtendimento) -> dict:
     attendance = snapshot.atendimento
     today = date.today()
     admitted_at = attendance.data_hora_entrada or datetime.now(timezone.utc)
+    birth_date = attendance.paciente.data_nascimento or today
+    age = today.year - birth_date.year - ((today.month, today.day) < (birth_date.month, birth_date.day))
     return {
         "cd_atendimento": attendance.id_origem_atendimento,
         "cd_paciente": attendance.paciente.id_origem_paciente,
         "nm_paciente": None,
-        "dt_nascimento": today,
-        "tp_sexo": "-",
+        "dt_nascimento": birth_date,
+        "tp_sexo": attendance.paciente.sexo or "-",
         "dt_atendimento": admitted_at,
-        "cd_unidade": attendance.unidade_atual or "-",
+        "cd_unidade": attendance.codigo_unidade or "-",
         "ds_unidade": attendance.unidade_atual or "-",
-        "cd_leito": attendance.leito_atual or "-",
+        "cd_leito": attendance.codigo_leito or "-",
         "ds_leito": attendance.leito_atual or "-",
         "active": attendance.ativo,
         "discharged_at": attendance.data_hora_saida,
-        "cd_prestador": "-",
-        "nm_prestador": "-",
-        "cd_convenio": "-",
-        "nm_convenio": "-",
-        "idade": 0,
+        "cd_prestador": attendance.codigo_prestador or "-",
+        "nm_prestador": attendance.nome_prestador or "-",
+        "cd_convenio": attendance.codigo_convenio or "-",
+        "nm_convenio": attendance.nome_convenio or "-",
+        "idade": max(age, 0),
         "dias_internacao": snapshot.dias_internacao,
         "status_risco": snapshot.status_risco,
         "risk_reasons": _clinical_snapshot_reasons(snapshot),

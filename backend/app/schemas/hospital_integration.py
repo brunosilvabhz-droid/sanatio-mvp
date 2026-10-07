@@ -22,8 +22,16 @@ class HospitalIntegrationRead(BaseModel):
 class IngestPatientSnapshot(BaseModel):
     cd_atendimento: str
     cd_paciente: str
+    dt_nascimento: datetime | None = None
+    tp_sexo: str | None = None
+    cd_unidade: str | None = None
     unit: str | None = None
+    cd_leito: str | None = None
     bed: str | None = None
+    cd_prestador: str | None = None
+    nm_prestador: str | None = None
+    cd_convenio: str | None = None
+    nm_convenio: str | None = None
     active: bool = True
     admitted_at: datetime | None = None
     discharged_at: datetime | None = None

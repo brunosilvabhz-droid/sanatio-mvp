@@ -81,6 +81,10 @@ def _get_or_create_patient(db: Session, cd_paciente: str) -> Paciente:
 
 def _upsert_attendance(db: Session, item) -> Atendimento:
     patient = _get_or_create_patient(db, item.cd_paciente)
+    if item.dt_nascimento:
+        patient.data_nascimento = item.dt_nascimento.date()
+    if item.tp_sexo:
+        patient.sexo = item.tp_sexo
     attendance = db.scalar(select(Atendimento).where(Atendimento.id_origem_atendimento == item.cd_atendimento))
     if not attendance:
         attendance = Atendimento(
@@ -90,7 +94,13 @@ def _upsert_attendance(db: Session, item) -> Atendimento:
         db.add(attendance)
     attendance.ativo = item.active
     attendance.unidade_atual = item.unit
+    attendance.codigo_unidade = item.cd_unidade
     attendance.leito_atual = item.bed
+    attendance.codigo_leito = item.cd_leito
+    attendance.codigo_prestador = item.cd_prestador
+    attendance.nome_prestador = item.nm_prestador
+    attendance.codigo_convenio = item.cd_convenio
+    attendance.nome_convenio = item.nm_convenio
     attendance.data_hora_entrada = item.admitted_at
     attendance.data_hora_saida = item.discharged_at
     db.flush()
@@ -449,7 +459,11 @@ def ingest_snapshots(
         snapshot.possui_isolamento_ativo = calculated_snapshot["has_active_isolation"]
         snapshot.data_hora_coleta = reference_at
 
-        monitoring_snapshot = item.model_dump()
+        monitoring_snapshot = {
+            key: value
+            for key, value in item.model_dump().items()
+            if key in PatientMonitoringSnapshot.__table__.columns
+        }
         monitoring_snapshot.update(calculated_snapshot)
         operational_snapshot = None
         if historical:

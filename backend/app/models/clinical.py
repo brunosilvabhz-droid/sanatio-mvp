@@ -1,6 +1,6 @@
-from datetime import datetime
+from datetime import date, datetime
 
-from sqlalchemy import Boolean, DateTime, ForeignKey, Integer, String, Text, UniqueConstraint, func
+from sqlalchemy import Boolean, Date, DateTime, ForeignKey, Integer, String, Text, UniqueConstraint, func
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.models.base import Base
@@ -11,6 +11,8 @@ class Paciente(Base):
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     id_origem_paciente: Mapped[str] = mapped_column(String(60), unique=True, index=True, nullable=False)
+    data_nascimento: Mapped[date | None] = mapped_column(Date, nullable=True)
+    sexo: Mapped[str | None] = mapped_column(String(10), nullable=True)
     criado_em: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
     atualizado_em: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False)
 
@@ -25,7 +27,13 @@ class Atendimento(Base):
     id_origem_atendimento: Mapped[str] = mapped_column(String(60), unique=True, index=True, nullable=False)
     ativo: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False, index=True)
     unidade_atual: Mapped[str | None] = mapped_column(String(120), index=True, nullable=True)
+    codigo_unidade: Mapped[str | None] = mapped_column(String(60), nullable=True)
     leito_atual: Mapped[str | None] = mapped_column(String(120), nullable=True)
+    codigo_leito: Mapped[str | None] = mapped_column(String(60), nullable=True)
+    codigo_prestador: Mapped[str | None] = mapped_column(String(60), nullable=True)
+    nome_prestador: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    codigo_convenio: Mapped[str | None] = mapped_column(String(60), nullable=True)
+    nome_convenio: Mapped[str | None] = mapped_column(String(255), nullable=True)
     data_hora_entrada: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     data_hora_saida: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     criado_em: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
