@@ -1,4 +1,4 @@
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 
 from sqlalchemy import select
 from sqlalchemy.orm import Session
@@ -29,9 +29,74 @@ def _initial_status(active: bool, days_in_use: int) -> str:
     return "MONITORADO"
 
 
+def _aware(value: datetime | None) -> datetime | None:
+    if value and value.tzinfo is None:
+        return value.replace(tzinfo=timezone.utc)
+    return value
+
+
+def treatment_courses(antimicrobials: list[dict], now: datetime | None = None) -> tuple[list[dict], set[tuple[str, str]]]:
+    now = _aware(now) or datetime.now(timezone.utc)
+    latest_prescriptions: dict[tuple[str, str], dict] = {}
+    for item in antimicrobials:
+        key = (str(item.get("cd_prescricao") or ""), str(item.get("cd_item_prescricao") or ""))
+        if not all(key):
+            continue
+        current = latest_prescriptions.get(key)
+        item_application = _aware(item.get("dt_aplicacao")) or _aware(item.get("dt_inicio"))
+        current_application = (_aware(current.get("dt_aplicacao")) or _aware(current.get("dt_inicio"))) if current else None
+        if current is None or (item_application and (not current_application or item_application >= current_application)):
+            latest_prescriptions[key] = dict(item)
+
+    by_medication: dict[str, list[dict]] = {}
+    for item in latest_prescriptions.values():
+        medication = str(item.get("ds_principio_ativo") or item.get("ds_antimicrobiano") or "").strip().casefold()
+        by_medication.setdefault(medication, []).append(item)
+
+    courses: list[dict] = []
+    for prescriptions in by_medication.values():
+        prescriptions.sort(key=lambda item: _aware(item.get("dt_inicio")) or datetime.min.replace(tzinfo=timezone.utc))
+        episodes: list[list[dict]] = []
+        for item in prescriptions:
+            start = _aware(item.get("dt_inicio"))
+            if not episodes:
+                episodes.append([item])
+                continue
+            previous_ends = [_aware(value.get("dt_fim")) for value in episodes[-1]]
+            open_prescription = any(end is None for end in previous_ends)
+            episode_end = max((end for end in previous_ends if end), default=None)
+            if start and (open_prescription or (episode_end and start <= episode_end + timedelta(days=1))):
+                episodes[-1].append(item)
+            else:
+                episodes.append([item])
+
+        for episode in episodes:
+            latest = max(episode, key=lambda item: _aware(item.get("dt_inicio")) or datetime.min.replace(tzinfo=timezone.utc))
+            course_start = min(_aware(item.get("dt_inicio")) for item in episode if item.get("dt_inicio"))
+            latest_end = _aware(latest.get("dt_fim"))
+            active = _active(latest)
+            course_end = now if active else max((_aware(item.get("dt_fim")) for item in episode if item.get("dt_fim")), default=now)
+            consolidated = dict(latest)
+            consolidated["dt_inicio"] = course_start
+            consolidated["sn_ativo"] = "S" if active else "N"
+            consolidated["dias_uso"] = max((min(course_end, now).date() - course_start.date()).days, 0)
+            courses.append(consolidated)
+    return courses, set(latest_prescriptions)
+
+
 def sync_for_patient(db: Session, patient: dict, antimicrobials: list[dict], monitoring_run_id: int | None = None) -> int:
     synced = 0
-    for item in antimicrobials:
+    courses, prescription_keys = treatment_courses(antimicrobials)
+    existing_audits = list(db.scalars(select(AntimicrobialAudit).where(
+        AntimicrobialAudit.cd_prescricao.in_({key[0] for key in prescription_keys}),
+        AntimicrobialAudit.cd_item_prescricao.in_({key[1] for key in prescription_keys}),
+    ))) if prescription_keys else []
+    for audit in existing_audits:
+        if (audit.cd_prescricao, audit.cd_item_prescricao) in prescription_keys and audit.status not in PROTECTED_STATUSES:
+            audit.active = False
+            audit.status = "ENCERRADO"
+
+    for item in courses:
         cd_prescricao = str(item.get("cd_prescricao") or "")
         cd_item_prescricao = str(item.get("cd_item_prescricao") or "")
         if not cd_prescricao or not cd_item_prescricao:

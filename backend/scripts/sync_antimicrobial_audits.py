@@ -20,7 +20,6 @@ def main() -> None:
         grouped: dict[int, tuple[Atendimento, Paciente, list[dict]]] = {}
         for item, attendance, patient in latest_by_prescription.values():
             bucket = grouped.setdefault(attendance.id, (attendance, patient, []))
-            operationally_active = bool(item.ativo)
             bucket[2].append(
                 {
                     "cd_prescricao": item.id_origem_prescricao,
@@ -30,7 +29,7 @@ def main() -> None:
                     "dt_inicio": item.data_hora_inicio,
                     "dt_fim": item.data_hora_fim,
                     "dias_uso": item.dias_uso,
-                    "sn_ativo": "S" if operationally_active else "N",
+                    "sn_ativo": "S" if item.ativo else "N",
                     "ds_dose": item.dose,
                     "ds_via": item.via,
                     "ds_frequencia": item.frequencia,
