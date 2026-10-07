@@ -68,7 +68,7 @@ def list_audits(
     paciente: str | None = None,
     antimicrobial: str | None = None,
     min_days: int | None = None,
-    active_only: bool = True,
+    active_only: bool = False,
     db: Session = Depends(get_db),
     _: User = Depends(get_current_user),
 ) -> list[AntimicrobialAuditRead]:
