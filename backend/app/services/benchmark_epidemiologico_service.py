@@ -66,10 +66,10 @@ class BenchmarkEpidemiologicoService:
 
     def fechamento_anvisa(self, periodo: str, tipo_unidade: str = "UTI_ADULTO") -> dict:
         inicio, fim = self._periodo(periodo)
-        paciente_dia = self._patient_days(inicio, fim)
-        casos_ipcsl, cvc_dia, densidade_ipcsl = self._calcular_indicador("IPCSL", inicio, fim)
-        casos_pav, vm_dia, densidade_pav = self._calcular_indicador("PAV", inicio, fim)
-        casos_itu_cvd, cvd_dia, densidade_itu_cvd = self._calcular_indicador("ITU_CVD", inicio, fim)
+        paciente_dia = self.patient_days(inicio, fim, tipo_unidade)
+        casos_ipcsl, cvc_dia, densidade_ipcsl = self._calcular_indicador("IPCSL", inicio, fim, tipo_unidade)
+        casos_pav, vm_dia, densidade_pav = self._calcular_indicador("PAV", inicio, fim, tipo_unidade)
+        casos_itu_cvd, cvd_dia, densidade_itu_cvd = self._calcular_indicador("ITU_CVD", inicio, fim, tipo_unidade)
         return {
             "tipo_unidade": tipo_unidade,
             "periodo": periodo,
@@ -190,13 +190,14 @@ class BenchmarkEpidemiologicoService:
                 total += self._active_days(procedure.data_hora_inicio, procedure.data_hora_fim, inicio, fim)
         return total
 
-    def _patient_days(self, inicio: datetime, fim: datetime) -> int:
-        atendimentos = self.db.scalars(
-            select(Atendimento).where(
+    def patient_days(self, inicio: datetime, fim: datetime, tipo_unidade: str | None = None) -> int:
+        stmt = select(Atendimento).where(
                 Atendimento.data_hora_entrada < fim,
                 (Atendimento.data_hora_saida.is_(None)) | (Atendimento.data_hora_saida >= inicio),
             )
-        ).all()
+        if tipo_unidade:
+            stmt = stmt.where(self._unit_condition(tipo_unidade))
+        atendimentos = self.db.scalars(stmt).all()
         return sum(self._active_days(item.data_hora_entrada, item.data_hora_saida, inicio, fim) for item in atendimentos)
 
     def _culture_matches(self, culture: CulturaAtendimento, needles: tuple[str, ...]) -> bool:
@@ -211,7 +212,7 @@ class BenchmarkEpidemiologicoService:
         normalized = tipo_unidade.strip().lower().replace("_", " ")
         unit = func.lower(Atendimento.unidade_atual)
         if normalized == "uti adulto":
-            return unit.like("%uti%adult%")
+            return unit.like("%uti%adult%") | (unit == "cti") | unit.like("%cti%adult%")
         if normalized in {"ui", "unidade internacao", "unidade de internacao"}:
             return unit.like("%internacao%")
         return unit == normalized

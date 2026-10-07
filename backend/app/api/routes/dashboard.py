@@ -35,7 +35,12 @@ def isolation_map(db: Session = Depends(get_db)) -> list[dict]:
 
 @router.get("/summary")
 def summary(db: Session = Depends(get_db)) -> dict:
-    clinical_snapshots = db.scalars(select(SnapshotAtendimento).order_by(SnapshotAtendimento.data_hora_coleta.desc())).all()
+    clinical_snapshots = db.scalars(
+        select(SnapshotAtendimento)
+        .join(Atendimento, Atendimento.id == SnapshotAtendimento.atendimento_id)
+        .where(Atendimento.ativo.is_(True))
+        .order_by(SnapshotAtendimento.data_hora_coleta.desc())
+    ).all()
     clinical_latest: dict[int, SnapshotAtendimento] = {}
     for snapshot in clinical_snapshots:
         clinical_latest.setdefault(snapshot.atendimento_id, snapshot)

@@ -2,7 +2,7 @@ import InfoOutlinedIcon from '@mui/icons-material/InfoOutlined';
 import MedicationIcon from '@mui/icons-material/Medication';
 import PeopleIcon from '@mui/icons-material/People';
 import TodayIcon from '@mui/icons-material/Today';
-import { Box, Chip, Grid, Paper, Stack, Table, TableBody, TableCell, TableHead, TableRow, Typography } from '@mui/material';
+import { Box, Chip, Grid, Paper, Stack, Table, TableBody, TableCell, TableHead, TableRow, TextField, Typography } from '@mui/material';
 import { Fragment, ReactNode, useEffect, useState } from 'react';
 import { api } from '../../api/client';
 
@@ -63,12 +63,16 @@ const chartItems = [
 ];
 
 export default function EpidemiologyReports() {
+  const [periodo, setPeriodo] = useState(() => {
+    const now = new Date();
+    return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+  });
   const [consumptionRows, setConsumptionRows] = useState<ConsumptionRow[]>([]);
   const [pathogenCards, setPathogenCards] = useState<{ label: string; value: string; rate: string }[]>([]);
   const [summary, setSummary] = useState({ totalDays: 0, patientDays: 0, therapyDuration: 0 });
 
   useEffect(() => {
-    api.get('/epidemiology/summary').then(({ data }) => {
+    api.get('/epidemiology/summary', { params: { periodo } }).then(({ data }) => {
       setConsumptionRows(data.consumptionRows || []);
       setPathogenCards(data.pathogenCards || []);
       setSummary({
@@ -77,7 +81,7 @@ export default function EpidemiologyReports() {
         therapyDuration: Number(data.therapyDuration || 0)
       });
     });
-  }, []);
+  }, [periodo]);
 
   const totalDays = consumptionRows.reduce((sum, row) => sum + row.days, 0);
   const patientDays = summary.patientDays;
@@ -92,6 +96,14 @@ export default function EpidemiologyReports() {
               Relatórios de consumo de <Box component="span" sx={{ color: '#00a6c8', fontWeight: 800 }}>antimicrobianos</Box>
               <InfoOutlinedIcon sx={{ ml: 1, color: '#00a6c8', verticalAlign: 'middle' }} />
             </Typography>
+            <TextField
+              label="Competência"
+              type="month"
+              size="small"
+              value={periodo}
+              onChange={(event) => setPeriodo(event.target.value)}
+              sx={{ mt: 1.5, width: 180 }}
+            />
           </Box>
           <HeaderMetric value={totalDays} label="Total de dias de uso de antimicrobianos" icon={<MedicationIcon />} />
           <HeaderMetric value={patientDays} label="Pacientes dia" icon={<PeopleIcon />} />

@@ -1,13 +1,14 @@
 from datetime import date, datetime, timezone
 
 from fastapi import APIRouter, Depends, Query
-from sqlalchemy import distinct, func, select
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_current_user
 from app.core.database import get_db
 from app.models.clinical import AntimicrobianoAtendimento, Atendimento, CulturaAtendimento, ProcedimentoInvasivoAtendimento
 from app.models.user import User
+from app.services.benchmark_epidemiologico_service import BenchmarkEpidemiologicoService
 
 router = APIRouter(prefix="/epidemiology", tags=["Epidemiologia"])
 
@@ -115,26 +116,43 @@ def _resistance_group(microorganism: str | None) -> str | None:
 
 
 @router.get("/summary")
-def summary(db: Session = Depends(get_db), _: User = Depends(get_current_user)) -> dict:
-    antimicrobial_rows = db.execute(
-        select(
-            AntimicrobianoAtendimento.nome_antimicrobiano,
-            func.count(distinct(AntimicrobianoAtendimento.atendimento_id)),
-            func.sum(AntimicrobianoAtendimento.dias_uso),
-        )
-        .group_by(AntimicrobianoAtendimento.nome_antimicrobiano)
-        .order_by(func.sum(AntimicrobianoAtendimento.dias_uso).desc())
-    ).all()
+def summary(
+    periodo: str = Query(default_factory=lambda: date.today().strftime("%Y-%m"), pattern=r"^\d{4}-\d{2}$"),
+    unidade: str | None = None,
+    db: Session = Depends(get_db),
+    _: User = Depends(get_current_user),
+) -> dict:
+    start, end = _month_period(periodo)
+    event_date = func.coalesce(AntimicrobianoAtendimento.data_hora_aplicacao, AntimicrobianoAtendimento.data_hora_inicio)
+    stmt = (
+        select(AntimicrobianoAtendimento, Atendimento)
+        .join(Atendimento, Atendimento.id == AntimicrobianoAtendimento.atendimento_id)
+        .where(event_date >= start, event_date < end)
+    )
+    if unidade:
+        stmt = stmt.where(Atendimento.unidade_atual == unidade)
+    grouped: dict[str, dict[str, set]] = {}
+    treated_attendances: set[int] = set()
+    for antimicrobial, attendance in db.execute(stmt).all():
+        name = antimicrobial.nome_antimicrobiano
+        application = antimicrobial.data_hora_aplicacao or antimicrobial.data_hora_inicio
+        data_aplicacao = application.date().isoformat()
+        item = grouped.setdefault(name, {"patients": set(), "therapy_days": set()})
+        item["patients"].add(attendance.id)
+        item["therapy_days"].add((attendance.id, data_aplicacao))
+        treated_attendances.add(attendance.id)
+
     consumption = []
     total_days = 0
-    for name, patients, days in antimicrobial_rows:
-        days_value = int(days or 0)
+    for name, values in grouped.items():
+        days_value = len(values["therapy_days"])
+        patients = len(values["patients"])
         total_days += days_value
         consumption.append(
             {
                 "className": _classify_antimicrobial(name),
                 "antimicrobial": name,
-                "patients": int(patients or 0),
+                "patients": patients,
                 "days": days_value,
                 "totalDose": 0.0,
                 "ddd": 0.0,
@@ -142,7 +160,14 @@ def summary(db: Session = Depends(get_db), _: User = Depends(get_current_user)) 
             }
         )
 
-    positive_cultures = db.scalars(select(CulturaAtendimento).where(CulturaAtendimento.positivo.is_(True))).all()
+    culture_stmt = select(CulturaAtendimento).join(Atendimento).where(
+        CulturaAtendimento.positivo.is_(True),
+        CulturaAtendimento.data_hora_coleta >= start,
+        CulturaAtendimento.data_hora_coleta < end,
+    )
+    if unidade:
+        culture_stmt = culture_stmt.where(Atendimento.unidade_atual == unidade)
+    positive_cultures = db.scalars(culture_stmt).all()
     groups: dict[str, int] = {}
     for culture in positive_cultures:
         group = _resistance_group(culture.microorganismo)
@@ -158,10 +183,14 @@ def summary(db: Session = Depends(get_db), _: User = Depends(get_current_user)) 
         for label, count in sorted(groups.items(), key=lambda item: item[1], reverse=True)
     ]
 
+    consumption.sort(key=lambda item: item["days"], reverse=True)
+    patient_days = BenchmarkEpidemiologicoService(db).patient_days(start, end)
     return {
+        "periodo": periodo,
+        "unidade": unidade,
         "consumptionRows": consumption,
         "pathogenCards": pathogens,
         "totalDays": total_days,
-        "patientDays": 0,
-        "therapyDuration": round(total_days / max(len(consumption), 1), 2),
+        "patientDays": patient_days,
+        "therapyDuration": round(total_days / max(len(treated_attendances), 1), 2),
     }
