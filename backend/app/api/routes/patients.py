@@ -41,12 +41,15 @@ def _latest_snapshots(db: Session) -> list[PatientMonitoringSnapshot]:
     return list(latest.values())
 
 
-def _latest_clinical_snapshots(db: Session) -> list[SnapshotAtendimento]:
-    snapshots = db.scalars(
+def _latest_clinical_snapshots(db: Session, *, active_only: bool = False) -> list[SnapshotAtendimento]:
+    statement = (
         select(SnapshotAtendimento)
         .join(SnapshotAtendimento.atendimento)
         .order_by(SnapshotAtendimento.data_hora_coleta.desc())
-    ).all()
+    )
+    if active_only:
+        statement = statement.where(Atendimento.ativo.is_(True))
+    snapshots = db.scalars(statement).all()
     latest: dict[str, SnapshotAtendimento] = {}
     for snapshot in snapshots:
         latest.setdefault(snapshot.atendimento.id_origem_atendimento, snapshot)
@@ -228,10 +231,11 @@ def list_patients(
     medico: str | None = None,
     convenio: str | None = None,
     status_risco: str | None = Query(default=None),
+    active_only: bool = Query(default=True),
     db: Session = Depends(get_db),
     _: User = Depends(get_current_user),
 ) -> list[dict]:
-    clinical_snapshots = _latest_clinical_snapshots(db)
+    clinical_snapshots = _latest_clinical_snapshots(db, active_only=active_only)
     if clinical_snapshots:
         patients = [_clinical_snapshot_to_patient(snapshot) for snapshot in clinical_snapshots]
     else:

@@ -86,11 +86,9 @@ class SnapshotAtendimento(Base):
 
 class MovimentacaoLeito(Base):
     __tablename__ = "movimentacoes_leito"
-    __table_args__ = (
-        UniqueConstraint("atendimento_id", "data_hora_movimentacao", "leito_destino", name="uq_movimentacao_leito_atendimento_hora_leito"),
-    )
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    chave_origem: Mapped[str | None] = mapped_column(String(64), unique=True, index=True, nullable=True)
     atendimento_id: Mapped[int] = mapped_column(ForeignKey("atendimentos.id"), index=True, nullable=False)
     unidade_origem: Mapped[str | None] = mapped_column(String(120), nullable=True)
     leito_origem: Mapped[str | None] = mapped_column(String(120), nullable=True)
