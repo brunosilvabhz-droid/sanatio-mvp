@@ -74,10 +74,9 @@ def treatment_courses(antimicrobials: list[dict], now: datetime | None = None) -
             latest = max(episode, key=lambda item: _aware(item.get("dt_inicio")) or datetime.min.replace(tzinfo=timezone.utc))
             course_start = min(_aware(item.get("dt_inicio")) for item in episode if item.get("dt_inicio"))
             latest_end = _aware(latest.get("dt_fim"))
-            active = _active(latest)
+            active = _active(latest) and (latest_end is None or latest_end > now)
             course_end = now if active else max((_aware(item.get("dt_fim")) for item in episode if item.get("dt_fim")), default=now)
             consolidated = dict(latest)
-            consolidated["dt_inicio"] = course_start
             consolidated["sn_ativo"] = "S" if active else "N"
             consolidated["dias_uso"] = max((min(course_end, now).date() - course_start.date()).days, 0)
             courses.append(consolidated)

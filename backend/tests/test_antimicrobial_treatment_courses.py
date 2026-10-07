@@ -31,13 +31,26 @@ def test_finished_prescription_continues_in_later_prescription_of_same_medicatio
     assert courses[0]["dias_uso"] == 9
 
 
-def test_end_date_does_not_close_latest_prescription_when_flag_is_active():
+def test_expired_end_date_closes_latest_prescription_even_when_flag_is_active():
     courses, _ = treatment_courses(
         [prescription("10", "2026-10-01T08:00:00", "2026-10-05T08:00:00", "S")],
         now=datetime(2026, 10, 10, tzinfo=timezone.utc),
     )
 
-    assert courses[0]["sn_ativo"] == "S"
+    assert courses[0]["sn_ativo"] == "N"
+    assert courses[0]["dias_uso"] == 4
+
+
+def test_course_uses_latest_prescription_date_and_accumulated_days():
+    courses, _ = treatment_courses(
+        [
+            prescription("10", "2026-10-01T08:00:00", "2026-10-05T08:00:00", "N"),
+            prescription("11", "2026-10-05T09:00:00", None, "S"),
+        ],
+        now=datetime(2026, 10, 10, tzinfo=timezone.utc),
+    )
+
+    assert courses[0]["dt_inicio"] == datetime(2026, 10, 5, 9, tzinfo=timezone.utc)
     assert courses[0]["dias_uso"] == 9
 
 

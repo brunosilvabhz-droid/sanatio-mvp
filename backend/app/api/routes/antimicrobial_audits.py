@@ -80,9 +80,9 @@ def list_audits(
             selectinload(AntimicrobialAudit.reviewed_by),
         )
         .order_by(
+            AntimicrobialAudit.active.desc(),
             case((AntimicrobialAudit.priority == "ALTA", 3), (AntimicrobialAudit.priority == "MEDIA", 2), else_=1).desc(),
-            AntimicrobialAudit.days_in_use.desc(),
-            AntimicrobialAudit.updated_at.desc(),
+            AntimicrobialAudit.started_at.desc(),
         )
     )
     if status:
