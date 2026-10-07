@@ -198,6 +198,8 @@ PATIENT_RESOLVER_VIEW=SANATIO.VW_RESOLVE_PACIENTE
 PATIENT_RESOLVER_ALLOWED_ORIGINS=https://sanatio.impactocg.com
 PATIENT_RESOLVER_HOST=127.0.0.1
 PATIENT_RESOLVER_PORT=5191
+PATIENT_RESOLVER_SSL_CERTFILE=/opt/sanatio-integrador/soulmv_integrator/tls/resolver.crt
+PATIENT_RESOLVER_SSL_KEYFILE=/opt/sanatio-integrador/soulmv_integrator/tls/resolver.key
 ```
 
 O `SOULMV_DSN` e o `SOULMV_ORACLE_THICK` são os mesmos já usados pelo
