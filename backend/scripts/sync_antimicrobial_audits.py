@@ -13,8 +13,12 @@ def main() -> None:
             .join(Paciente, Paciente.id == Atendimento.paciente_id)
             .order_by(AntimicrobianoAtendimento.data_hora_aplicacao, AntimicrobianoAtendimento.id)
         ).all()
-        grouped: dict[int, tuple[Atendimento, Paciente, list[dict]]] = {}
+        latest_by_prescription: dict[tuple[str, str], tuple[AntimicrobianoAtendimento, Atendimento, Paciente]] = {}
         for item, attendance, patient in rows:
+            latest_by_prescription[(item.id_origem_prescricao, item.id_origem_item_prescricao)] = (item, attendance, patient)
+
+        grouped: dict[int, tuple[Atendimento, Paciente, list[dict]]] = {}
+        for item, attendance, patient in latest_by_prescription.values():
             bucket = grouped.setdefault(attendance.id, (attendance, patient, []))
             operationally_active = bool(item.ativo and attendance.ativo and item.data_hora_fim is None)
             bucket[2].append(
@@ -45,7 +49,14 @@ def main() -> None:
                 antimicrobials,
             )
         db.commit()
-        print({"attendances": len(grouped), "source_rows": len(rows), "audits_created": created})
+        print(
+            {
+                "attendances": len(grouped),
+                "source_rows": len(rows),
+                "prescriptions_after_consolidation": len(latest_by_prescription),
+                "audits_created": created,
+            }
+        )
 
 
 if __name__ == "__main__":
