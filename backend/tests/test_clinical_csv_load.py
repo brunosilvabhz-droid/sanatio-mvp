@@ -4,7 +4,7 @@ from types import SimpleNamespace
 import pytest
 
 from app.services.antimicrobial_quantity import calculate_product_quantity
-from scripts.load_clinical_csv import antimicrobial_rows, movement_rows, parse_date, validate_columns
+from scripts.load_clinical_csv import antimicrobial_rows, movement_rows, parse_date, read_csv, validate_columns
 
 
 def antimicrobial(**overrides):
@@ -82,3 +82,23 @@ def test_calculate_product_quantity_preserves_combination_components():
 
     assert display == "1000/250"
     assert grams is None
+
+
+def test_read_csv_repairs_unquoted_decimal_comma_in_dose(tmp_path):
+    path = tmp_path / "antimicrobials.csv"
+    path.write_text(
+        "CD_ATENDIMENTO,CD_PACIENTE,CD_PRESCRICAO,CD_ITEM_PRESCRICAO,CD_PRODUTO,"
+        "DS_ANTIMICROBIANO,PRINCIPIO_ATIVO,DT_INICIO,DT_APLICACAO,DT_FIM,SN_ATIVO,"
+        "QT_DOSE,DS_DOSE,DS_VIA,DS_FREQUENCIA,DIAS_USO\n"
+        "1,2,3,4,150,Vancomicina,VANCOMICINA,01-08-2019 10:00:00,01-08-2019 16:00:00,,"
+        "S,0,25,FRASCO/AMPOLA,INTRAVENOSA,6 HS X 6 HS,10\n",
+        encoding="utf-8",
+    )
+
+    rows, _ = read_csv(path)
+
+    assert rows[0]["QT_DOSE"] == "0,25"
+    assert rows[0]["DS_DOSE"] == "FRASCO/AMPOLA"
+    assert rows[0]["DS_VIA"] == "INTRAVENOSA"
+    assert rows[0]["DS_FREQUENCIA"] == "6 HS X 6 HS"
+    assert rows[0]["DIAS_USO"] == "10"

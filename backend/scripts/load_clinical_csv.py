@@ -43,7 +43,20 @@ def parse_date(value: str | None) -> datetime | None:
 def read_csv(path: Path) -> tuple[list[dict[str, str]], str]:
     raw = path.read_bytes()
     with path.open(encoding="utf-8-sig", newline="") as csv_file:
-        return list(csv.DictReader(csv_file)), hashlib.sha256(raw).hexdigest()
+        reader = csv.DictReader(csv_file)
+        rows = []
+        for line_number, row in enumerate(reader, 2):
+            overflow = row.pop(None, None)
+            if overflow:
+                if len(overflow) != 1 or not clean(row.get("QT_DOSE")).isdigit() or not clean(row.get("DS_DOSE")).isdigit():
+                    raise ValueError(f"Linha CSV com colunas excedentes nao reconhecidas: {line_number}")
+                row["QT_DOSE"] = f'{clean(row["QT_DOSE"])},{clean(row["DS_DOSE"])}'
+                row["DS_DOSE"] = row["DS_VIA"]
+                row["DS_VIA"] = row["DS_FREQUENCIA"]
+                row["DS_FREQUENCIA"] = row["DIAS_USO"]
+                row["DIAS_USO"] = overflow[0]
+            rows.append(row)
+        return rows, hashlib.sha256(raw).hexdigest()
 
 
 REQUIRED_COLUMNS = {
