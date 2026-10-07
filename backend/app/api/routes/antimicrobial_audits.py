@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy import case, select
 from sqlalchemy.orm import Session, selectinload
 
@@ -68,7 +68,8 @@ def list_audits(
     paciente: str | None = None,
     antimicrobial: str | None = None,
     min_days: int | None = None,
-    active_only: bool = False,
+    active_only: bool = True,
+    limit: int = Query(default=500, ge=1, le=2000),
     db: Session = Depends(get_db),
     _: User = Depends(get_current_user),
 ) -> list[AntimicrobialAuditRead]:
@@ -100,7 +101,7 @@ def list_audits(
         stmt = stmt.where(AntimicrobialAudit.days_in_use >= min_days)
     if active_only:
         stmt = stmt.where(AntimicrobialAudit.active.is_(True))
-    return [_audit_to_read(audit) for audit in db.scalars(stmt).all()]
+    return [_audit_to_read(audit) for audit in db.scalars(stmt.limit(limit)).all()]
 
 
 @router.patch("/{audit_id}", response_model=AntimicrobialAuditRead)

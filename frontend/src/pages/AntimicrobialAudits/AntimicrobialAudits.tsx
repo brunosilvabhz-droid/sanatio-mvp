@@ -45,7 +45,7 @@ export default function AntimicrobialAudits() {
     paciente: '',
     antimicrobial: '',
     min_days: '7',
-    active_only: false
+    active_only: true
   });
   const [sortBy, setSortBy] = useState('priority_desc');
 
@@ -172,7 +172,7 @@ export default function AntimicrobialAudits() {
             {sortedRows.length === 0 && (
               <TableRow>
                 <TableCell colSpan={10} align="center" sx={{ py: 5, color: 'text.secondary' }}>
-                  Nenhum antimicrobiano corresponde aos filtros. Desmarque Ativos para consultar prescrições encerradas.
+                  Nenhum antimicrobiano corresponde aos filtros selecionados.
                 </TableCell>
               </TableRow>
             )}

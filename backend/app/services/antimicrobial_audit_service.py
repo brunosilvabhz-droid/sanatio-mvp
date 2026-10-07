@@ -53,6 +53,8 @@ def sync_for_patient(db: Session, patient: dict, antimicrobials: list[dict], mon
             )
             db.add(audit)
             synced += 1
+        elif active and audit.status == "ENCERRADO":
+            audit.status = _initial_status(True, days_in_use)
         elif audit.status == "MONITORADO" and active and days_in_use >= 7:
             audit.status = "PENDENTE"
 
