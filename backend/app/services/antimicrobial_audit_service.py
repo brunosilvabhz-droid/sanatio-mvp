@@ -85,6 +85,7 @@ def treatment_courses(antimicrobials: list[dict], now: datetime | None = None) -
 
 def sync_for_patient(db: Session, patient: dict, antimicrobials: list[dict], monitoring_run_id: int | None = None) -> int:
     synced = 0
+    patient_active = bool(patient.get("active", True))
     courses, prescription_keys = treatment_courses(antimicrobials)
     existing_audits = list(db.scalars(select(AntimicrobialAudit).where(
         AntimicrobialAudit.cd_prescricao.in_({key[0] for key in prescription_keys}),
@@ -101,7 +102,7 @@ def sync_for_patient(db: Session, patient: dict, antimicrobials: list[dict], mon
         if not cd_prescricao or not cd_item_prescricao:
             continue
 
-        active = _active(item)
+        active = patient_active and _active(item)
         days_in_use = int(item.get("dias_uso") or 0)
         audit = db.scalar(
             select(AntimicrobialAudit).where(

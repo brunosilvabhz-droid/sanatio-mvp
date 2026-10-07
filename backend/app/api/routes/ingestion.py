@@ -703,7 +703,12 @@ def ingest_snapshots(
 
     if not historical:
         for item in payload.patients:
-            patient_payload = {"cd_atendimento": item.cd_atendimento, "cd_paciente": item.cd_paciente, "ds_unidade": item.unit}
+            patient_payload = {
+                "cd_atendimento": item.cd_atendimento,
+                "cd_paciente": item.cd_paciente,
+                "ds_unidade": item.unit,
+                "active": item.active,
+            }
             antimicrobial_audit_service.sync_for_patient(db, patient_payload, antimicrobials_by_patient.get(item.cd_atendimento, []), monitoring_run.id)
 
     finished_at = datetime.now(timezone.utc)

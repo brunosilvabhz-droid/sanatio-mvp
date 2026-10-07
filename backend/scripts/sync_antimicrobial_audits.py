@@ -44,6 +44,7 @@ def main() -> None:
                     "cd_atendimento": attendance.id_origem_atendimento,
                     "cd_paciente": patient.id_origem_paciente,
                     "ds_unidade": attendance.unidade_atual,
+                    "active": attendance.ativo,
                 },
                 antimicrobials,
             )
