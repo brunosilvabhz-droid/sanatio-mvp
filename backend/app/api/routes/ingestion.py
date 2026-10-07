@@ -18,6 +18,7 @@ from app.models.clinical import (
     MovimentacaoLeito,
     Paciente,
     ProcedimentoInvasivoAtendimento,
+    ProdutoAntimicrobiano,
     SnapshotAtendimento,
     SolicitacaoExameAtendimento,
 )
@@ -28,6 +29,7 @@ from app.models.patient_monitoring_snapshot import PatientMonitoringSnapshot
 from app.models.setting import Setting
 from app.schemas.hospital_integration import HospitalIntegrationCreate, HospitalIntegrationRead, IngestPayload
 from app.services import alert_service, antimicrobial_audit_service
+from app.services.antimicrobial_quantity import calculate_product_quantity
 
 router = APIRouter(tags=["Integracao hospitalar"])
 
@@ -597,6 +599,14 @@ def ingest_snapshots(
         antimicrobial.data_hora_aplicacao = item.dt_aplicacao
         antimicrobial.data_hora_fim = item.dt_fim
         antimicrobial.ativo = _is_active(item.sn_ativo)
+        product = db.scalar(
+            select(ProdutoAntimicrobiano).where(ProdutoAntimicrobiano.codigo_produto == item.cd_produto)
+        ) if item.cd_produto else None
+        dose_quantity, total_quantity, total_grams, total_unit = calculate_product_quantity(item.qt_dose, product)
+        antimicrobial.quantidade_dose = dose_quantity
+        antimicrobial.quantidade_total = total_quantity
+        antimicrobial.quantidade_total_gramas = total_grams
+        antimicrobial.unidade_quantidade_total = total_unit
         antimicrobial.dose = item.ds_dose
         antimicrobial.via = item.ds_via
         antimicrobial.frequencia = item.ds_frequencia

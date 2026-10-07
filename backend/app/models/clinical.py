@@ -1,6 +1,6 @@
 from datetime import date, datetime
 
-from sqlalchemy import Boolean, Date, DateTime, ForeignKey, Integer, String, Text, UniqueConstraint, func
+from sqlalchemy import Boolean, Date, DateTime, ForeignKey, Integer, Numeric, String, Text, UniqueConstraint, func
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.models.base import Base
@@ -98,6 +98,19 @@ class MovimentacaoLeito(Base):
     criado_em: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
 
 
+class ProdutoAntimicrobiano(Base):
+    __tablename__ = "produtos_antimicrobianos"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    codigo_produto: Mapped[str] = mapped_column(String(60), unique=True, index=True, nullable=False)
+    descricao: Mapped[str] = mapped_column(String(255), nullable=False)
+    quantidade: Mapped[str] = mapped_column(String(80), nullable=False)
+    unidade_medida: Mapped[str] = mapped_column(String(20), nullable=False)
+    codigo_atc: Mapped[str] = mapped_column(String(20), index=True, nullable=False)
+    criado_em: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    atualizado_em: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False)
+
+
 class AntimicrobianoAtendimento(Base):
     __tablename__ = "antimicrobianos_atendimento"
     __table_args__ = (
@@ -121,6 +134,10 @@ class AntimicrobianoAtendimento(Base):
     data_hora_aplicacao: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), index=True, nullable=True)
     data_hora_fim: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     ativo: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False, index=True)
+    quantidade_dose: Mapped[float | None] = mapped_column(Numeric(18, 4), nullable=True)
+    quantidade_total: Mapped[str | None] = mapped_column(String(120), nullable=True)
+    quantidade_total_gramas: Mapped[float | None] = mapped_column(Numeric(18, 6), nullable=True)
+    unidade_quantidade_total: Mapped[str | None] = mapped_column(String(20), nullable=True)
     dose: Mapped[str | None] = mapped_column(String(120), nullable=True)
     via: Mapped[str | None] = mapped_column(String(80), nullable=True)
     frequencia: Mapped[str | None] = mapped_column(String(120), nullable=True)

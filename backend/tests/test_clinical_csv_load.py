@@ -1,6 +1,10 @@
+from decimal import Decimal
+from types import SimpleNamespace
+
 import pytest
 
-from scripts.load_clinical_csv import antimicrobial_rows, movement_rows, validate_columns
+from app.services.antimicrobial_quantity import calculate_product_quantity
+from scripts.load_clinical_csv import antimicrobial_rows, movement_rows, parse_date, validate_columns
 
 
 def antimicrobial(**overrides):
@@ -9,7 +13,7 @@ def antimicrobial(**overrides):
         "CD_ITEM_PRESCRICAO": "40", "CD_PRODUTO": "50", "DS_ANTIMICROBIANO": "Medicamento",
         "PRINCIPIO_ATIVO": "Principio A", "DT_INICIO": "01/10/26", "DT_APLICACAO": "02/10/26",
         "DT_FIM": "", "SN_ATIVO": "S", "DS_DOSE": "1", "DS_VIA": "EV",
-        "DS_FREQUENCIA": "12/12h", "DIAS_USO": "2",
+        "DS_FREQUENCIA": "12/12h", "DIAS_USO": "2", "QT_DOSE": "2",
     }
     row.update(overrides)
     return row
@@ -53,3 +57,28 @@ def test_movement_rows_keeps_distinct_same_day_movements():
 def test_validate_columns_reports_missing_fields():
     with pytest.raises(ValueError, match="CD_PACIENTE"):
         validate_columns("exam-requests", [{"CD_PEDIDO": "1"}])
+
+
+def test_parse_date_preserves_application_time():
+    assert parse_date("01-08-2019 14:30:00").hour == 14
+    assert parse_date("01-08-2019 14:30:00").minute == 30
+
+
+def test_calculate_product_quantity_converts_milligrams_to_grams():
+    product = SimpleNamespace(quantidade="500", unidade_medida="mg")
+
+    dose, display, grams, unit = calculate_product_quantity("2", product)
+
+    assert dose == Decimal("2")
+    assert display == "1000"
+    assert grams == Decimal("1")
+    assert unit == "mg"
+
+
+def test_calculate_product_quantity_preserves_combination_components():
+    product = SimpleNamespace(quantidade="500/125", unidade_medida="mg")
+
+    _, display, grams, _ = calculate_product_quantity("2", product)
+
+    assert display == "1000/250"
+    assert grams is None

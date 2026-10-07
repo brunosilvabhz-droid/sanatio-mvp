@@ -4,6 +4,7 @@ import AlertAudit from '../pages/AlertAudit/AlertAudit';
 import AlertRules from '../pages/AlertRules/AlertRules';
 import Alerts from '../pages/Alerts/Alerts';
 import AntimicrobialAudits from '../pages/AntimicrobialAudits/AntimicrobialAudits';
+import AntimicrobialProducts from '../pages/AntimicrobialProducts/AntimicrobialProducts';
 import AnvisaClosure from '../pages/AnvisaClosure/AnvisaClosure';
 import Dashboard from '../pages/Dashboard/Dashboard';
 import EpidemiologyBenchmark from '../pages/EpidemiologyBenchmark/EpidemiologyBenchmark';
@@ -49,6 +50,7 @@ export default function App() {
           <Route path="interventions" element={<Interventions />} />
           <Route path="lab-pdf" element={<LabPdfImport />} />
           <Route path="antimicrobial-audits" element={<AntimicrobialAudits />} />
+          <Route path="antimicrobial-products" element={<AntimicrobialProducts />} />
           <Route path="epidemiology-reports" element={<EpidemiologyReports />} />
           <Route path="epidemiology-benchmark" element={<EpidemiologyBenchmark />} />
           <Route path="anvisa-closure" element={<AnvisaClosure />} />

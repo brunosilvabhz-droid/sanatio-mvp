@@ -247,6 +247,7 @@ def query_specs(
                 "ds_principio_ativo",
                 "dt_inicio",
                 "dt_aplicacao",
+                "qt_dose",
             ),
             sql=f"""
                 SELECT *
@@ -462,6 +463,7 @@ def build_payload(
                 "dt_aplicacao": iso(row["dt_aplicacao"]),
                 "dt_fim": iso(row.get("dt_fim")),
                 "sn_ativo": "S" if (active_on(row.get("dt_inicio"), row.get("dt_fim"), reference_date) if reference_date else parse_bool(row.get("sn_ativo", "S"))) else "N",
+                "qt_dose": float(row["qt_dose"]) if row.get("qt_dose") is not None else None,
                 "ds_frequencia": row.get("ds_frequencia"),
                 "ds_via": row.get("ds_via"),
                 "ds_dose": row.get("ds_dose"),

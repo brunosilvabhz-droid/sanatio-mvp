@@ -65,6 +65,7 @@ class IngestAntimicrobial(BaseModel):
     dt_aplicacao: datetime
     dt_fim: datetime | None = None
     sn_ativo: str = "S"
+    qt_dose: float | None = None
     ds_frequencia: str | None = None
     ds_via: str | None = None
     ds_dose: str | None = None

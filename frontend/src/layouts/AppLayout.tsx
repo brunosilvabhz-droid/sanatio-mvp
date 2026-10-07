@@ -15,6 +15,7 @@ import SickIcon from '@mui/icons-material/Sick';
 import SupportAgentIcon from '@mui/icons-material/SupportAgent';
 import TravelExploreIcon from '@mui/icons-material/TravelExplore';
 import UploadFileIcon from '@mui/icons-material/UploadFile';
+import Inventory2Icon from '@mui/icons-material/Inventory2';
 import {
   AppBar,
   Box,
@@ -31,7 +32,7 @@ import {
   Tooltip,
   Typography
 } from '@mui/material';
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { api } from '../api/client';
 import BrandLogo from '../components/BrandLogo';
@@ -47,6 +48,7 @@ const groups = [
       { label: 'Alertas', path: '/alerts', icon: <NotificationsActiveIcon /> },
       { label: 'Intervenções', path: '/interventions', icon: <ReplyIcon /> },
       { label: 'Antimicrobianos', path: '/antimicrobial-audits', icon: <MedicationIcon /> },
+      { label: 'Cadastro de produtos', path: '/antimicrobial-products', icon: <Inventory2Icon />, roles: ['ADMIN', 'FARMACIA'] },
       { label: 'Resultados do laboratório', path: '/lab-pdf', icon: <UploadFileIcon /> }
     ]
   },
@@ -81,6 +83,10 @@ const groups = [
 export default function AppLayout() {
   const navigate = useNavigate();
   const location = useLocation();
+  const [roleName, setRoleName] = useState(() => {
+    const stored = localStorage.getItem('sanatio_user');
+    return stored ? JSON.parse(stored)?.role?.name || '' : '';
+  });
 
   const logout = () => {
     localStorage.removeItem('sanatio_token');
@@ -93,6 +99,7 @@ export default function AppLayout() {
     api.get('/auth/me').then(({ data }) => {
       localStorage.setItem('sanatio_user', JSON.stringify(data));
       localStorage.setItem('sanatio_can_view_patient_name', String(Boolean(data.can_view_patient_name)));
+      setRoleName(data.role?.name || '');
     });
   }, []);
 
@@ -155,7 +162,7 @@ export default function AppLayout() {
                 {group.title}
               </Typography>
               <List disablePadding>
-                {group.items.map((item) => {
+                {group.items.filter((item) => !item.roles || item.roles.includes(roleName)).map((item) => {
                   const selected = location.pathname.startsWith(item.path);
                   return (
                     <ListItemButton

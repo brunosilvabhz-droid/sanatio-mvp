@@ -2,7 +2,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from starlette.middleware.trustedhost import TrustedHostMiddleware
 
-from app.api.routes import admin, alerts, antimicrobial_audits, auth, dashboard, epidemiology, epidemiology_reference, ingestion, interventions, lab_pdf, monitoring, patients, support_tickets
+from app.api.routes import admin, alerts, antimicrobial_audits, antimicrobial_products, auth, dashboard, epidemiology, epidemiology_reference, ingestion, interventions, lab_pdf, monitoring, patients, support_tickets
 from app.core.config import settings
 
 app = FastAPI(
@@ -28,6 +28,7 @@ app.include_router(auth.router)
 app.include_router(patients.router)
 app.include_router(alerts.router)
 app.include_router(antimicrobial_audits.router)
+app.include_router(antimicrobial_products.router)
 app.include_router(interventions.router)
 app.include_router(epidemiology.router)
 app.include_router(epidemiology_reference.router)

@@ -1,6 +1,17 @@
 export type Role = { id: number; name: string; description?: string };
 export type User = { id: number; email: string; full_name: string; active: boolean; can_view_patient_name: boolean; role: Role };
 
+export type AntimicrobialProduct = {
+  id: number;
+  codigo_produto: string;
+  descricao: string;
+  quantidade: string;
+  unidade_medida: string;
+  codigo_atc: string;
+  criado_em: string;
+  atualizado_em: string;
+};
+
 export type Patient = {
   cd_atendimento: string;
   cd_paciente: string;

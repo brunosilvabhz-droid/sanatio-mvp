@@ -8,17 +8,20 @@ from collections import defaultdict
 from datetime import datetime, timezone
 from pathlib import Path
 
-from sqlalchemy import select
+from sqlalchemy import delete, select
 
 from app.core.database import SessionLocal
+from app.models.antimicrobial_audit import AntimicrobialAudit, AntimicrobialAuditAction
 from app.models.clinical import (
     AntimicrobianoAtendimento,
     Atendimento,
     ExecucaoIntegracao,
     MovimentacaoLeito,
     Paciente,
+    ProdutoAntimicrobiano,
     SolicitacaoExameAtendimento,
 )
+from app.services.antimicrobial_quantity import calculate_product_quantity
 
 
 def clean(value: str | None) -> str:
@@ -27,7 +30,14 @@ def clean(value: str | None) -> str:
 
 def parse_date(value: str | None) -> datetime | None:
     value = clean(value)
-    return datetime.strptime(value, "%d/%m/%y").replace(tzinfo=timezone.utc) if value else None
+    if not value:
+        return None
+    for pattern in ("%d/%m/%y", "%d-%m-%Y %H:%M:%S", "%d/%m/%Y %H:%M:%S"):
+        try:
+            return datetime.strptime(value, pattern).replace(tzinfo=timezone.utc)
+        except ValueError:
+            continue
+    raise ValueError(f"Data invalida: {value}")
 
 
 def read_csv(path: Path) -> tuple[list[dict[str, str]], str]:
@@ -41,7 +51,7 @@ REQUIRED_COLUMNS = {
         "CD_ATENDIMENTO", "CD_PACIENTE", "CD_PRESCRICAO", "CD_ITEM_PRESCRICAO",
         "CD_PRODUTO", "DS_ANTIMICROBIANO", "PRINCIPIO_ATIVO", "DT_INICIO",
         "DT_APLICACAO", "DT_FIM", "SN_ATIVO", "DS_DOSE", "DS_VIA",
-        "DS_FREQUENCIA", "DIAS_USO",
+        "DS_FREQUENCIA", "DIAS_USO", "QT_DOSE",
     },
     "movements": {
         "CD_ATENDIMENTO", "CD_PACIENTE", "DT_MOVIMENTACAO", "DS_UNIDADE_ORIGEM",
@@ -157,7 +167,7 @@ def movement_rows(rows: list[dict[str, str]]) -> tuple[list[dict[str, str]], int
     return list(unique.values()), len(rows) - len(unique)
 
 
-def load_antimicrobials(db, source: list[dict[str, str]], digest: str, apply: bool) -> dict:
+def load_antimicrobials(db, source: list[dict[str, str]], digest: str, apply: bool, replace: bool = False) -> dict:
     rows, exact_duplicates, merged_principles = antimicrobial_rows(source)
     attendance_ids = {clean(row["CD_ATENDIMENTO"]) for row in rows}
     existing_attendances = set(db.scalars(select(Atendimento.id_origem_atendimento).where(Atendimento.id_origem_atendimento.in_(attendance_ids))))
@@ -169,7 +179,20 @@ def load_antimicrobials(db, source: list[dict[str, str]], digest: str, apply: bo
     }
     if not apply:
         return report
+    if replace:
+        db.execute(delete(AntimicrobialAuditAction))
+        db.execute(delete(AntimicrobialAudit))
+        db.execute(delete(AntimicrobianoAtendimento))
+        db.flush()
     attendances, new_patients, new_attendances = ensure_attendances(db, rows)
+    product_codes = {clean(row["CD_PRODUTO"]) for row in rows}
+    products = {
+        product.codigo_produto: product
+        for product in db.scalars(select(ProdutoAntimicrobiano).where(ProdutoAntimicrobiano.codigo_produto.in_(product_codes)))
+    }
+    missing_products = sorted(product_codes - set(products))
+    if missing_products:
+        raise ValueError(f"Produtos sem cadastro: {', '.join(missing_products[:20])}")
     run = start_run(db, "antimicrobianos", digest, len({clean(row["CD_PACIENTE"]) for row in rows}))
     attendance_db_ids = {item.id for item in attendances.values()}
     existing = {
@@ -200,12 +223,17 @@ def load_antimicrobials(db, source: list[dict[str, str]], digest: str, apply: bo
         item.data_hora_inicio = start
         item.data_hora_fim = end
         item.ativo = clean(row["SN_ATIVO"]).upper() == "S"
+        dose_quantity, total_quantity, total_grams, total_unit = calculate_product_quantity(row["QT_DOSE"], products.get(clean(row["CD_PRODUTO"])))
+        item.quantidade_dose = dose_quantity
+        item.quantidade_total = total_quantity
+        item.quantidade_total_gramas = total_grams
+        item.unidade_quantidade_total = total_unit
         item.dose = clean(row["DS_DOSE"]) or None
         item.via = clean(row["DS_VIA"]) or None
         item.frequencia = clean(row["DS_FREQUENCIA"]) or None
         item.dias_uso = int(clean(row["DIAS_USO"])) if clean(row["DIAS_USO"]) else max(((end or datetime.now(timezone.utc)).date() - start.date()).days, 0)
     finish_run(db, run)
-    report.update(created=created, updated=updated, new_patients=new_patients, new_attendances=new_attendances, integration_run_id=run.id)
+    report.update(created=created, updated=updated, new_patients=new_patients, new_attendances=new_attendances, integration_run_id=run.id, replaced=replace)
     return report
 
 
@@ -285,6 +313,7 @@ def main() -> None:
     parser.add_argument("kind", choices=["antimicrobials", "movements", "exam-requests"])
     parser.add_argument("csv_path", type=Path)
     parser.add_argument("--apply", action="store_true")
+    parser.add_argument("--replace", action="store_true", help="Substitui antimicrobianos e auditorias existentes na mesma transacao")
     args = parser.parse_args()
     rows, digest = read_csv(args.csv_path)
     validate_columns(args.kind, rows)
@@ -294,7 +323,12 @@ def main() -> None:
             "movements": load_movements,
             "exam-requests": load_exam_requests,
         }
-        report = loaders[args.kind](db, rows, digest, args.apply)
+        if args.replace and (args.kind != "antimicrobials" or not args.apply):
+            parser.error("--replace exige antimicrobials e --apply")
+        if args.kind == "antimicrobials":
+            report = load_antimicrobials(db, rows, digest, args.apply, args.replace)
+        else:
+            report = loaders[args.kind](db, rows, digest, args.apply)
     print(json.dumps(report, ensure_ascii=False, indent=2))
 
 

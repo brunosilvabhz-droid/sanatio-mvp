@@ -137,9 +137,10 @@ def summary(
         name = antimicrobial.nome_antimicrobiano
         application = antimicrobial.data_hora_aplicacao or antimicrobial.data_hora_inicio
         data_aplicacao = application.date().isoformat()
-        item = grouped.setdefault(name, {"patients": set(), "therapy_days": set()})
+        item = grouped.setdefault(name, {"patients": set(), "therapy_days": set(), "total_grams": 0.0})
         item["patients"].add(attendance.id)
         item["therapy_days"].add((attendance.id, data_aplicacao))
+        item["total_grams"] += float(antimicrobial.quantidade_total_gramas or 0)
         treated_attendances.add(attendance.id)
 
     consumption = []
@@ -154,7 +155,7 @@ def summary(
                 "antimicrobial": name,
                 "patients": patients,
                 "days": days_value,
-                "totalDose": 0.0,
+                "totalDose": round(float(values["total_grams"]), 4),
                 "ddd": 0.0,
                 "dot": float(days_value),
             }
