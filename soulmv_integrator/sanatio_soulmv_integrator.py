@@ -38,7 +38,10 @@ class QuerySpec:
 
 
 def normalize_row(row: dict[str, Any]) -> dict[str, Any]:
-    return {str(key).lower(): value for key, value in row.items()}
+    normalized = {str(key).lower(): value for key, value in row.items()}
+    if "ds_principio_ativo" not in normalized and "principio_ativo" in normalized:
+        normalized["ds_principio_ativo"] = normalized["principio_ativo"]
+    return normalized
 
 
 def parse_bool(value: Any) -> bool:
@@ -343,7 +346,7 @@ def fetch_rows(conn, engine: str, spec: QuerySpec) -> list[dict[str, Any]]:
         cursor = conn.cursor()
         cursor.execute(spec.sql, spec.params)
         columns = [column[0].lower() for column in cursor.description]
-        normalized = [dict(zip(columns, row)) for row in cursor.fetchall()]
+        normalized = [normalize_row(dict(zip(columns, row))) for row in cursor.fetchall()]
         cursor.close()
 
     for column in spec.required_columns:
