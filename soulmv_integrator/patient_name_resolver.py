@@ -5,7 +5,7 @@ from contextlib import closing
 from urllib import error, request
 
 import oracledb
-from fastapi import Depends, FastAPI, Header, HTTPException, Query
+from fastapi import Depends, FastAPI, Header, HTTPException, Query, Request
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
@@ -64,6 +64,14 @@ app.add_middleware(
     allow_methods=["GET"],
     allow_headers=["Authorization", "Content-Type"],
 )
+
+
+@app.middleware("http")
+async def allow_private_network_access(http_request: Request, call_next):
+    response = await call_next(http_request)
+    if http_request.headers.get("access-control-request-private-network") == "true":
+        response.headers["Access-Control-Allow-Private-Network"] = "true"
+    return response
 
 
 @app.on_event("startup")
