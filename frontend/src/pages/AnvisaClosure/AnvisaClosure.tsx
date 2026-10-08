@@ -15,12 +15,19 @@ function numberPt(value: number) {
   return Number(value || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 }
 
+const UNIT_TYPE = 'UTI_ADULTO';
+
+function unitLabel(tipoUnidade?: string) {
+  if (tipoUnidade === 'UTI_ADULTO') return 'UTI Adulto';
+  return (tipoUnidade || UNIT_TYPE).replace(/_/g, ' ');
+}
+
 export default function AnvisaClosure() {
   const [periodo, setPeriodo] = useState(currentPeriod());
   const [closure, setClosure] = useState<AnvisaClosureType | null>(null);
 
   async function load() {
-    const response = await api.get('/epidemiology/public-references/anvisa-closure', { params: { periodo, tipo_unidade: 'UTI_ADULTO' } });
+    const response = await api.get('/epidemiology/public-references/anvisa-closure', { params: { periodo, tipo_unidade: UNIT_TYPE } });
     setClosure(response.data);
   }
 
@@ -36,10 +43,22 @@ export default function AnvisaClosure() {
 
   return (
     <Stack spacing={2.5}>
-      <PageHeader eyebrow="Indicadores" title="Fechamento Anvisa" subtitle="Consolidação mensal para conferência SCIH. Não há envio automático nesta etapa." />
+      <PageHeader
+        eyebrow="Indicadores"
+        title="Fechamento Anvisa"
+        subtitle="Consolidação mensal da UTI Adulto para conferência SCIH. Não há envio automático nesta etapa."
+        chips={<Chip label={`Setor: ${unitLabel(closure?.tipo_unidade)}`} size="small" color="primary" variant="outlined" />}
+      />
       <Paper sx={{ p: 2 }}>
         <Stack direction={{ xs: 'column', md: 'row' }} spacing={1.5} alignItems={{ xs: 'stretch', md: 'center' }}>
           <TextField label="Período" type="month" value={periodo} onChange={(event) => setPeriodo(event.target.value)} />
+          <TextField
+            label="Setor assistencial"
+            value={unitLabel(closure?.tipo_unidade)}
+            InputProps={{ readOnly: true }}
+            helperText="Todos os indicadores abaixo consideram somente este setor."
+            sx={{ minWidth: 240 }}
+          />
           <TextField select label="Status" value={closure?.status || 'rascunho'} onChange={(event) => setStatus(event.target.value)} sx={{ minWidth: 200 }}>
             <MenuItem value="rascunho">rascunho</MenuItem>
             <MenuItem value="em_conferencia">em_conferencia</MenuItem>
@@ -53,7 +72,7 @@ export default function AnvisaClosure() {
       {closure && (
         <>
           <Grid container spacing={2}>
-            <Grid item xs={12} md={3}><MetricCard label="Paciente-dia" value={closure.paciente_dia} /></Grid>
+            <Grid item xs={12} md={3}><MetricCard label={`Paciente-dia - ${unitLabel(closure.tipo_unidade)}`} value={closure.paciente_dia} /></Grid>
             <Grid item xs={12} md={3}><MetricCard label="CVC-dia" value={closure.cvc_dia} /></Grid>
             <Grid item xs={12} md={3}><MetricCard label="VM-dia" value={closure.vm_dia} /></Grid>
             <Grid item xs={12} md={3}><MetricCard label="CVD-dia" value={closure.cvd_dia} /></Grid>
