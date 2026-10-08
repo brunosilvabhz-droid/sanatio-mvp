@@ -148,6 +148,10 @@ def _snapshot_reasons(snapshot: PatientMonitoringSnapshot) -> list[str]:
 
 
 def _antimicrobial_to_read(item: AntimicrobianoAtendimento, attendance: Atendimento) -> dict:
+    now = datetime.now(timezone.utc)
+    started_at = item.data_hora_inicio
+    ended_at = min(item.data_hora_fim, now) if item.data_hora_fim else now
+    prescription_days = max((ended_at.date() - started_at.date()).days, 0)
     return {
         "cd_atendimento": attendance.id_origem_atendimento,
         "cd_paciente": attendance.paciente.id_origem_paciente,
@@ -163,7 +167,7 @@ def _antimicrobial_to_read(item: AntimicrobianoAtendimento, attendance: Atendime
         "ds_frequencia": item.frequencia or "",
         "ds_via": item.via or "",
         "ds_dose": item.dose or "",
-        "dias_uso": item.dias_uso,
+        "dias_uso": prescription_days,
     }
 
 

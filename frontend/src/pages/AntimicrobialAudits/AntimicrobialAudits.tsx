@@ -143,7 +143,7 @@ export default function AntimicrobialAudits() {
               <TableCell>Unidade</TableCell>
               <TableCell>Antimicrobiano</TableCell>
               <TableCell>Inicio</TableCell>
-              <TableCell align="right">Dias</TableCell>
+              <TableCell align="right">Curso (dias)</TableCell>
               <TableCell>Prescrição</TableCell>
               <TableCell>Status</TableCell>
               <TableCell>Prioridade</TableCell>

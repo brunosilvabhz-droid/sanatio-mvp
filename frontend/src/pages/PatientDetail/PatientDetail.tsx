@@ -398,5 +398,6 @@ function Timeline({ events }: { events: TimelineEvent[] }) {
 }
 
 function formatColumn(value: string) {
+  if (value === 'dias_uso') return 'Duração da prescrição (dias)';
   return value.replace(/_/g, ' ');
 }

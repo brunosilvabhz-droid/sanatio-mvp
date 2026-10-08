@@ -204,12 +204,16 @@ def _calculate_snapshot_from_details(
         ]
     else:
         reference_at = datetime.now(timezone.utc)
-        active_antimicrobials = [antimicrobial for antimicrobial in antimicrobials if _active_until(antimicrobial.sn_ativo, antimicrobial.dt_fim, reference_at)]
+        antimicrobial_courses, _ = antimicrobial_audit_service.treatment_courses(
+            [antimicrobial.model_dump() for antimicrobial in antimicrobials],
+            now=reference_at,
+        )
+        active_antimicrobials = [course for course in antimicrobial_courses if _is_active(course.get("sn_ativo"))]
         active_invasive = [procedure for procedure in invasive_procedures if _is_active(procedure.sn_ativo) and not procedure.dt_fim]
         active_isolations = [isolation for isolation in isolations if _active_until(isolation.sn_ativo, isolation.dt_fim, reference_at)]
 
     max_antimicrobial_days = max(
-        [(_days_between(antimicrobial.dt_inicio, None, reference_date) if historical else antimicrobial.dias_uso or _days_between(antimicrobial.dt_inicio, antimicrobial.dt_fim)) for antimicrobial in active_antimicrobials]
+        [(_days_between(antimicrobial.dt_inicio, None, reference_date) if historical else int(antimicrobial.get("dias_uso") or 0)) for antimicrobial in active_antimicrobials]
         or [0]
     )
     max_invasive_device_days = max(
@@ -313,12 +317,16 @@ def _create_antimicrobial_alerts(
 ) -> int:
     created = 0
     reference_at = datetime.now(timezone.utc)
-    active_antimicrobials = [antimicrobial for antimicrobial in antimicrobials if _active_until(antimicrobial.sn_ativo, antimicrobial.dt_fim, reference_at)]
+    courses, _ = antimicrobial_audit_service.treatment_courses(
+        [antimicrobial.model_dump() for antimicrobial in antimicrobials],
+        now=reference_at,
+    )
+    active_antimicrobials = [course for course in courses if _is_active(course.get("sn_ativo"))]
 
     prolonged_by_key: dict[str, int] = {}
     for antimicrobial in active_antimicrobials:
-        key = _antimicrobial_key(antimicrobial)
-        days = antimicrobial.dias_uso or _days_between(antimicrobial.dt_inicio, antimicrobial.dt_fim)
+        key = str(antimicrobial.get("ds_principio_ativo") or antimicrobial.get("ds_antimicrobiano") or "Principio ativo nao identificado").strip()
+        days = int(antimicrobial.get("dias_uso") or 0)
         prolonged_by_key[key] = max(prolonged_by_key.get(key, 0), days)
 
     prolonged = {name: days for name, days in prolonged_by_key.items() if days >= same_antimicrobial_days}
