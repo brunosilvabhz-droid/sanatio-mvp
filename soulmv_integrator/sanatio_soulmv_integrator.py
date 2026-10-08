@@ -179,11 +179,11 @@ def _query_window(
     return {
         "patients": f"dt_alta IS NULL OR dt_alta >= {start} OR dt_atendimento >= {start}",
         "bed_movements": f"dt_movimentacao >= {start}",
-        "antimicrobials": f"dt_aplicacao >= {start}",
+        "antimicrobials": f"dt_aplicacao >= {start} OR dt_fim IS NULL OR dt_fim >= {start}",
         "cultures": f"dt_coleta >= {start} OR dt_resultado >= {start}",
         "exam_requests": f"dt_solicitacao >= {start}",
         "invasive_procedures": f"dt_inicio >= {start} OR dt_fim >= {start}",
-        "isolations": f"dt_inicio >= {start} OR dt_fim >= {start}",
+        "isolations": f"dt_inicio >= {start} OR dt_fim IS NULL OR dt_fim >= {start}",
     }, {"lookback_days": lookback_days}
 
 
@@ -390,9 +390,10 @@ def calculate_risk(
         active_isolations = [row for row in isolations if active_on(row.get("dt_inicio"), row.get("dt_fim"), reference_date)]
         cultures = [row for row in cultures if (as_date(row.get("dt_coleta")) or reference_date) <= reference_date]
     else:
-        active_antimicrobials = [row for row in antimicrobials if parse_bool(row.get("sn_ativo")) and not row.get("dt_fim")]
+        today = datetime.now().date()
+        active_antimicrobials = [row for row in antimicrobials if parse_bool(row.get("sn_ativo")) and active_on(row.get("dt_inicio"), row.get("dt_fim"), today)]
         active_invasive = [row for row in invasive if parse_bool(row.get("sn_ativo")) and not row.get("dt_fim")]
-        active_isolations = [row for row in isolations if parse_bool(row.get("sn_ativo")) and not row.get("dt_fim")]
+        active_isolations = [row for row in isolations if parse_bool(row.get("sn_ativo")) and active_on(row.get("dt_inicio"), row.get("dt_fim"), today)]
 
     max_antimicrobial_days = max([days_between(row.get("dt_inicio"), None, reference_date) if reference_date else safe_int(row.get("dias_uso"), days_between(row.get("dt_inicio"), row.get("dt_fim"))) for row in active_antimicrobials] or [0])
     max_invasive_device_days = max([days_between(row.get("dt_inicio"), None, reference_date) if reference_date else safe_int(row.get("dias_permanencia"), days_between(row.get("dt_inicio"), row.get("dt_fim"))) for row in active_invasive] or [0])

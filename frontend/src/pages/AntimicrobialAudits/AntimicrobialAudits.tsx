@@ -44,7 +44,7 @@ export default function AntimicrobialAudits() {
     atendimento: '',
     paciente: '',
     antimicrobial: '',
-    min_days: '7',
+    min_days: '',
     active_only: true
   });
   const pendingCount = useMemo(() => rows.filter((row) => ['PENDENTE', 'EM_ANALISE'].includes(row.status)).length, [rows]);

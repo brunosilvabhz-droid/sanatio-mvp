@@ -41,6 +41,16 @@ def test_expired_end_date_closes_latest_prescription_even_when_flag_is_active():
     assert courses[0]["dias_uso"] == 4
 
 
+def test_future_end_date_keeps_latest_prescription_active():
+    courses, _ = treatment_courses(
+        [prescription("10", "2026-10-08T08:00:00", "2026-10-12T08:00:00", "S")],
+        now=datetime(2026, 10, 10, tzinfo=timezone.utc),
+    )
+
+    assert courses[0]["sn_ativo"] == "S"
+    assert courses[0]["dias_uso"] == 2
+
+
 def test_course_uses_latest_prescription_date_and_accumulated_days():
     courses, _ = treatment_courses(
         [

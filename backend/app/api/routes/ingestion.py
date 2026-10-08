@@ -124,6 +124,17 @@ def _is_active(value: str | None) -> bool:
     return str(value or "").upper() == "S"
 
 
+def _active_until(value: str | None, end: datetime | None, reference: datetime | None = None) -> bool:
+    if not _is_active(value):
+        return False
+    if not end:
+        return True
+    reference = reference or datetime.now(timezone.utc)
+    if end.tzinfo is None:
+        end = end.replace(tzinfo=timezone.utc)
+    return end > reference
+
+
 def _antimicrobial_key(item) -> str:
     return str(item.ds_principio_ativo or "Principio ativo nao identificado").strip()
 
@@ -192,9 +203,10 @@ def _calculate_snapshot_from_details(
             if item.dt_inicio.date() <= reference_date and (not item.dt_fim or item.dt_fim.date() > reference_date)
         ]
     else:
-        active_antimicrobials = [antimicrobial for antimicrobial in antimicrobials if _is_active(antimicrobial.sn_ativo) and not antimicrobial.dt_fim]
+        reference_at = datetime.combine(reference_date, datetime.max.time(), tzinfo=timezone.utc)
+        active_antimicrobials = [antimicrobial for antimicrobial in antimicrobials if _active_until(antimicrobial.sn_ativo, antimicrobial.dt_fim, reference_at)]
         active_invasive = [procedure for procedure in invasive_procedures if _is_active(procedure.sn_ativo) and not procedure.dt_fim]
-        active_isolations = [isolation for isolation in isolations if _is_active(isolation.sn_ativo) and not isolation.dt_fim]
+        active_isolations = [isolation for isolation in isolations if _active_until(isolation.sn_ativo, isolation.dt_fim, reference_at)]
 
     max_antimicrobial_days = max(
         [(_days_between(antimicrobial.dt_inicio, None, reference_date) if historical else antimicrobial.dias_uso or _days_between(antimicrobial.dt_inicio, antimicrobial.dt_fim)) for antimicrobial in active_antimicrobials]
@@ -300,7 +312,8 @@ def _create_antimicrobial_alerts(
     reference_date: date,
 ) -> int:
     created = 0
-    active_antimicrobials = [antimicrobial for antimicrobial in antimicrobials if _is_active(antimicrobial.sn_ativo) and not antimicrobial.dt_fim]
+    reference_at = datetime.combine(reference_date, datetime.max.time(), tzinfo=timezone.utc)
+    active_antimicrobials = [antimicrobial for antimicrobial in antimicrobials if _active_until(antimicrobial.sn_ativo, antimicrobial.dt_fim, reference_at)]
 
     prolonged_by_key: dict[str, int] = {}
     for antimicrobial in active_antimicrobials:
@@ -598,7 +611,7 @@ def ingest_snapshots(
         antimicrobial.data_hora_inicio = item.dt_inicio
         antimicrobial.data_hora_aplicacao = item.dt_aplicacao
         antimicrobial.data_hora_fim = item.dt_fim
-        antimicrobial.ativo = _is_active(item.sn_ativo)
+        antimicrobial.ativo = _active_until(item.sn_ativo, item.dt_fim)
         product = db.scalar(
             select(ProdutoAntimicrobiano).where(ProdutoAntimicrobiano.codigo_produto == item.cd_produto)
         ) if item.cd_produto else None
@@ -699,7 +712,7 @@ def ingest_snapshots(
             db.add(isolation)
         isolation.isolamento = item.ds_isolamento
         isolation.data_hora_fim = item.dt_fim
-        isolation.ativo = _is_active(item.sn_ativo)
+        isolation.ativo = _active_until(item.sn_ativo, item.dt_fim)
 
     if not historical:
         for item in payload.patients:

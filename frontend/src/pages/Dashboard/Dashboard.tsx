@@ -136,7 +136,7 @@ export default function Dashboard() {
                 <Typography variant="h6" fontWeight={800}>Mapa de isolamentos ativos</Typography>
                 <Typography variant="body2" color="text.secondary">Pacientes que exigem atenção imediata da equipe assistencial.</Typography>
               </Box>
-              <Chip icon={<MasksIcon />} label={`${isolationMap.length} isolamento(s)`} color={isolationMap.length ? 'warning' : 'default'} />
+              <Chip icon={<MasksIcon />} label={`${isolationMap.length} precaução(ões) ativa(s)`} color={isolationMap.length ? 'warning' : 'default'} />
             </Stack>
             {isolationMap.length ? (
               <Table size="small">

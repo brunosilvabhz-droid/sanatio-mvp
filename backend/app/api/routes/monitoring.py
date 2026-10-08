@@ -1,12 +1,11 @@
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy import select
-from sqlalchemy.orm import Session, selectinload
+from sqlalchemy.orm import Session
 
 from app.api.deps import get_current_user
 from app.core.database import get_db
 from app.models.clinical import ExecucaoIntegracao
 from app.models.hospital_integration import HospitalIntegration
-from app.models.monitoring_run import MonitoringRun
 from app.models.monitoring_rule import MonitoringRule
 from app.models.setting import Setting
 from app.models.user import User
@@ -22,25 +21,6 @@ SCHEDULE_SETTINGS = {
     "daily_time": ("monitoring.schedule.daily_time", "07:00", "Horario preferencial de execucao diaria"),
     "timezone": ("monitoring.schedule.timezone", "America/Sao_Paulo", "Fuso horario da agenda automatica"),
 }
-
-
-def _run_to_read(run: MonitoringRun) -> MonitoringRunRead:
-    user = run.triggered_by
-    return MonitoringRunRead(
-        source_key=f"monitoring-{run.id}",
-        source_type="Monitoramento manual",
-        id=run.id,
-        triggered_by_user_id=run.triggered_by_user_id,
-        triggered_by_name=user.full_name if user else None,
-        triggered_by_email=user.email if user else None,
-        status=run.status,
-        patients_processed=run.patients_processed,
-        alerts_created=run.alerts_created,
-        duration_ms=run.duration_ms,
-        error_message=run.error_message,
-        started_at=run.started_at,
-        finished_at=run.finished_at,
-    )
 
 
 def _integration_run_to_read(run: ExecucaoIntegracao, hospital_name: str | None) -> MonitoringRunRead:
@@ -151,12 +131,6 @@ def update_schedule(
 
 @router.get("/runs", response_model=list[MonitoringRunRead])
 def list_runs(db: Session = Depends(get_db), _: User = Depends(get_current_user)) -> list[MonitoringRunRead]:
-    monitoring_runs = db.scalars(
-        select(MonitoringRun)
-        .options(selectinload(MonitoringRun.triggered_by))
-        .order_by(MonitoringRun.started_at.desc())
-        .limit(100)
-    ).all()
     integration_runs = db.scalars(select(ExecucaoIntegracao).order_by(ExecucaoIntegracao.data_hora_inicio.desc()).limit(100)).all()
     hospital_ids = {run.hospital_integracao_id for run in integration_runs if run.hospital_integracao_id}
     hospitals = {}
@@ -165,6 +139,4 @@ def list_runs(db: Session = Depends(get_db), _: User = Depends(get_current_user)
             hospital.id: hospital.hospital_name
             for hospital in db.scalars(select(HospitalIntegration).where(HospitalIntegration.id.in_(hospital_ids))).all()
         }
-    runs = [_run_to_read(run) for run in monitoring_runs]
-    runs.extend(_integration_run_to_read(run, hospitals.get(run.hospital_integracao_id)) for run in integration_runs)
-    return sorted(runs, key=lambda run: run.started_at, reverse=True)[:100]
+    return [_integration_run_to_read(run, hospitals.get(run.hospital_integracao_id)) for run in integration_runs]
