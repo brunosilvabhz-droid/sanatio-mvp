@@ -167,5 +167,7 @@ def test_incremental_antimicrobials_do_not_include_old_open_rows() -> None:
     specs = {spec.key: spec for spec in query_specs(views, "oracle", 2)}
 
     assert "dt_aplicacao >= SYSDATE - :lookback_days" in specs["antimicrobials"].sql
+    assert "dt_inicio >= SYSDATE - :lookback_days" not in specs["antimicrobials"].sql
+    assert "dt_fim >= SYSDATE - :lookback_days" not in specs["antimicrobials"].sql
     assert "dt_fim IS NULL" not in specs["antimicrobials"].sql
     assert "dt_fim IS NULL" not in specs["isolations"].sql
