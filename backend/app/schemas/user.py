@@ -1,6 +1,6 @@
 from pydantic import BaseModel, EmailStr, Field
 
-from app.schemas.auth import RoleRead
+from app.schemas.auth import RoleRead, UserHospitalRead
 
 
 class UserCreate(BaseModel):
@@ -10,6 +10,7 @@ class UserCreate(BaseModel):
     role_name: str
     active: bool = True
     can_view_patient_name: bool = False
+    hospital_ids: list[int] = []
 
 
 class UserUpdate(BaseModel):
@@ -18,6 +19,7 @@ class UserUpdate(BaseModel):
     role_name: str | None = None
     active: bool | None = None
     can_view_patient_name: bool | None = None
+    hospital_ids: list[int] | None = None
 
 
 class UserRead(BaseModel):
@@ -27,5 +29,6 @@ class UserRead(BaseModel):
     active: bool
     can_view_patient_name: bool
     role: RoleRead
+    hospitals: list[UserHospitalRead] = []
 
     model_config = {"from_attributes": True}

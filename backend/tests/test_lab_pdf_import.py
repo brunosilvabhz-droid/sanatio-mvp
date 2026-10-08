@@ -9,7 +9,7 @@ from sqlalchemy import create_engine, select
 from sqlalchemy.orm import Session
 
 import app.models  # noqa: F401
-from app.api.routes.lab_pdf import LinkRequest, confirm_suggestions, import_pdf, link_result, list_results, patient_results
+from app.api.routes.lab_pdf import LinkRequest, cancel_import, confirm_suggestions, import_pdf, link_result, list_results, patient_results, validate_import
 from app.models.base import Base
 from app.models.clinical import Atendimento, CulturaAtendimento, Paciente, SolicitacaoExameAtendimento
 from app.models.lab_pdf_import import ResultadoPdfLaboratorio
@@ -51,7 +51,19 @@ class LabPdfImportTest(unittest.TestCase):
         self.assertEqual(patient_results("200", self.db, self.user), [])
         result = confirm_suggestions(batch["id"], self.db, self.user)
         self.assertEqual(result["vinculados"], 1)
+        self.assertEqual(patient_results("200", self.db, self.user), [])
+        self.assertEqual(validate_import(batch["id"], self.db, self.user)["status"], "VALIDADA")
         self.assertEqual(patient_results("200", self.db, self.user)[0]["os_pedido"], "271993")
+
+    def test_pending_import_can_be_cancelled(self):
+        from app.models.lab_pdf_import import ImportacaoPdfLaboratorio
+        batch = ImportacaoPdfLaboratorio(nome_arquivo="cancelar.pdf", sha256="c" * 64, paginas=1, total_resultados=1, usuario_id=self.user.id)
+        self.db.add(batch)
+        self.db.flush()
+        self.db.add(ResultadoPdfLaboratorio(importacao_id=batch.id, ordem=1, pagina=1, os_pedido="999", data_coleta=datetime(2026, 9, 3), data_resultado=datetime(2026, 9, 7), exame_amostra="Cultura", resultado="Negativo", situacao="FINAL"))
+        self.db.commit()
+        self.assertEqual(cancel_import(batch.id, self.db, self.user)["status"], "CANCELADA")
+        self.assertEqual(list_results(batch.id, self.db, self.user), [])
 
     def test_unmatched_os_needs_explicit_manual_confirmation(self):
         row = ResultadoPdfLaboratorio(

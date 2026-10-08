@@ -11,6 +11,7 @@ from app.models.user import Role, User
 
 ROLES = [
     ("ADMIN", "Administracao do sistema"),
+    ("SUPORTE_TI", "Administracao de usuarios e suporte do hospital"),
     ("SCIH", "Servico de Controle de Infeccao Hospitalar"),
     ("FARMACIA", "Farmacia clinica"),
     ("DIRETORIA", "Diretoria"),

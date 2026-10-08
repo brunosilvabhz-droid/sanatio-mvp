@@ -16,6 +16,9 @@ import ForgotPassword from '../pages/Login/ForgotPassword';
 import ResetPassword from '../pages/Login/ResetPassword';
 import Interventions from '../pages/Interventions/Interventions';
 import LabPdfImport from '../pages/LabPdfImport/LabPdfImport';
+import LabImportLogs from '../pages/LabPdfImport/LabImportLogs';
+import Reports from '../pages/Reports/Reports';
+import Help from '../pages/Help/Help';
 import MonitoringRuns from '../pages/MonitoringRuns/MonitoringRuns';
 import PatientDetail from '../pages/PatientDetail/PatientDetail';
 import Patients from '../pages/Patients/Patients';
@@ -49,6 +52,7 @@ export default function App() {
           <Route path="alerts" element={<Alerts />} />
           <Route path="interventions" element={<Interventions />} />
           <Route path="lab-pdf" element={<LabPdfImport />} />
+          <Route path="lab-pdf/logs" element={<LabImportLogs />} />
           <Route path="antimicrobial-audits" element={<AntimicrobialAudits />} />
           <Route path="antimicrobial-products" element={<AntimicrobialProducts />} />
           <Route path="epidemiology-reports" element={<EpidemiologyReports />} />
@@ -59,6 +63,8 @@ export default function App() {
           <Route path="alert-rules" element={<AlertRules />} />
           <Route path="monitoring-runs" element={<MonitoringRuns />} />
           <Route path="alert-audit" element={<AlertAudit />} />
+          <Route path="reports" element={<Reports />} />
+          <Route path="help" element={<Help />} />
           <Route path="support" element={<SupportTickets />} />
           <Route path="users" element={<Users />} />
           <Route path="settings" element={<Settings />} />

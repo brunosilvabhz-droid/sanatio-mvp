@@ -1,6 +1,6 @@
 from datetime import datetime
 
-from sqlalchemy import Boolean, DateTime, ForeignKey, Integer, String, func
+from sqlalchemy import Boolean, DateTime, ForeignKey, Integer, String, UniqueConstraint, func
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.models.base import Base
@@ -28,6 +28,21 @@ class User(Base):
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
 
     role: Mapped[Role] = relationship("Role")
+    hospital_links: Mapped[list["UserHospital"]] = relationship("UserHospital", back_populates="user", cascade="all, delete-orphan")
+    hospitals = relationship("HospitalIntegration", secondary="user_hospitals", viewonly=True)
+
+
+class UserHospital(Base):
+    __tablename__ = "user_hospitals"
+    __table_args__ = (UniqueConstraint("user_id", "hospital_id", name="uq_user_hospital"),)
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
+    hospital_id: Mapped[int] = mapped_column(ForeignKey("hospital_integrations.id", ondelete="CASCADE"), nullable=False, index=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+
+    user: Mapped[User] = relationship("User", back_populates="hospital_links")
+    hospital = relationship("HospitalIntegration")
 
 
 class PasswordResetToken(Base):

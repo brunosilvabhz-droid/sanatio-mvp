@@ -32,6 +32,13 @@ class RoleRead(BaseModel):
     model_config = {"from_attributes": True}
 
 
+class UserHospitalRead(BaseModel):
+    id: int
+    hospital_name: str
+
+    model_config = {"from_attributes": True}
+
+
 class UserRead(BaseModel):
     id: int
     email: str
@@ -39,5 +46,6 @@ class UserRead(BaseModel):
     active: bool
     can_view_patient_name: bool
     role: RoleRead
+    hospitals: list[UserHospitalRead] = []
 
     model_config = {"from_attributes": True}

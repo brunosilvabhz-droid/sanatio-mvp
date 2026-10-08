@@ -4,7 +4,7 @@ from pathlib import PurePath
 
 from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
 from pydantic import BaseModel
-from sqlalchemy import select
+from sqlalchemy import delete, select
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_current_user
@@ -84,7 +84,8 @@ async def import_pdf(
         raise HTTPException(status_code=422, detail=str(exc)) from exc
     batch = ImportacaoPdfLaboratorio(
         nome_arquivo=filename, sha256=digest, paginas=pages,
-        total_resultados=len(parsed), usuario_id=user.id,
+        total_resultados=len(parsed), usuario_id=user.id, status="PENDENTE",
+        hospital_id=user.hospitals[0].id if len(user.hospitals) == 1 else None,
     )
     db.add(batch)
     db.flush()
@@ -106,7 +107,9 @@ async def import_pdf(
 def list_imports(db: Session = Depends(get_db), _: User = Depends(require_lab_user)) -> list[dict]:
     batches = db.scalars(select(ImportacaoPdfLaboratorio).order_by(ImportacaoPdfLaboratorio.id.desc()).limit(30)).all()
     return [{"id": batch.id, "nome_arquivo": batch.nome_arquivo, "paginas": batch.paginas,
-             "total_resultados": batch.total_resultados, "importado_em": batch.importado_em} for batch in batches]
+             "total_resultados": batch.total_resultados, "status": batch.status,
+             "importado_em": batch.importado_em, "validado_em": batch.validado_em,
+             "cancelado_em": batch.cancelado_em} for batch in batches]
 
 
 @router.get("/imports/{import_id}/results")
@@ -127,8 +130,11 @@ def list_results(import_id: int, db: Session = Depends(get_db), user: User = Dep
 
 @router.post("/imports/{import_id}/confirm-suggestions")
 def confirm_suggestions(import_id: int, db: Session = Depends(get_db), user: User = Depends(require_lab_user)) -> dict:
-    if not db.get(ImportacaoPdfLaboratorio, import_id):
+    batch = db.get(ImportacaoPdfLaboratorio, import_id)
+    if not batch:
         raise HTTPException(status_code=404, detail="Importação não encontrada")
+    if batch.status != "PENDENTE":
+        raise HTTPException(status_code=409, detail="A carga não está mais pendente")
     rows = db.scalars(select(ResultadoPdfLaboratorio).where(
         ResultadoPdfLaboratorio.importacao_id == import_id,
         ResultadoPdfLaboratorio.atendimento_id.is_(None),
@@ -147,11 +153,47 @@ def confirm_suggestions(import_id: int, db: Session = Depends(get_db), user: Use
     return {"vinculados": linked}
 
 
+@router.post("/imports/{import_id}/validate")
+def validate_import(import_id: int, db: Session = Depends(get_db), user: User = Depends(require_lab_user)) -> dict:
+    batch = db.get(ImportacaoPdfLaboratorio, import_id)
+    if not batch:
+        raise HTTPException(status_code=404, detail="Importação não encontrada")
+    if batch.status != "PENDENTE":
+        raise HTTPException(status_code=409, detail="A carga não está mais pendente")
+    unresolved = db.scalar(select(ResultadoPdfLaboratorio).where(
+        ResultadoPdfLaboratorio.importacao_id == import_id,
+        ResultadoPdfLaboratorio.atendimento_id.is_(None),
+    ).limit(1))
+    if unresolved:
+        raise HTTPException(status_code=422, detail="Vincule todos os resultados antes de validar a carga")
+    batch.status = "VALIDADA"
+    batch.validado_em = datetime.now(timezone.utc)
+    db.commit()
+    return {"id": batch.id, "status": batch.status}
+
+
+@router.post("/imports/{import_id}/cancel")
+def cancel_import(import_id: int, db: Session = Depends(get_db), _: User = Depends(require_lab_user)) -> dict:
+    batch = db.get(ImportacaoPdfLaboratorio, import_id)
+    if not batch:
+        raise HTTPException(status_code=404, detail="Importação não encontrada")
+    if batch.status != "PENDENTE":
+        raise HTTPException(status_code=409, detail="Somente cargas pendentes podem ser canceladas")
+    db.execute(delete(ResultadoPdfLaboratorio).where(ResultadoPdfLaboratorio.importacao_id == import_id))
+    batch.status = "CANCELADA"
+    batch.sha256 = f"cancelled:{batch.id}:{batch.sha256}"[:64]
+    batch.cancelado_em = datetime.now(timezone.utc)
+    db.commit()
+    return {"id": batch.id, "status": batch.status}
+
+
 @router.post("/results/{result_id}/link")
 def link_result(result_id: int, payload: LinkRequest, db: Session = Depends(get_db), user: User = Depends(require_lab_user)) -> dict:
     row = db.get(ResultadoPdfLaboratorio, result_id)
     if not row:
         raise HTTPException(status_code=404, detail="Resultado não encontrado")
+    if row.importacao.status != "PENDENTE":
+        raise HTTPException(status_code=409, detail="A carga não está pendente")
     attendance = db.scalar(select(Atendimento).where(Atendimento.id_origem_atendimento == payload.cd_atendimento.strip()))
     if not attendance:
         raise HTTPException(status_code=404, detail="Atendimento não encontrado no SANATIO")
@@ -172,5 +214,10 @@ def patient_results(cd_atendimento: str, db: Session = Depends(get_db), user: Us
     attendance = db.scalar(select(Atendimento).where(Atendimento.id_origem_atendimento == cd_atendimento))
     if not attendance:
         return []
-    rows = db.scalars(select(ResultadoPdfLaboratorio).where(ResultadoPdfLaboratorio.atendimento_id == attendance.id).order_by(ResultadoPdfLaboratorio.data_resultado.desc())).all()
+    rows = db.scalars(
+        select(ResultadoPdfLaboratorio)
+        .join(ImportacaoPdfLaboratorio, ImportacaoPdfLaboratorio.id == ResultadoPdfLaboratorio.importacao_id)
+        .where(ResultadoPdfLaboratorio.atendimento_id == attendance.id, ImportacaoPdfLaboratorio.status == "VALIDADA")
+        .order_by(ResultadoPdfLaboratorio.data_resultado.desc())
+    ).all()
     return [_row_read(row, user, db) for row in rows]

@@ -24,3 +24,9 @@ def require_admin(current_user: User = Depends(get_current_user)) -> User:
     if current_user.role.name != "ADMIN":
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Acesso restrito a ADMIN")
     return current_user
+
+
+def require_admin_or_support(current_user: User = Depends(get_current_user)) -> User:
+    if current_user.role.name not in {"ADMIN", "SUPORTE_TI"}:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Acesso restrito à administração")
+    return current_user

@@ -16,6 +16,8 @@ import SupportAgentIcon from '@mui/icons-material/SupportAgent';
 import TravelExploreIcon from '@mui/icons-material/TravelExplore';
 import UploadFileIcon from '@mui/icons-material/UploadFile';
 import Inventory2Icon from '@mui/icons-material/Inventory2';
+import HelpOutlineIcon from '@mui/icons-material/HelpOutline';
+import HistoryIcon from '@mui/icons-material/History';
 import {
   AppBar,
   Box,
@@ -49,7 +51,8 @@ const groups = [
       { label: 'Intervenções', path: '/interventions', icon: <ReplyIcon /> },
       { label: 'Antimicrobianos', path: '/antimicrobial-audits', icon: <MedicationIcon /> },
       { label: 'Cadastro de produtos', path: '/antimicrobial-products', icon: <Inventory2Icon />, roles: ['ADMIN', 'FARMACIA'] },
-      { label: 'Resultados do laboratório', path: '/lab-pdf', icon: <UploadFileIcon /> }
+      { label: 'Resultados do laboratório', path: '/lab-pdf', icon: <UploadFileIcon /> },
+      { label: 'Histórico de cargas', path: '/lab-pdf/logs', icon: <HistoryIcon /> }
     ]
   },
   {
@@ -60,22 +63,24 @@ const groups = [
       { label: 'Fechamento Anvisa', path: '/anvisa-closure', icon: <FactCheckIcon /> },
       { label: 'Config. alertas', path: '/alert-rules', icon: <RuleIcon /> },
       { label: 'Execuções', path: '/monitoring-runs', icon: <ManageHistoryIcon /> },
-      { label: 'Relatórios', path: '/alert-audit', icon: <FactCheckIcon /> }
+      { label: 'Relatórios', path: '/reports', icon: <FactCheckIcon /> },
+      { label: 'Auditoria de alertas', path: '/alert-audit', icon: <ManageHistoryIcon /> }
     ]
   },
   {
-    title: 'Suporte',
+    title: 'Ajuda',
     items: [
+      { label: 'Central de ajuda', path: '/help', icon: <HelpOutlineIcon /> },
       { label: 'Chamados', path: '/support', icon: <SupportAgentIcon /> }
     ]
   },
   {
     title: 'Administração',
     items: [
-      { label: 'Usuários', path: '/users', icon: <GroupIcon /> },
-      { label: 'Referências Epidemiológicas', path: '/epidemiology-references', icon: <UploadFileIcon /> },
-      { label: 'Perfil do Estabelecimento', path: '/establishment-profile', icon: <DomainIcon /> },
-      { label: 'Configurações', path: '/settings', icon: <SettingsIcon /> }
+      { label: 'Usuários', path: '/users', icon: <GroupIcon />, roles: ['ADMIN', 'SUPORTE_TI'] },
+      { label: 'Referências Epidemiológicas', path: '/epidemiology-references', icon: <UploadFileIcon />, roles: ['ADMIN'] },
+      { label: 'Perfil do Estabelecimento', path: '/establishment-profile', icon: <DomainIcon />, roles: ['ADMIN'] },
+      { label: 'Configurações', path: '/settings', icon: <SettingsIcon />, roles: ['ADMIN'] }
     ]
   }
 ];
@@ -87,6 +92,7 @@ export default function AppLayout() {
     const stored = localStorage.getItem('sanatio_user');
     return stored ? JSON.parse(stored)?.role?.name || '' : '';
   });
+  const [hospitalLabel, setHospitalLabel] = useState('Hospital');
 
   const logout = () => {
     localStorage.removeItem('sanatio_token');
@@ -100,6 +106,7 @@ export default function AppLayout() {
       localStorage.setItem('sanatio_user', JSON.stringify(data));
       localStorage.setItem('sanatio_can_view_patient_name', String(Boolean(data.can_view_patient_name)));
       setRoleName(data.role?.name || '');
+      setHospitalLabel(data.role?.name === 'ADMIN' ? 'Administração geral' : (data.hospitals || []).map((hospital: { hospital_name: string }) => hospital.hospital_name).join(', ') || 'Sem hospital vinculado');
     });
   }, []);
 
@@ -123,7 +130,7 @@ export default function AppLayout() {
           <Stack direction="row" spacing={1.5} alignItems="center">
             <Chip
               icon={<LocalHospitalIcon />}
-              label="HML clínica"
+              label={hospitalLabel}
               variant="outlined"
               sx={{ borderColor: '#c9dce2', color: 'text.secondary', bgcolor: '#f8fbfc' }}
             />

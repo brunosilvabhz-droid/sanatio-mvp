@@ -30,7 +30,7 @@ from app.models.patient_bed_movement import PatientBedMovement
 from app.models.patient_timeline_note import PatientTimelineNote
 from app.models.setting import Setting
 from app.models.support_ticket import SupportTicket
-from app.models.user import PasswordResetToken, Role, User
+from app.models.user import PasswordResetToken, Role, User, UserHospital
 
 __all__ = [
     "Alert",
@@ -68,4 +68,5 @@ __all__ = [
     "SolicitacaoExameAtendimento",
     "SupportTicket",
     "User",
+    "UserHospital",
 ]

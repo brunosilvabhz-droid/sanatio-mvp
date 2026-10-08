@@ -1,5 +1,6 @@
 export type Role = { id: number; name: string; description?: string };
-export type User = { id: number; email: string; full_name: string; active: boolean; can_view_patient_name: boolean; role: Role };
+export type UserHospital = { id: number; hospital_name: string };
+export type User = { id: number; email: string; full_name: string; active: boolean; can_view_patient_name: boolean; role: Role; hospitals: UserHospital[] };
 
 export type AntimicrobialProduct = {
   id: number;

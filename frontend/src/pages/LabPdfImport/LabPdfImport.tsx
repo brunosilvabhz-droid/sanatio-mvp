@@ -1,13 +1,13 @@
 import CheckCircleOutlineIcon from '@mui/icons-material/CheckCircleOutline';
+import CancelOutlinedIcon from '@mui/icons-material/CancelOutlined';
 import UploadFileIcon from '@mui/icons-material/UploadFile';
 import { Alert, Box, Button, Checkbox, Chip, FormControlLabel, Paper, Stack, Table, TableBody, TableCell, TableHead, TableRow, TextField, Typography } from '@mui/material';
 import axios from 'axios';
-import { ChangeEvent, useEffect, useState } from 'react';
+import { ChangeEvent, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { api } from '../../api/client';
 import PageHeader from '../../components/PageHeader';
 
-type ImportBatch = { id: number; nome_arquivo: string; paginas: number; total_resultados: number; importado_em: string };
 export type LabPdfResult = {
   id: number;
   pagina: number;
@@ -29,7 +29,6 @@ function errorMessage(error: unknown) {
 
 export default function LabPdfImport() {
   const navigate = useNavigate();
-  const [imports, setImports] = useState<ImportBatch[]>([]);
   const [selected, setSelected] = useState<number | null>(null);
   const [rows, setRows] = useState<LabPdfResult[]>([]);
   const [attendance, setAttendance] = useState<Record<number, string>>({});
@@ -38,22 +37,12 @@ export default function LabPdfImport() {
   const [message, setMessage] = useState('');
   const [error, setError] = useState('');
 
-  async function loadImports() {
-    const { data } = await api.get<ImportBatch[]>('/lab-pdf/imports');
-    setImports(data);
-    return data;
-  }
-
   async function loadResults(id: number) {
     const { data } = await api.get<LabPdfResult[]>(`/lab-pdf/imports/${id}/results`);
     setRows(data);
     setSelected(id);
     setAttendance(Object.fromEntries(data.map((row) => [row.id, row.cd_atendimento || row.cd_atendimento_sugerido || ''])));
   }
-
-  useEffect(() => {
-    loadImports().then((data) => { if (data[0]) loadResults(data[0].id); }).catch((cause) => setError(errorMessage(cause)));
-  }, []);
 
   async function upload(event: ChangeEvent<HTMLInputElement>) {
     const file = event.target.files?.[0];
@@ -65,7 +54,6 @@ export default function LabPdfImport() {
       const form = new FormData();
       form.append('file', file);
       const { data } = await api.post<{ id: number; total_resultados: number; sugestoes: number }>('/lab-pdf/imports', form);
-      await loadImports();
       await loadResults(data.id);
       setMessage(`${data.total_resultados} resultados extraídos; ${data.sugestoes} vínculos por OS sugeridos para conferência.`);
     } catch (cause) {
@@ -107,6 +95,42 @@ export default function LabPdfImport() {
     }
   }
 
+  async function validateImport() {
+    if (!selected) return;
+    setBusy(true);
+    setError('');
+    try {
+      await api.post(`/lab-pdf/imports/${selected}/validate`);
+      setSelected(null);
+      setRows([]);
+      setAttendance({});
+      setManual({});
+      setMessage('Carga validada com sucesso. A área de importação está pronta para um novo arquivo.');
+    } catch (cause) {
+      setError(errorMessage(cause));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function cancelImport() {
+    if (!selected) return;
+    setBusy(true);
+    setError('');
+    try {
+      await api.post(`/lab-pdf/imports/${selected}/cancel`);
+      setSelected(null);
+      setRows([]);
+      setAttendance({});
+      setManual({});
+      setMessage('Carga cancelada. Nenhum resultado foi disponibilizado aos pacientes.');
+    } catch (cause) {
+      setError(errorMessage(cause));
+    } finally {
+      setBusy(false);
+    }
+  }
+
   const linked = rows.filter((row) => row.cd_atendimento).length;
 
   return (
@@ -123,24 +147,15 @@ export default function LabPdfImport() {
           <Typography variant="body2" color="text.secondary">Resultados permanecem pendentes até a confirmação do atendimento.</Typography>
         </Stack>
       </Paper>
-      <Paper sx={{ p: 2 }}>
-        <Typography variant="subtitle1" fontWeight={700} sx={{ mb: 1 }}>Importações</Typography>
-        <Stack direction="row" gap={1} flexWrap="wrap">
-          {imports.map((item) => (
-            <Button key={item.id} size="small" variant={selected === item.id ? 'contained' : 'outlined'} onClick={() => loadResults(item.id)}>
-              {item.nome_arquivo} · {item.total_resultados}
-            </Button>
-          ))}
-          {!imports.length && <Typography color="text.secondary">Nenhum relatório importado.</Typography>}
-        </Stack>
-      </Paper>
       {selected && (
         <Paper sx={{ p: 2 }}>
           <Stack direction={{ xs: 'column', md: 'row' }} alignItems={{ md: 'center' }} justifyContent="space-between" gap={1} sx={{ mb: 2 }}>
             <Typography variant="subtitle1" fontWeight={700}>Conferência · {linked}/{rows.length} vinculados</Typography>
-            <Button variant="outlined" startIcon={<CheckCircleOutlineIcon />} disabled={busy || !rows.some((row) => !row.cd_atendimento && row.cd_atendimento_sugerido)} onClick={confirmSuggestions}>
-              Confirmar vínculos por OS
-            </Button>
+            <Stack direction="row" spacing={1}>
+              <Button color="error" variant="outlined" startIcon={<CancelOutlinedIcon />} disabled={busy} onClick={cancelImport}>Cancelar carga</Button>
+              <Button variant="outlined" disabled={busy || !rows.some((row) => !row.cd_atendimento && row.cd_atendimento_sugerido)} onClick={confirmSuggestions}>Vincular sugestões</Button>
+              <Button variant="contained" startIcon={<CheckCircleOutlineIcon />} disabled={busy || linked !== rows.length} onClick={validateImport}>Validar carga</Button>
+            </Stack>
           </Stack>
           <Box sx={{ overflowX: 'auto' }}>
             <Table size="small" sx={{ minWidth: 1100 }}>

@@ -15,8 +15,12 @@ class ImportacaoPdfLaboratorio(Base):
     paginas: Mapped[int] = mapped_column(Integer, nullable=False)
     total_resultados: Mapped[int] = mapped_column(Integer, nullable=False)
     usuario_id: Mapped[int] = mapped_column(ForeignKey("users.id"), nullable=False)
+    hospital_id: Mapped[int | None] = mapped_column(ForeignKey("hospital_integrations.id"), nullable=True, index=True)
+    status: Mapped[str] = mapped_column(String(20), default="PENDENTE", nullable=False, index=True)
+    validado_em: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    cancelado_em: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     importado_em: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
-    resultados = relationship("ResultadoPdfLaboratorio", back_populates="importacao")
+    resultados = relationship("ResultadoPdfLaboratorio", back_populates="importacao", cascade="all, delete-orphan")
 
 
 class ResultadoPdfLaboratorio(Base):
