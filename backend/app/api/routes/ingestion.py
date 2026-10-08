@@ -203,7 +203,7 @@ def _calculate_snapshot_from_details(
             if item.dt_inicio.date() <= reference_date and (not item.dt_fim or item.dt_fim.date() > reference_date)
         ]
     else:
-        reference_at = datetime.combine(reference_date, datetime.max.time(), tzinfo=timezone.utc)
+        reference_at = datetime.now(timezone.utc)
         active_antimicrobials = [antimicrobial for antimicrobial in antimicrobials if _active_until(antimicrobial.sn_ativo, antimicrobial.dt_fim, reference_at)]
         active_invasive = [procedure for procedure in invasive_procedures if _is_active(procedure.sn_ativo) and not procedure.dt_fim]
         active_isolations = [isolation for isolation in isolations if _active_until(isolation.sn_ativo, isolation.dt_fim, reference_at)]
@@ -312,7 +312,7 @@ def _create_antimicrobial_alerts(
     reference_date: date,
 ) -> int:
     created = 0
-    reference_at = datetime.combine(reference_date, datetime.max.time(), tzinfo=timezone.utc)
+    reference_at = datetime.now(timezone.utc)
     active_antimicrobials = [antimicrobial for antimicrobial in antimicrobials if _active_until(antimicrobial.sn_ativo, antimicrobial.dt_fim, reference_at)]
 
     prolonged_by_key: dict[str, int] = {}
