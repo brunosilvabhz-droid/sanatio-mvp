@@ -1,11 +1,17 @@
 from datetime import date, datetime, time, timezone
 from io import BytesIO
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import StreamingResponse
 from openpyxl import Workbook
+from reportlab.lib import colors
+from reportlab.lib.pagesizes import A4, landscape
+from reportlab.lib.styles import ParagraphStyle, getSampleStyleSheet
+from reportlab.lib.units import mm
+from reportlab.platypus import LongTable, Paragraph, SimpleDocTemplate, Spacer, TableStyle
 from sqlalchemy import select
 from sqlalchemy.orm import Session
+from xml.sax.saxutils import escape
 
 from app.api.deps import get_current_user
 from app.core.database import get_db
@@ -25,6 +31,16 @@ REPORT_LABELS = {
 
 def _export_value(value: object) -> object:
     return value.isoformat() if isinstance(value, (date, datetime)) else value
+
+
+def _display_value(value: object) -> str:
+    if value is None or value == "":
+        return "-"
+    if isinstance(value, datetime):
+        return value.astimezone().strftime("%d/%m/%Y %H:%M") if value.tzinfo else value.strftime("%d/%m/%Y %H:%M")
+    if isinstance(value, date):
+        return value.strftime("%d/%m/%Y")
+    return str(value)
 
 
 def _period(start: date | None, end: date | None) -> tuple[datetime | None, datetime | None]:
@@ -93,35 +109,55 @@ def clinical_report_xlsx(report_type: str, start: date | None = None, end: date 
 
 
 def _pdf_bytes(title: str, rows: list[dict]) -> bytes:
-    lines = [f"SANATIO - {title}", f"Total: {len(rows)}", ""]
-    for row in rows:
-        lines.append(" | ".join(f"{key}: {value or '-'}" for key, value in row.items()))
-    chunks = [lines[index:index + 65] for index in range(0, len(lines), 65)] or [[f"SANATIO - {title}", "Sem dados"]]
-    font_id = 3 + len(chunks) * 2
-    page_ids = [3 + index * 2 for index in range(len(chunks))]
-    objects = [b"<< /Type /Catalog /Pages 2 0 R >>", f"<< /Type /Pages /Kids [{' '.join(f'{page_id} 0 R' for page_id in page_ids)}] /Count {len(chunks)} >>".encode()]
-    for index, chunk in enumerate(chunks):
-        page_id = page_ids[index]
-        content_id = page_id + 1
-        commands = ["BT /F1 8 Tf 36 806 Td"]
-        for line_index, line in enumerate(chunk):
-            escaped = str(line)[:150].replace("\\", "\\\\").replace("(", "\\(").replace(")", "\\)")
-            if line_index:
-                commands.append("0 -11 Td")
-            commands.append(f"({escaped}) Tj")
-        commands.append("ET")
-        stream = "\n".join(commands).encode("latin-1", errors="replace")
-        objects.append(f"<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Resources << /Font << /F1 {font_id} 0 R >> >> /Contents {content_id} 0 R >>".encode())
-        objects.append(b"<< /Length %d >>\nstream\n" % len(stream) + stream + b"\nendstream")
-    objects.append(b"<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>")
-    result = bytearray(b"%PDF-1.4\n")
-    offsets = [0]
-    for index, obj in enumerate(objects, 1):
-        offsets.append(len(result)); result.extend(f"{index} 0 obj\n".encode()); result.extend(obj); result.extend(b"\nendobj\n")
-    xref = len(result); result.extend(f"xref\n0 {len(objects)+1}\n0000000000 65535 f \n".encode())
-    for offset in offsets[1:]: result.extend(f"{offset:010d} 00000 n \n".encode())
-    result.extend(f"trailer << /Size {len(objects)+1} /Root 1 0 R >>\nstartxref\n{xref}\n%%EOF".encode())
-    return bytes(result)
+    output = BytesIO()
+    document = SimpleDocTemplate(
+        output, pagesize=landscape(A4),
+        leftMargin=10 * mm, rightMargin=10 * mm, topMargin=16 * mm, bottomMargin=14 * mm,
+        title=f"SANATIO - {title}", author="SANATIO",
+    )
+    styles = getSampleStyleSheet()
+    title_style = ParagraphStyle("ReportTitle", parent=styles["Title"], fontName="Helvetica-Bold", fontSize=16, leading=19, textColor=colors.HexColor("#092F3A"), spaceAfter=2 * mm)
+    meta_style = ParagraphStyle("ReportMeta", parent=styles["Normal"], fontSize=8, leading=10, textColor=colors.HexColor("#52666D"))
+    header_style = ParagraphStyle("TableHeader", parent=styles["Normal"], fontName="Helvetica-Bold", fontSize=7, leading=8, textColor=colors.white)
+    cell_style = ParagraphStyle("TableCell", parent=styles["Normal"], fontSize=6.5, leading=8, textColor=colors.HexColor("#17333C"))
+    story = [
+        Paragraph(f"SANATIO | {escape(title)}", title_style),
+        Paragraph(f"Emitido em {datetime.now().strftime('%d/%m/%Y %H:%M')} &nbsp;&nbsp;|&nbsp;&nbsp; {len(rows)} registro(s)", meta_style),
+        Spacer(1, 5 * mm),
+    ]
+    if rows:
+        headers = list(rows[0])
+        table_data = [[Paragraph(escape(header), header_style) for header in headers]]
+        table_data.extend([[Paragraph(escape(_display_value(row.get(header))), cell_style) for header in headers] for row in rows])
+        available_width = landscape(A4)[0] - 20 * mm
+        weights = [max(9, min(28, max(len(str(header)), max((len(_display_value(row.get(header))) for row in rows[:100]), default=0)))) for header in headers]
+        weight_total = sum(weights)
+        column_widths = [available_width * weight / weight_total for weight in weights]
+        table = LongTable(table_data, colWidths=column_widths, repeatRows=1, splitByRow=True)
+        table.setStyle(TableStyle([
+            ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#008C99")),
+            ("VALIGN", (0, 0), (-1, -1), "TOP"),
+            ("LEFTPADDING", (0, 0), (-1, -1), 4), ("RIGHTPADDING", (0, 0), (-1, -1), 4),
+            ("TOPPADDING", (0, 0), (-1, -1), 4), ("BOTTOMPADDING", (0, 0), (-1, -1), 4),
+            ("GRID", (0, 0), (-1, -1), 0.25, colors.HexColor("#C7D8DD")),
+            ("ROWBACKGROUNDS", (0, 1), (-1, -1), [colors.white, colors.HexColor("#F3F7F8")]),
+        ]))
+        story.append(table)
+    else:
+        story.append(Paragraph("Nenhum registro encontrado para os filtros informados.", styles["Normal"]))
+
+    def footer(canvas, doc) -> None:
+        canvas.saveState()
+        canvas.setStrokeColor(colors.HexColor("#C7D8DD"))
+        canvas.line(10 * mm, 10 * mm, landscape(A4)[0] - 10 * mm, 10 * mm)
+        canvas.setFont("Helvetica", 7)
+        canvas.setFillColor(colors.HexColor("#52666D"))
+        canvas.drawString(10 * mm, 6 * mm, "SANATIO - Uso assistencial")
+        canvas.drawRightString(landscape(A4)[0] - 10 * mm, 6 * mm, f"Página {doc.page}")
+        canvas.restoreState()
+
+    document.build(story, onFirstPage=footer, onLaterPages=footer)
+    return output.getvalue()
 
 
 @router.get("/clinical.pdf")
