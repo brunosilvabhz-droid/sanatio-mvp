@@ -1,4 +1,5 @@
 from datetime import date, datetime, timezone
+from decimal import Decimal, InvalidOperation
 
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy import func, select
@@ -11,6 +12,13 @@ from app.models.user import User
 from app.services.benchmark_epidemiologico_service import BenchmarkEpidemiologicoService
 
 router = APIRouter(prefix="/epidemiology", tags=["Epidemiologia"])
+
+
+def _numeric_quantity(value: str | None) -> float:
+    try:
+        return float(Decimal(str(value or "0").strip().replace(",", ".")))
+    except InvalidOperation:
+        return 0.0
 
 
 def _device_kind(value: str) -> str | None:
@@ -137,10 +145,12 @@ def summary(
         name = antimicrobial.nome_antimicrobiano
         application = antimicrobial.data_hora_aplicacao or antimicrobial.data_hora_inicio
         data_aplicacao = application.date().isoformat()
-        item = grouped.setdefault(name, {"patients": set(), "therapy_days": set(), "total_grams": 0.0})
+        item = grouped.setdefault(name, {"patients": set(), "therapy_days": set(), "total_grams": 0.0, "total_ml": 0.0})
         item["patients"].add(attendance.id)
         item["therapy_days"].add((attendance.id, data_aplicacao))
         item["total_grams"] += float(antimicrobial.quantidade_total_gramas or 0)
+        if (antimicrobial.unidade_quantidade_total or "").lower() == "ml":
+            item["total_ml"] += _numeric_quantity(antimicrobial.quantidade_total)
         treated_attendances.add(attendance.id)
 
     consumption = []
@@ -149,13 +159,16 @@ def summary(
         days_value = len(values["therapy_days"])
         patients = len(values["patients"])
         total_days += days_value
+        dose_unit = "mL" if values["total_ml"] and not values["total_grams"] else "g"
+        total_dose = values["total_ml"] if dose_unit == "mL" else values["total_grams"]
         consumption.append(
             {
                 "className": _classify_antimicrobial(name),
                 "antimicrobial": name,
                 "patients": patients,
                 "days": days_value,
-                "totalDose": round(float(values["total_grams"]), 4),
+                "totalDose": round(float(total_dose), 4),
+                "totalDoseUnit": dose_unit,
                 "ddd": 0.0,
                 "dot": float(days_value),
             }

@@ -8,6 +8,7 @@ import app.models  # noqa: F401
 from app.models.base import Base
 from app.models.clinical import Atendimento, Paciente
 from app.services.benchmark_epidemiologico_service import BenchmarkEpidemiologicoService
+from app.api.routes.epidemiology import _numeric_quantity
 
 
 def _session() -> Session:
@@ -55,3 +56,9 @@ def test_patient_days_respects_adult_icu_and_cti_alias() -> None:
 
     assert total == 3
     db.close()
+
+
+def test_ml_quantity_is_parsed_without_affecting_dot_units() -> None:
+    assert _numeric_quantity("150") == 150.0
+    assert _numeric_quantity("5,5") == 5.5
+    assert _numeric_quantity(None) == 0.0

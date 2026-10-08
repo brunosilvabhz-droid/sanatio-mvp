@@ -2,7 +2,7 @@ import InfoOutlinedIcon from '@mui/icons-material/InfoOutlined';
 import MedicationIcon from '@mui/icons-material/Medication';
 import PeopleIcon from '@mui/icons-material/People';
 import TodayIcon from '@mui/icons-material/Today';
-import { Box, Chip, Grid, Paper, Stack, Table, TableBody, TableCell, TableHead, TableRow, TextField, Typography } from '@mui/material';
+import { Box, Chip, Grid, Paper, Stack, Table, TableBody, TableCell, TableHead, TableRow, TextField, Tooltip, Typography } from '@mui/material';
 import { Fragment, ReactNode, useEffect, useState } from 'react';
 import { api } from '../../api/client';
 
@@ -12,6 +12,7 @@ type ConsumptionRow = {
   patients: number;
   days: number;
   totalDose: number;
+  totalDoseUnit?: string;
   ddd: number;
   dot: number;
 };
@@ -172,9 +173,14 @@ function ConsumptionTable({ rows }: { rows: ConsumptionRow[] }) {
           <TableCell />
           <TableCell align="right" sx={{ color: '#049bd3', fontWeight: 800 }}>Pacientes<br />(n)</TableCell>
           <TableCell align="right" sx={{ color: '#23245f', fontWeight: 800 }}>Dias de Uso<br />(n)</TableCell>
-          <TableCell align="right">Dose Total<br />(g)</TableCell>
+          <TableCell align="right">Dose Total<br />(unidade)</TableCell>
           <TableCell align="right">DDD<br /><InfoOutlinedIcon sx={{ fontSize: 15, color: '#00a6c8' }} /></TableCell>
-          <TableCell align="right">DOT<br /><InfoOutlinedIcon sx={{ fontSize: 15, color: '#00a6c8' }} /></TableCell>
+          <TableCell align="right">
+            DOT<br />
+            <Tooltip title="Cada dia em que o paciente recebeu ao menos uma dose conta como 1 DOT, inclusive medicamentos em mL.">
+              <InfoOutlinedIcon sx={{ fontSize: 15, color: '#00a6c8' }} />
+            </Tooltip>
+          </TableCell>
         </TableRow>
       </TableHead>
       <TableBody>
@@ -197,9 +203,11 @@ function ConsumptionTable({ rows }: { rows: ConsumptionRow[] }) {
                 <TableCell sx={{ pl: 4 }}>{row.antimicrobial}</TableCell>
                 <TableCell align="right" sx={{ color: '#049bd3', fontWeight: 800 }}>{row.patients}</TableCell>
                 <TableCell align="right" sx={{ color: '#23245f', fontWeight: 800 }}>{row.days.toLocaleString('pt-BR')}</TableCell>
-                <TableCell align="right">{row.totalDose.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</TableCell>
+                <TableCell align="right">
+                  {row.totalDose.toLocaleString('pt-BR', { minimumFractionDigits: 2 })} {row.totalDoseUnit || 'g'}
+                </TableCell>
                 <TableCell align="right">{row.ddd.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</TableCell>
-                <TableCell align="right">{row.dot.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</TableCell>
+                <TableCell align="right">{row.dot.toLocaleString('pt-BR', { maximumFractionDigits: 0 })}</TableCell>
               </TableRow>
             </Fragment>
           );
