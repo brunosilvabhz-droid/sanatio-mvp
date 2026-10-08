@@ -1,0 +1,10 @@
+[Unit]
+Description=Executa a integracao SANATIO a cada 30 minutos
+
+[Timer]
+OnCalendar=*-*-* *:00,30:00
+Persistent=true
+Unit=sanatio-integrator.service
+
+[Install]
+WantedBy=timers.target

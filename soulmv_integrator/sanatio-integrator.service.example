@@ -1,0 +1,13 @@
+[Unit]
+Description=SANATIO - integracao incremental SOUL MV
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+WorkingDirectory=/opt/sanatio-integrador/soulmv_integrator
+EnvironmentFile=/opt/sanatio-integrador/soulmv_integrator/.env.integrador
+ExecStart=/opt/sanatio-integrador/soulmv_integrator/.venv/bin/python /opt/sanatio-integrador/soulmv_integrator/sanatio_soulmv_integrator.py --config config.prod.json --log-level INFO
+NoNewPrivileges=true
+PrivateTmp=true
+

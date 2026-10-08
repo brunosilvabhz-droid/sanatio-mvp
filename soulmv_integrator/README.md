@@ -183,6 +183,28 @@ No Agendador de Tarefas:
 
 Nunca grave tokens reais no Git. Gere um token por hospital na tela `Configurações` do SANATIO e mantenha-o apenas no arquivo local protegido ou em variável de ambiente.
 
+## Agendamento com systemd
+
+Para executar a integração incremental nos minutos `00` e `30` de cada hora,
+instale os modelos como serviços do usuário que mantém o integrador:
+
+```bash
+mkdir -p ~/.config/systemd/user
+cp sanatio-integrator.service.example ~/.config/systemd/user/sanatio-integrator.service
+cp sanatio-integrator.timer.example ~/.config/systemd/user/sanatio-integrator.timer
+systemctl --user daemon-reload
+systemctl --user enable --now sanatio-integrator.timer
+systemctl --user list-timers sanatio-integrator.timer
+```
+
+O administrador deve executar uma vez `sudo loginctl enable-linger socor` para
+manter os serviços do usuário ativos após logout e reinicialização. Consulte as
+últimas execuções com:
+
+```bash
+journalctl --user -u sanatio-integrator.service -n 100 --no-pager
+```
+
 ## Resolvedor local de nomes de pacientes
 
 O resolvedor roda no servidor do integrador e consulta somente
