@@ -1,8 +1,8 @@
 [Unit]
-Description=Executa a integracao SANATIO a cada 30 minutos
+Description=Executa a integracao SANATIO a cada 15 minutos
 
 [Timer]
-OnCalendar=*-*-* *:00,30:00
+OnCalendar=*-*-* *:00,15,30,45:00
 Persistent=true
 Unit=sanatio-integrator.service
 

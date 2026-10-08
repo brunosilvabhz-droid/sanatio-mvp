@@ -185,7 +185,7 @@ Nunca grave tokens reais no Git. Gere um token por hospital na tela `Configuraç
 
 ## Agendamento com systemd
 
-Para executar a integração incremental nos minutos `00` e `30` de cada hora,
+Para executar a integração incremental a cada 15 minutos, nos minutos `00`, `15`, `30` e `45` de cada hora,
 instale os modelos como serviços do usuário que mantém o integrador:
 
 ```bash
