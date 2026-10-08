@@ -10,6 +10,7 @@ from app.core.database import get_db
 from app.models.clinical import AntimicrobianoAtendimento, Atendimento, CulturaAtendimento, ProcedimentoInvasivoAtendimento
 from app.models.user import User
 from app.services.benchmark_epidemiologico_service import BenchmarkEpidemiologicoService
+from app.services.invasive_device import device_kind, effective_end
 
 router = APIRouter(prefix="/epidemiology", tags=["Epidemiologia"])
 
@@ -22,14 +23,8 @@ def _numeric_quantity(value: str | None) -> float:
 
 
 def _device_kind(value: str) -> str | None:
-    normalized = value.lower()
-    if any(term in normalized for term in ("cvc", "cateter venoso central", "venoso central")):
-        return "CVC"
-    if any(term in normalized for term in ("ventil", "respirador", "ventilacao mecanica", " vm ")):
-        return "VM"
-    if any(term in normalized for term in ("cvd", "sonda vesical", "cateter vesical", "demora")):
-        return "SVD"
-    return None
+    kind = device_kind(value)
+    return "SVD" if kind == "CVD" else kind
 
 
 def _month_period(periodo: str) -> tuple[datetime, datetime]:
@@ -71,10 +66,11 @@ def device_usage(
     totals = {"CVC": 0, "VM": 0, "SVD": 0}
     units: dict[str, dict[str, int]] = {}
     for procedure, attendance in db.execute(stmt).all():
-        kind = _device_kind(f"{procedure.procedimento} {procedure.local_instalacao or ''}")
+        normalized_kind = device_kind(procedure.procedimento, procedure.local_instalacao)
+        kind = "SVD" if normalized_kind == "CVD" else normalized_kind
         if not kind:
             continue
-        days = _overlap_days(procedure.data_hora_inicio, procedure.data_hora_fim, start, end)
+        days = _overlap_days(procedure.data_hora_inicio, effective_end(procedure), start, end)
         totals[kind] += days
         unit = attendance.unidade_atual or "Unidade não informada"
         units.setdefault(unit, {"CVC": 0, "VM": 0, "SVD": 0})[kind] += days

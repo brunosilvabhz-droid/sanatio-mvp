@@ -1,6 +1,8 @@
 from dataclasses import dataclass
 from datetime import date, datetime, timedelta, timezone
 from statistics import median
+
+from app.services.invasive_device import device_kind, effective_end
 from types import SimpleNamespace
 
 from sqlalchemy import func, select
@@ -183,11 +185,11 @@ class BenchmarkEpidemiologicoService:
         if tipo_unidade:
             stmt = stmt.where(self._unit_condition(tipo_unidade))
         procedures = self.db.scalars(stmt).all()
+        expected_kind = "CVC" if "cvc" in needles else "VM" if "vm" in needles else "CVD"
         total = 0
         for procedure in procedures:
-            searchable = " ".join([procedure.procedimento or "", procedure.local_instalacao or ""])
-            if self._contains_any(searchable, needles):
-                total += self._active_days(procedure.data_hora_inicio, procedure.data_hora_fim, inicio, fim)
+            if device_kind(procedure.procedimento, procedure.local_instalacao) == expected_kind:
+                total += self._active_days(procedure.data_hora_inicio, effective_end(procedure), inicio, fim)
         return total
 
     def patient_days(self, inicio: datetime, fim: datetime, tipo_unidade: str | None = None) -> int:
