@@ -178,18 +178,18 @@ class BenchmarkEpidemiologicoService:
         return self.db.scalars(stmt).all()
 
     def _device_days(self, inicio: datetime, fim: datetime, needles: tuple[str, ...], tipo_unidade: str | None = None) -> int:
-        stmt = select(ProcedimentoInvasivoAtendimento).join(Atendimento, Atendimento.id == ProcedimentoInvasivoAtendimento.atendimento_id).where(
+        stmt = select(ProcedimentoInvasivoAtendimento, Atendimento).join(Atendimento, Atendimento.id == ProcedimentoInvasivoAtendimento.atendimento_id).where(
                 ProcedimentoInvasivoAtendimento.data_hora_inicio < fim,
                 (ProcedimentoInvasivoAtendimento.data_hora_fim.is_(None)) | (ProcedimentoInvasivoAtendimento.data_hora_fim >= inicio),
             )
         if tipo_unidade:
             stmt = stmt.where(self._unit_condition(tipo_unidade))
-        procedures = self.db.scalars(stmt).all()
+        procedures = self.db.execute(stmt).all()
         expected_kind = "CVC" if "cvc" in needles else "VM" if "vm" in needles else "CVD"
         total = 0
-        for procedure in procedures:
+        for procedure, attendance in procedures:
             if device_kind(procedure.procedimento, procedure.local_instalacao) == expected_kind:
-                total += self._active_days(procedure.data_hora_inicio, effective_end(procedure), inicio, fim)
+                total += self._active_days(procedure.data_hora_inicio, effective_end(procedure, attendance.data_hora_saida), inicio, fim)
         return total
 
     def patient_days(self, inicio: datetime, fim: datetime, tipo_unidade: str | None = None) -> int:

@@ -27,9 +27,10 @@ def device_kind(procedure: str | None, location: str | None = None) -> str | Non
     return None
 
 
-def effective_end(procedure: ProcedimentoInvasivoAtendimento) -> datetime | None:
-    if procedure.data_hora_fim:
-        return procedure.data_hora_fim
-    if not procedure.ativo:
-        return procedure.data_hora_inicio + timedelta(days=max(procedure.dias_permanencia or 0, 0))
-    return None
+def effective_end(procedure: ProcedimentoInvasivoAtendimento, attendance_end: datetime | None = None) -> datetime | None:
+    end = procedure.data_hora_fim
+    if not end and not procedure.ativo:
+        end = procedure.data_hora_inicio + timedelta(days=max(procedure.dias_permanencia or 0, 0))
+    if attendance_end and (not end or attendance_end < end):
+        end = attendance_end
+    return end

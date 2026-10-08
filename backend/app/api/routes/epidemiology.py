@@ -70,7 +70,7 @@ def device_usage(
         kind = "SVD" if normalized_kind == "CVD" else normalized_kind
         if not kind:
             continue
-        days = _overlap_days(procedure.data_hora_inicio, effective_end(procedure), start, end)
+        days = _overlap_days(procedure.data_hora_inicio, effective_end(procedure, attendance.data_hora_saida), start, end)
         totals[kind] += days
         unit = attendance.unidade_atual or "Unidade não informada"
         units.setdefault(unit, {"CVC": 0, "VM": 0, "SVD": 0})[kind] += days

@@ -21,3 +21,17 @@ def test_inactive_procedure_uses_reported_stay_as_implicit_end() -> None:
         dias_permanencia=5,
     )
     assert effective_end(procedure) == datetime(2026, 9, 8, tzinfo=timezone.utc)
+
+
+def test_attendance_discharge_caps_device_end() -> None:
+    started_at = datetime(2026, 9, 3, tzinfo=timezone.utc)
+    discharged_at = datetime(2026, 9, 6, tzinfo=timezone.utc)
+    procedure = ProcedimentoInvasivoAtendimento(
+        atendimento_id=1,
+        id_origem_procedimento="2",
+        procedimento="VM",
+        data_hora_inicio=started_at,
+        ativo=True,
+        dias_permanencia=20,
+    )
+    assert effective_end(procedure, discharged_at) == discharged_at
