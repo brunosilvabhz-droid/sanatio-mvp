@@ -19,20 +19,24 @@ from app.models.clinical import (
     MovimentacaoLeito,
     Paciente,
     ProdutoAntimicrobiano,
+    ProcedimentoInvasivoAtendimento,
     SolicitacaoExameAtendimento,
 )
 from app.services.antimicrobial_quantity import calculate_product_quantity
 
 
 def clean(value: str | None) -> str:
-    return str(value or "").strip()
+    result = str(value or "").strip()
+    if result.startswith('="') and result.endswith('"'):
+        return result[2:-1].strip()
+    return result
 
 
 def parse_date(value: str | None) -> datetime | None:
     value = clean(value)
     if not value:
         return None
-    for pattern in ("%d/%m/%y", "%d-%m-%Y %H:%M:%S", "%d/%m/%Y %H:%M:%S"):
+    for pattern in ("%d/%m/%y", "%d-%m-%Y %H:%M:%S", "%d/%m/%Y %H:%M:%S", "%d.%m.%Y %H:%M:%S"):
         try:
             return datetime.strptime(value, pattern).replace(tzinfo=timezone.utc)
         except ValueError:
@@ -55,7 +59,7 @@ def read_csv(path: Path) -> tuple[list[dict[str, str]], str]:
                 row["DS_VIA"] = row["DS_FREQUENCIA"]
                 row["DS_FREQUENCIA"] = row["DIAS_USO"]
                 row["DIAS_USO"] = overflow[0]
-            rows.append(row)
+            rows.append({clean(key).upper(): clean(value) for key, value in row.items()})
         return rows, hashlib.sha256(raw).hexdigest()
 
 
@@ -71,6 +75,10 @@ REQUIRED_COLUMNS = {
         "DS_LEITO_ORIGEM", "DS_UNIDADE_DESTINO", "DS_LEITO_DESTINO",
     },
     "exam-requests": {"CD_PEDIDO", "CD_ATENDIMENTO", "CD_PACIENTE", "DT_SOLICITACAO"},
+    "invasive-procedures": {
+        "CD_ATENDIMENTO", "CD_PACIENTE", "CD_PROCEDIMENTO", "DS_PROCEDIMENTO",
+        "DT_INICIO", "DT_FIM", "SN_ATIVO", "DS_LOCAL_ANATOMICO", "DIAS_PERMANENCIA",
+    },
 }
 
 
@@ -321,9 +329,55 @@ def load_exam_requests(db, rows: list[dict[str, str]], digest: str, apply: bool)
     return report
 
 
+def load_invasive_procedures(db, rows: list[dict[str, str]], digest: str, apply: bool) -> dict:
+    keys = [(clean(row["CD_ATENDIMENTO"]), clean(row["CD_PROCEDIMENTO"]), parse_date(row["DT_INICIO"])) for row in rows]
+    if len(keys) != len(set(keys)):
+        raise ValueError("O arquivo possui procedimentos duplicados por atendimento, codigo e inicio")
+    attendance_ids = {clean(row["CD_ATENDIMENTO"]) for row in rows}
+    existing_attendances = set(db.scalars(select(Atendimento.id_origem_atendimento).where(Atendimento.id_origem_atendimento.in_(attendance_ids))))
+    report = {
+        "source_rows": len(rows), "unique_procedures": len(keys),
+        "unique_attendances": len(attendance_ids), "unique_patients": len({clean(row["CD_PACIENTE"]) for row in rows}),
+        "missing_attendances": len(attendance_ids - existing_attendances),
+        "mode": "APPLY" if apply else "DRY_RUN", "file_sha256": digest,
+    }
+    if not apply:
+        return report
+    attendances, new_patients, new_attendances = ensure_attendances(db, rows)
+    run = start_run(db, "procedimentos-invasivos", digest, report["unique_patients"])
+    attendance_db_ids = {item.id for item in attendances.values()}
+    existing = {
+        (item.atendimento_id, item.id_origem_procedimento, item.data_hora_inicio): item
+        for item in db.scalars(select(ProcedimentoInvasivoAtendimento).where(ProcedimentoInvasivoAtendimento.atendimento_id.in_(attendance_db_ids)))
+    }
+    created = updated = 0
+    for row, (_, procedure_id, started_at) in zip(rows, keys):
+        attendance = attendances[clean(row["CD_ATENDIMENTO"])]
+        key = (attendance.id, procedure_id, started_at)
+        item = existing.get(key)
+        if not item:
+            item = ProcedimentoInvasivoAtendimento(
+                atendimento_id=attendance.id,
+                id_origem_procedimento=procedure_id,
+                data_hora_inicio=started_at,
+            )
+            db.add(item)
+            created += 1
+        else:
+            updated += 1
+        item.procedimento = clean(row["DS_PROCEDIMENTO"])
+        item.data_hora_fim = parse_date(row["DT_FIM"])
+        item.ativo = clean(row["SN_ATIVO"]).upper() == "S"
+        item.local_instalacao = clean(row["DS_LOCAL_ANATOMICO"]) or None
+        item.dias_permanencia = int(clean(row["DIAS_PERMANENCIA"]) or 0)
+    finish_run(db, run)
+    report.update(created=created, updated=updated, new_patients=new_patients, new_attendances=new_attendances, integration_run_id=run.id)
+    return report
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description="Carga unica de dados clinicos CSV.")
-    parser.add_argument("kind", choices=["antimicrobials", "movements", "exam-requests"])
+    parser.add_argument("kind", choices=["antimicrobials", "movements", "exam-requests", "invasive-procedures"])
     parser.add_argument("csv_path", type=Path)
     parser.add_argument("--apply", action="store_true")
     parser.add_argument("--replace", action="store_true", help="Substitui antimicrobianos e auditorias existentes na mesma transacao")
@@ -335,6 +389,7 @@ def main() -> None:
             "antimicrobials": load_antimicrobials,
             "movements": load_movements,
             "exam-requests": load_exam_requests,
+            "invasive-procedures": load_invasive_procedures,
         }
         if args.replace and (args.kind != "antimicrobials" or not args.apply):
             parser.error("--replace exige antimicrobials e --apply")

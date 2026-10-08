@@ -273,7 +273,8 @@ def query_specs(
                     dt_inicio,
                     dt_fim,
                     sn_ativo,
-                    ds_local_instalacao
+                    ds_local_anatomico AS ds_local_instalacao,
+                    dias_permanencia
                 FROM {invasive}
                 {where("invasive_procedures")}
             """,
