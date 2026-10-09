@@ -5,10 +5,35 @@ from sqlalchemy.orm import Session
 from app.api.deps import get_current_user
 from app.core.database import get_db
 from app.models.alert import Alert
-from app.models.clinical import Atendimento, IsolamentoAtendimento, Paciente, SnapshotAtendimento
+from app.models.clinical import AntimicrobianoAtendimento, Atendimento, IsolamentoAtendimento, Paciente, SnapshotAtendimento
 from app.models.patient_monitoring_snapshot import PatientMonitoringSnapshot
+from app.services.antimicrobial_audit_service import treatment_courses
 
 router = APIRouter(prefix="/dashboard", tags=["Dashboard"], dependencies=[Depends(get_current_user)])
+
+
+def _prolonged_antimicrobial_attendances(db: Session, minimum_days: int = 7) -> int:
+    rows = db.execute(
+        select(AntimicrobianoAtendimento, Atendimento)
+        .join(Atendimento, Atendimento.id == AntimicrobianoAtendimento.atendimento_id)
+        .where(Atendimento.ativo.is_(True))
+    ).all()
+    by_attendance: dict[int, list[dict]] = {}
+    for antimicrobial, attendance in rows:
+        by_attendance.setdefault(attendance.id, []).append({
+            "cd_prescricao": antimicrobial.id_origem_prescricao,
+            "cd_item_prescricao": antimicrobial.id_origem_item_prescricao,
+            "ds_antimicrobiano": antimicrobial.nome_antimicrobiano,
+            "ds_principio_ativo": antimicrobial.principio_ativo,
+            "dt_inicio": antimicrobial.data_hora_inicio,
+            "dt_aplicacao": antimicrobial.data_hora_aplicacao,
+            "dt_fim": antimicrobial.data_hora_fim,
+            "sn_ativo": "S" if antimicrobial.ativo else "N",
+        })
+    return sum(
+        any(int(course.get("dias_uso") or 0) >= minimum_days for course in treatment_courses(items)[0])
+        for items in by_attendance.values()
+    )
 
 
 @router.get("/isolation-map")
@@ -35,6 +60,7 @@ def isolation_map(db: Session = Depends(get_db)) -> list[dict]:
 
 @router.get("/summary")
 def summary(db: Session = Depends(get_db)) -> dict:
+    prolonged_antimicrobials = _prolonged_antimicrobial_attendances(db)
     clinical_snapshots = db.scalars(
         select(SnapshotAtendimento)
         .join(Atendimento, Atendimento.id == SnapshotAtendimento.atendimento_id)
@@ -54,7 +80,7 @@ def summary(db: Session = Depends(get_db)) -> dict:
             "critical_alerts": critical_alerts,
             "high_risk_patients": len([p for p in snapshot_values if p.status_risco == "alto"]),
             "positive_cultures": len([p for p in snapshot_values if p.possui_cultura_positiva]),
-            "prolonged_antimicrobials": len([p for p in snapshot_values if p.maior_dias_antimicrobiano >= 7]),
+            "prolonged_antimicrobials": prolonged_antimicrobials,
             "active_isolations": len([p for p in snapshot_values if p.possui_isolamento_ativo]),
         }
 
@@ -72,7 +98,7 @@ def summary(db: Session = Depends(get_db)) -> dict:
             "critical_alerts": critical_alerts,
             "high_risk_patients": len([p for p in snapshot_values if p.risk_status == "alto"]),
             "positive_cultures": len([p for p in snapshot_values if p.has_positive_culture]),
-            "prolonged_antimicrobials": len([p for p in snapshot_values if p.max_antimicrobial_days >= 7]),
+            "prolonged_antimicrobials": prolonged_antimicrobials,
             "active_isolations": len([p for p in snapshot_values if p.has_active_isolation]),
         }
 
