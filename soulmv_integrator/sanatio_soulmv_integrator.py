@@ -483,7 +483,7 @@ def build_payload(
                 "dt_inicio": iso(row["dt_inicio"]),
                 "dt_aplicacao": iso(row["dt_aplicacao"]),
                 "dt_fim": iso(row.get("dt_fim")),
-                "sn_ativo": "S" if (active_on(row.get("dt_inicio"), row.get("dt_fim"), reference_date) if reference_date else not row.get("dt_fim")) else "N",
+                "sn_ativo": "S" if (active_on(row.get("dt_inicio"), row.get("dt_fim"), reference_date) if reference_date else parse_bool(row.get("sn_ativo", "S"))) else "N",
                 "qt_dose": float(row["qt_dose"]) if row.get("qt_dose") is not None else None,
                 "ds_frequencia": row.get("ds_frequencia"),
                 "ds_via": row.get("ds_via"),
@@ -525,7 +525,7 @@ def build_payload(
                 "ds_procedimento": row["ds_procedimento"],
                 "dt_inicio": iso(row["dt_inicio"]),
                 "dt_fim": iso(row.get("dt_fim")),
-                "sn_ativo": "S" if (active_on(row.get("dt_inicio"), row.get("dt_fim"), reference_date) if reference_date else parse_bool(row.get("sn_ativo", "S"))) else "N",
+                "sn_ativo": "S" if (active_on(row.get("dt_inicio"), row.get("dt_fim"), reference_date) if reference_date else not row.get("dt_fim")) else "N",
                 "ds_local_instalacao": row.get("ds_local_instalacao"),
                 "dias_permanencia": days_between(row.get("dt_inicio"), None, reference_date) if reference_date and active_on(row.get("dt_inicio"), row.get("dt_fim"), reference_date) else safe_int(row.get("dias_permanencia"), days_between(row.get("dt_inicio"), row.get("dt_fim"))),
             }
