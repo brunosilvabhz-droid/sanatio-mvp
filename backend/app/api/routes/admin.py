@@ -98,6 +98,12 @@ def update_user(user_id: int, payload: UserUpdate, db: Session = Depends(get_db)
     allowed = _allowed_hospital_ids(current_user)
     if allowed is not None and (user.role.name == "ADMIN" or not {hospital.id for hospital in user.hospitals}.intersection(allowed)):
         raise HTTPException(status_code=403, detail="Usuário fora da área de atuação")
+    if payload.email is not None:
+        normalized_email = str(payload.email).strip().lower()
+        email_owner = db.scalar(select(User).where(User.email == normalized_email, User.id != user.id))
+        if email_owner:
+            raise HTTPException(status_code=409, detail="E-mail já cadastrado")
+        user.email = normalized_email
     if payload.full_name is not None:
         user.full_name = payload.full_name
     if payload.password:
