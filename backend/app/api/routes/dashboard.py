@@ -7,33 +7,19 @@ from app.core.database import get_db
 from app.models.alert import Alert
 from app.models.clinical import AntimicrobianoAtendimento, Atendimento, IsolamentoAtendimento, Paciente, SnapshotAtendimento
 from app.models.patient_monitoring_snapshot import PatientMonitoringSnapshot
-from app.services.antimicrobial_audit_service import treatment_courses
 
 router = APIRouter(prefix="/dashboard", tags=["Dashboard"], dependencies=[Depends(get_current_user)])
 
 
 def _prolonged_antimicrobial_attendances(db: Session, minimum_days: int = 7) -> int:
-    rows = db.execute(
-        select(AntimicrobianoAtendimento, Atendimento)
+    return db.scalar(
+        select(func.count(func.distinct(AntimicrobianoAtendimento.atendimento_id)))
         .join(Atendimento, Atendimento.id == AntimicrobianoAtendimento.atendimento_id)
-        .where(Atendimento.ativo.is_(True))
-    ).all()
-    by_attendance: dict[int, list[dict]] = {}
-    for antimicrobial, attendance in rows:
-        by_attendance.setdefault(attendance.id, []).append({
-            "cd_prescricao": antimicrobial.id_origem_prescricao,
-            "cd_item_prescricao": antimicrobial.id_origem_item_prescricao,
-            "ds_antimicrobiano": antimicrobial.nome_antimicrobiano,
-            "ds_principio_ativo": antimicrobial.principio_ativo,
-            "dt_inicio": antimicrobial.data_hora_inicio,
-            "dt_aplicacao": antimicrobial.data_hora_aplicacao,
-            "dt_fim": antimicrobial.data_hora_fim,
-            "sn_ativo": "S" if antimicrobial.ativo else "N",
-        })
-    return sum(
-        any(int(course.get("dias_uso") or 0) >= minimum_days for course in treatment_courses(items)[0])
-        for items in by_attendance.values()
-    )
+        .where(
+            Atendimento.ativo.is_(True),
+            AntimicrobianoAtendimento.dias_uso >= minimum_days,
+        )
+    ) or 0
 
 
 @router.get("/isolation-map")
