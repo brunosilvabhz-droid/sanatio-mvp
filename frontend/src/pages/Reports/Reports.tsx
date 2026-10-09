@@ -9,6 +9,7 @@ const reportTypes = [
   { value: 'patients', label: 'Pacientes' },
   { value: 'antimicrobials', label: 'Antimicrobianos' },
   { value: 'isolations', label: 'Isolamentos' },
+  { value: 'positive_cultures', label: 'Culturas positivas' },
   { value: 'alerts', label: 'Alertas' }
 ];
 

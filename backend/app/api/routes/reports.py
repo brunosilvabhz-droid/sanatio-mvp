@@ -16,7 +16,15 @@ from xml.sax.saxutils import escape
 from app.api.deps import get_current_user
 from app.core.database import get_db
 from app.models.alert import Alert
-from app.models.clinical import AntimicrobianoAtendimento, Atendimento, IsolamentoAtendimento, Paciente
+from app.models.clinical import (
+    AntimicrobianoAtendimento,
+    Atendimento,
+    CulturaAtendimento,
+    IsolamentoAtendimento,
+    Paciente,
+    ProcedimentoInvasivoAtendimento,
+)
+from app.models.lab_pdf_import import ImportacaoPdfLaboratorio, ResultadoPdfLaboratorio
 from app.models.user import User
 
 router = APIRouter(prefix="/reports", tags=["Relatórios"], dependencies=[Depends(get_current_user)])
@@ -26,6 +34,7 @@ REPORT_LABELS = {
     "antimicrobials": "Antimicrobianos",
     "isolations": "Isolamentos",
     "alerts": "Alertas",
+    "positive_cultures": "Culturas positivas",
 }
 
 
@@ -49,8 +58,133 @@ def _period(start: date | None, end: date | None) -> tuple[datetime | None, date
     return start_at, end_at
 
 
+def _positive_culture_rows(
+    db: Session,
+    start_at: datetime | None,
+    end_at: datetime | None,
+    unit: str | None,
+    status: str | None,
+) -> list[dict]:
+    clinical_stmt = (
+        select(CulturaAtendimento, Atendimento, Paciente)
+        .join(Atendimento, Atendimento.id == CulturaAtendimento.atendimento_id)
+        .join(Paciente, Paciente.id == Atendimento.paciente_id)
+        .where(CulturaAtendimento.positivo.is_(True))
+    )
+    pdf_stmt = (
+        select(ResultadoPdfLaboratorio, Atendimento, Paciente)
+        .join(Atendimento, Atendimento.id == ResultadoPdfLaboratorio.atendimento_id)
+        .join(Paciente, Paciente.id == Atendimento.paciente_id)
+        .join(ImportacaoPdfLaboratorio, ImportacaoPdfLaboratorio.id == ResultadoPdfLaboratorio.importacao_id)
+        .where(
+            ImportacaoPdfLaboratorio.status == "VALIDADA",
+            ResultadoPdfLaboratorio.situacao == "POSITIVA",
+        )
+    )
+    if start_at:
+        clinical_stmt = clinical_stmt.where(CulturaAtendimento.data_hora_coleta >= start_at)
+        pdf_stmt = pdf_stmt.where(ResultadoPdfLaboratorio.data_coleta >= start_at)
+    if end_at:
+        clinical_stmt = clinical_stmt.where(CulturaAtendimento.data_hora_coleta <= end_at)
+        pdf_stmt = pdf_stmt.where(ResultadoPdfLaboratorio.data_coleta <= end_at)
+    if unit:
+        clinical_stmt = clinical_stmt.where(Atendimento.unidade_atual.ilike(f"%{unit}%"))
+        pdf_stmt = pdf_stmt.where(Atendimento.unidade_atual.ilike(f"%{unit}%"))
+    if status == "ATIVO":
+        clinical_stmt = clinical_stmt.where(Atendimento.ativo.is_(True))
+        pdf_stmt = pdf_stmt.where(Atendimento.ativo.is_(True))
+    if status == "ENCERRADO":
+        clinical_stmt = clinical_stmt.where(Atendimento.ativo.is_(False))
+        pdf_stmt = pdf_stmt.where(Atendimento.ativo.is_(False))
+
+    cultures: list[dict] = []
+    attendance_ids: set[int] = set()
+    for culture, attendance, patient in db.execute(clinical_stmt).all():
+        attendance_ids.add(attendance.id)
+        cultures.append({
+            "attendance_id": attendance.id,
+            "collection": culture.data_hora_coleta,
+            "result_at": culture.data_hora_resultado,
+            "attendance": attendance.id_origem_atendimento,
+            "patient": patient.id_origem_paciente,
+            "unit": attendance.unidade_atual,
+            "bed": attendance.leito_atual,
+            "exam": " / ".join(filter(None, [culture.exame, culture.material])),
+            "microorganism": culture.microorganismo,
+            "result": culture.resultado,
+            "source": "Integração hospitalar",
+            "active": attendance.ativo,
+        })
+
+    latest_pdf: dict[tuple[int, str, str], tuple[ResultadoPdfLaboratorio, Atendimento, Paciente]] = {}
+    for result, attendance, patient in db.execute(pdf_stmt).all():
+        normalized_exam = " ".join(result.exame_amostra.strip().casefold().split()).removesuffix(" cultura")
+        key = (attendance.id, result.os_pedido, f"{result.data_coleta.isoformat()}:{normalized_exam}")
+        current = latest_pdf.get(key)
+        if current is None or result.data_resultado > current[0].data_resultado:
+            latest_pdf[key] = (result, attendance, patient)
+    for result, attendance, patient in latest_pdf.values():
+        attendance_ids.add(attendance.id)
+        cultures.append({
+            "attendance_id": attendance.id,
+            "collection": result.data_coleta,
+            "result_at": result.data_resultado,
+            "attendance": attendance.id_origem_atendimento,
+            "patient": patient.id_origem_paciente,
+            "unit": attendance.unidade_atual,
+            "bed": attendance.leito_atual,
+            "exam": result.exame_amostra,
+            "microorganism": None,
+            "result": result.resultado,
+            "source": "PDF validado",
+            "active": attendance.ativo,
+        })
+
+    antimicrobials: dict[int, set[str]] = {}
+    procedures: dict[int, set[str]] = {}
+    if attendance_ids:
+        for attendance_id, name in db.execute(
+            select(AntimicrobianoAtendimento.atendimento_id, AntimicrobianoAtendimento.nome_antimicrobiano)
+            .where(AntimicrobianoAtendimento.atendimento_id.in_(attendance_ids))
+        ):
+            antimicrobials.setdefault(attendance_id, set()).add(name)
+        for attendance_id, name in db.execute(
+            select(ProcedimentoInvasivoAtendimento.atendimento_id, ProcedimentoInvasivoAtendimento.procedimento)
+            .where(ProcedimentoInvasivoAtendimento.atendimento_id.in_(attendance_ids))
+        ):
+            procedures.setdefault(attendance_id, set()).add(name)
+
+    cultures.sort(key=lambda item: (item["collection"], item["result_at"] or item["collection"]), reverse=True)
+    return [
+        {
+            "Coleta": item["collection"],
+            "Resultado em": item["result_at"],
+            "Atendimento": item["attendance"],
+            "Paciente": item["patient"],
+            "Unidade": item["unit"],
+            "Leito": item["bed"],
+            "Exame / amostra": item["exam"],
+            "Microrganismo": item["microorganism"],
+            "Resultado": item["result"],
+            "Antimicrobiano": (
+                f"Sim: {', '.join(sorted(antimicrobials[item['attendance_id']]))}"
+                if item["attendance_id"] in antimicrobials else "Não"
+            ),
+            "Procedimento invasivo": (
+                f"Sim: {', '.join(sorted(procedures[item['attendance_id']]))}"
+                if item["attendance_id"] in procedures else "Não"
+            ),
+            "Fonte": item["source"],
+            "Status atendimento": "ATIVO" if item["active"] else "ENCERRADO",
+        }
+        for item in cultures[:5000]
+    ]
+
+
 def _rows(db: Session, report_type: str, start: date | None, end: date | None, unit: str | None, status: str | None) -> list[dict]:
     start_at, end_at = _period(start, end)
+    if report_type == "positive_cultures":
+        return _positive_culture_rows(db, start_at, end_at, unit, status)
     if report_type == "patients":
         stmt = select(Atendimento, Paciente).join(Paciente, Paciente.id == Atendimento.paciente_id)
         if start_at: stmt = stmt.where(Atendimento.data_hora_entrada >= start_at)
