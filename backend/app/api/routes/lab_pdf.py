@@ -77,6 +77,19 @@ async def import_pdf(
     digest = hashlib.sha256(content).hexdigest()
     existing = db.scalar(select(ImportacaoPdfLaboratorio).where(ImportacaoPdfLaboratorio.sha256 == digest))
     if existing:
+        if existing.status == "PENDENTE":
+            suggestions = db.scalars(select(ResultadoPdfLaboratorio).where(
+                ResultadoPdfLaboratorio.importacao_id == existing.id,
+                ResultadoPdfLaboratorio.atendimento_id.is_(None),
+                ResultadoPdfLaboratorio.atendimento_sugerido_id.is_not(None),
+            )).all()
+            return {
+                "id": existing.id,
+                "paginas": existing.paginas,
+                "total_resultados": existing.total_resultados,
+                "sugestoes": len(suggestions),
+                "retomada": True,
+            }
         raise HTTPException(status_code=409, detail=f"Este PDF já foi importado (importação {existing.id})")
     try:
         pages, parsed = parse_lab_pdf(content)
@@ -100,7 +113,7 @@ async def import_pdf(
             atendimento_sugerido_id=candidates[0].id if len(candidates) == 1 else None,
         ))
     db.commit()
-    return {"id": batch.id, "paginas": pages, "total_resultados": len(parsed), "sugestoes": sum(len(candidates_by_os[row["os_pedido"]]) == 1 for row in parsed)}
+    return {"id": batch.id, "paginas": pages, "total_resultados": len(parsed), "sugestoes": sum(len(candidates_by_os[row["os_pedido"]]) == 1 for row in parsed), "retomada": False}
 
 
 @router.get("/imports")

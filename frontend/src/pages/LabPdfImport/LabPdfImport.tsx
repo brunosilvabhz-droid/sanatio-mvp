@@ -3,8 +3,8 @@ import CancelOutlinedIcon from '@mui/icons-material/CancelOutlined';
 import UploadFileIcon from '@mui/icons-material/UploadFile';
 import { Alert, Box, Button, Checkbox, Chip, FormControlLabel, Paper, Stack, Table, TableBody, TableCell, TableHead, TableRow, TextField, Typography } from '@mui/material';
 import axios from 'axios';
-import { ChangeEvent, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { ChangeEvent, useEffect, useState } from 'react';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { api } from '../../api/client';
 import PageHeader from '../../components/PageHeader';
 
@@ -22,6 +22,15 @@ export type LabPdfResult = {
   cd_atendimento: string | null;
 };
 
+type PendingImport = {
+  id: number;
+  nome_arquivo: string;
+  paginas: number;
+  total_resultados: number;
+  status: string;
+  importado_em: string;
+};
+
 function errorMessage(error: unknown) {
   const detail = axios.isAxiosError(error) ? error.response?.data?.detail : null;
   return typeof detail === 'string' ? detail : 'Não foi possível concluir a operação.';
@@ -29,7 +38,9 @@ function errorMessage(error: unknown) {
 
 export default function LabPdfImport() {
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
   const [selected, setSelected] = useState<number | null>(null);
+  const [pendingImports, setPendingImports] = useState<PendingImport[]>([]);
   const [rows, setRows] = useState<LabPdfResult[]>([]);
   const [attendance, setAttendance] = useState<Record<number, string>>({});
   const [manual, setManual] = useState<Record<number, boolean>>({});
@@ -37,12 +48,26 @@ export default function LabPdfImport() {
   const [message, setMessage] = useState('');
   const [error, setError] = useState('');
 
+  async function refreshPending() {
+    const { data } = await api.get<PendingImport[]>('/lab-pdf/imports');
+    setPendingImports(data.filter((item) => item.status === 'PENDENTE'));
+  }
+
   async function loadResults(id: number) {
     const { data } = await api.get<LabPdfResult[]>(`/lab-pdf/imports/${id}/results`);
     setRows(data);
     setSelected(id);
     setAttendance(Object.fromEntries(data.map((row) => [row.id, row.cd_atendimento || row.cd_atendimento_sugerido || ''])));
+    setSearchParams({ import: String(id) }, { replace: true });
   }
+
+  useEffect(() => {
+    refreshPending().catch((cause) => setError(errorMessage(cause)));
+    const importId = Number(searchParams.get('import'));
+    if (importId > 0) loadResults(importId).catch((cause) => setError(errorMessage(cause)));
+    // A consulta inicial deve ocorrer apenas ao abrir a tela.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   async function upload(event: ChangeEvent<HTMLInputElement>) {
     const file = event.target.files?.[0];
@@ -53,9 +78,12 @@ export default function LabPdfImport() {
     try {
       const form = new FormData();
       form.append('file', file);
-      const { data } = await api.post<{ id: number; total_resultados: number; sugestoes: number }>('/lab-pdf/imports', form);
+      const { data } = await api.post<{ id: number; total_resultados: number; sugestoes: number; retomada: boolean }>('/lab-pdf/imports', form);
       await loadResults(data.id);
-      setMessage(`${data.total_resultados} resultados extraídos; ${data.sugestoes} vínculos por OS sugeridos para conferência.`);
+      await refreshPending();
+      setMessage(data.retomada
+        ? `Carga pendente reaberta com ${data.total_resultados} resultados.`
+        : `${data.total_resultados} resultados extraídos; ${data.sugestoes} vínculos por OS sugeridos para conferência.`);
     } catch (cause) {
       setError(errorMessage(cause));
     } finally {
@@ -105,6 +133,8 @@ export default function LabPdfImport() {
       setRows([]);
       setAttendance({});
       setManual({});
+      setSearchParams({}, { replace: true });
+      await refreshPending();
       setMessage('Carga validada com sucesso. A área de importação está pronta para um novo arquivo.');
     } catch (cause) {
       setError(errorMessage(cause));
@@ -123,6 +153,8 @@ export default function LabPdfImport() {
       setRows([]);
       setAttendance({});
       setManual({});
+      setSearchParams({}, { replace: true });
+      await refreshPending();
       setMessage('Carga cancelada. Nenhum resultado foi disponibilizado aos pacientes.');
     } catch (cause) {
       setError(errorMessage(cause));
@@ -147,6 +179,23 @@ export default function LabPdfImport() {
           <Typography variant="body2" color="text.secondary">Resultados permanecem pendentes até a confirmação do atendimento.</Typography>
         </Stack>
       </Paper>
+      {!selected && pendingImports.length > 0 && (
+        <Paper sx={{ p: 2 }}>
+          <Typography variant="subtitle1" fontWeight={800}>Cargas pendentes</Typography>
+          <Typography variant="body2" color="text.secondary" sx={{ mb: 1.5 }}>Retome a conferência antes de enviar novamente o mesmo PDF.</Typography>
+          <Stack spacing={1}>
+            {pendingImports.map((item) => (
+              <Stack key={item.id} direction={{ xs: 'column', sm: 'row' }} alignItems={{ sm: 'center' }} justifyContent="space-between" gap={1}>
+                <Box>
+                  <Typography fontWeight={700}>{item.nome_arquivo}</Typography>
+                  <Typography variant="body2" color="text.secondary">{item.total_resultados} resultado(s) · {item.paginas} página(s) · {new Date(item.importado_em).toLocaleString('pt-BR')}</Typography>
+                </Box>
+                <Button variant="outlined" onClick={() => loadResults(item.id)} disabled={busy}>Retomar</Button>
+              </Stack>
+            ))}
+          </Stack>
+        </Paper>
+      )}
       {selected && (
         <Paper sx={{ p: 2 }}>
           <Stack direction={{ xs: 'column', md: 'row' }} alignItems={{ md: 'center' }} justifyContent="space-between" gap={1} sx={{ mb: 2 }}>

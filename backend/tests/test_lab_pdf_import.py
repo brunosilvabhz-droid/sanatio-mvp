@@ -65,6 +65,20 @@ class LabPdfImportTest(unittest.TestCase):
         self.assertEqual(cancel_import(batch.id, self.db, self.user)["status"], "CANCELADA")
         self.assertEqual(list_results(batch.id, self.db, self.user), [])
 
+    def test_uploading_same_pending_pdf_resumes_existing_import(self):
+        parsed = [{
+            "pagina": 1, "os_pedido": "271993", "nome_relatorio": "PACIENTE TESTE",
+            "data_coleta": datetime(2026, 9, 3, 3, 54),
+            "data_resultado": datetime(2026, 9, 7, 7, 41),
+            "exame_amostra": "Hemocultura", "resultado": "Negativo", "situacao": "FINAL",
+        }]
+        with patch("app.api.routes.lab_pdf.parse_lab_pdf", return_value=(1, parsed)):
+            first = asyncio.run(import_pdf(UploadFile(filename="relatorio.pdf", file=io.BytesIO(b"%PDF-pending")), self.db, self.user))
+            resumed = asyncio.run(import_pdf(UploadFile(filename="relatorio.pdf", file=io.BytesIO(b"%PDF-pending")), self.db, self.user))
+
+        self.assertEqual(resumed["id"], first["id"])
+        self.assertTrue(resumed["retomada"])
+
     def test_unmatched_os_needs_explicit_manual_confirmation(self):
         row = ResultadoPdfLaboratorio(
             importacao_id=1, ordem=1, pagina=1, os_pedido="999999",
