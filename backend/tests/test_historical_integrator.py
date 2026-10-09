@@ -10,11 +10,28 @@ sys.path.insert(0, str(ROOT))
 from soulmv_integrator.sanatio_soulmv_integrator import (  # noqa: E402
     build_payload,
     connect,
+    end_details_at_discharge,
     filter_historical_rows,
     query_specs,
     restrict_details_to_patients,
     split_payload,
 )
+
+
+def test_discharge_ends_open_antimicrobials_and_invasive_procedures() -> None:
+    rows = {
+        "patients": [{"cd_atendimento": "A1", "dt_alta": "2026-01-05T12:00:00"}],
+        "antimicrobials": [{"cd_atendimento": "A1", "dt_inicio": "2026-01-01T08:00:00", "dt_fim": None, "sn_ativo": "S", "dias_uso": 99}],
+        "invasive_procedures": [{"cd_atendimento": "A1", "dt_inicio": "2026-01-02T08:00:00", "dt_fim": None, "sn_ativo": "S", "dias_permanencia": 99}],
+    }
+
+    normalized = end_details_at_discharge(rows)
+
+    assert normalized["antimicrobials"][0]["dt_fim"] == datetime(2026, 1, 5, 12)
+    assert normalized["antimicrobials"][0]["sn_ativo"] == "N"
+    assert normalized["antimicrobials"][0]["dias_uso"] == 4
+    assert normalized["invasive_procedures"][0]["dt_fim"] == datetime(2026, 1, 5, 12)
+    assert normalized["invasive_procedures"][0]["dias_permanencia"] == 3
 
 
 def test_oracle_thick_mode_is_enabled_by_environment(monkeypatch) -> None:

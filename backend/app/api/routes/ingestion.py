@@ -151,6 +151,26 @@ def _days_between(start: datetime | None, end: datetime | None = None, reference
     return max((final.date() - start.date()).days, 0)
 
 
+def _end_details_at_discharge(payload: IngestPayload) -> None:
+    discharge_by_attendance = {
+        item.cd_atendimento: item.discharged_at
+        for item in payload.patients
+        if item.discharged_at
+    }
+    for items in (payload.antimicrobials, payload.invasive_procedures):
+        for item in items:
+            discharge = discharge_by_attendance.get(item.cd_atendimento)
+            if not discharge or (item.dt_fim and item.dt_fim <= discharge):
+                continue
+            item.dt_fim = discharge
+            item.sn_ativo = "N"
+            days = _days_between(item.dt_inicio, discharge)
+            if hasattr(item, "dias_uso"):
+                item.dias_uso = days
+            else:
+                item.dias_permanencia = days
+
+
 def _current_exposure_days(items: list, reference_date: date) -> int:
     exposed_days: set[date] = set()
     for item in items:
@@ -419,6 +439,7 @@ def ingest_snapshots(
     reference_at = payload.data_referencia or started_at
     if reference_at.tzinfo is None:
         reference_at = reference_at.replace(tzinfo=timezone.utc)
+    _end_details_at_discharge(payload)
     monitoring_run = MonitoringRun(status="RUNNING", started_at=started_at)
     db.add(monitoring_run)
     integration_run = ExecucaoIntegracao(

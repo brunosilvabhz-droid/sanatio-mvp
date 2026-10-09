@@ -84,6 +84,19 @@ def as_date(value: Any) -> date | None:
         return None
 
 
+def as_datetime(value: Any) -> datetime | None:
+    if value is None or value == "":
+        return None
+    if isinstance(value, datetime):
+        return value
+    if isinstance(value, date):
+        return datetime.combine(value, time.min)
+    try:
+        return datetime.fromisoformat(str(value))
+    except ValueError:
+        return None
+
+
 def days_between(start: Any, end: Any | None = None, reference_date: date | None = None) -> int:
     if not start:
         return 0
@@ -116,6 +129,27 @@ def active_on(start: Any, end: Any | None, reference_date: date) -> bool:
     start_date = as_date(start)
     end_date = as_date(end)
     return bool(start_date and start_date <= reference_date and (end_date is None or end_date > reference_date))
+
+
+def end_details_at_discharge(rows: dict[str, list[dict[str, Any]]]) -> dict[str, list[dict[str, Any]]]:
+    discharge_by_attendance = {
+        str(patient["cd_atendimento"]): as_datetime(patient.get("dt_alta"))
+        for patient in rows.get("patients", [])
+        if patient.get("dt_alta")
+    }
+    normalized = dict(rows)
+    for key, days_key in (("antimicrobials", "dias_uso"), ("invasive_procedures", "dias_permanencia")):
+        normalized[key] = []
+        for source in rows.get(key, []):
+            row = dict(source)
+            discharge = discharge_by_attendance.get(str(row.get("cd_atendimento")))
+            current_end = as_datetime(row.get("dt_fim"))
+            if discharge and (current_end is None or current_end > discharge):
+                row["dt_fim"] = discharge
+                row["sn_ativo"] = "N"
+                row[days_key] = days_between(row.get("dt_inicio"), discharge)
+            normalized[key].append(row)
+    return normalized
 
 
 def load_config(path: str) -> dict[str, Any]:
@@ -430,6 +464,7 @@ def build_payload(
     thresholds: dict[str, int],
     reference_date: date | None = None,
 ) -> dict[str, Any]:
+    rows = end_details_at_discharge(rows)
     patients = []
     for row in rows["patients"]:
         unit = row.get("ds_unidade")
