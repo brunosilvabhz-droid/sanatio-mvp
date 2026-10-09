@@ -182,7 +182,7 @@ def _query_window(
         "antimicrobials": f"dt_aplicacao >= {start} OR dt_fim IS NULL OR dt_fim >= {start}",
         "cultures": f"dt_coleta >= {start} OR dt_resultado >= {start}",
         "exam_requests": f"dt_solicitacao >= {start}",
-        "invasive_procedures": f"dt_inicio >= {start} OR dt_fim >= {start}",
+        "invasive_procedures": f"dt_inicio >= {start} OR dt_fim IS NULL OR dt_fim >= {start}",
         "isolations": f"dt_inicio >= {start} OR dt_fim IS NULL OR dt_fim >= {start}",
     }, {"lookback_days": lookback_days}
 
@@ -393,7 +393,7 @@ def calculate_risk(
     else:
         today = datetime.now().date()
         active_antimicrobials = [row for row in antimicrobials if parse_bool(row.get("sn_ativo")) and active_on(row.get("dt_inicio"), row.get("dt_fim"), today)]
-        active_invasive = [row for row in invasive if parse_bool(row.get("sn_ativo")) and not row.get("dt_fim")]
+        active_invasive = [row for row in invasive if not row.get("dt_fim")]
         active_isolations = [row for row in isolations if parse_bool(row.get("sn_ativo")) and active_on(row.get("dt_inicio"), row.get("dt_fim"), today)]
 
     max_antimicrobial_days = max([days_between(row.get("dt_inicio"), None, reference_date) if reference_date else safe_int(row.get("dias_uso"), days_between(row.get("dt_inicio"), row.get("dt_fim"))) for row in active_antimicrobials] or [0])
@@ -483,7 +483,7 @@ def build_payload(
                 "dt_inicio": iso(row["dt_inicio"]),
                 "dt_aplicacao": iso(row["dt_aplicacao"]),
                 "dt_fim": iso(row.get("dt_fim")),
-                "sn_ativo": "S" if (active_on(row.get("dt_inicio"), row.get("dt_fim"), reference_date) if reference_date else parse_bool(row.get("sn_ativo", "S"))) else "N",
+                "sn_ativo": "S" if (active_on(row.get("dt_inicio"), row.get("dt_fim"), reference_date) if reference_date else not row.get("dt_fim")) else "N",
                 "qt_dose": float(row["qt_dose"]) if row.get("qt_dose") is not None else None,
                 "ds_frequencia": row.get("ds_frequencia"),
                 "ds_via": row.get("ds_via"),

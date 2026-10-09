@@ -209,7 +209,7 @@ def _calculate_snapshot_from_details(
             now=reference_at,
         )
         active_antimicrobials = [course for course in antimicrobial_courses if _is_active(course.get("sn_ativo"))]
-        active_invasive = [procedure for procedure in invasive_procedures if _is_active(procedure.sn_ativo) and not procedure.dt_fim]
+        active_invasive = [procedure for procedure in invasive_procedures if not procedure.dt_fim]
         active_isolations = [isolation for isolation in isolations if _active_until(isolation.sn_ativo, isolation.dt_fim, reference_at)]
 
     max_antimicrobial_days = max(
@@ -699,7 +699,7 @@ def ingest_snapshots(
         procedure.procedimento = item.ds_procedimento
         procedure.local_instalacao = item.ds_local_instalacao
         procedure.data_hora_fim = item.dt_fim
-        procedure.ativo = _is_active(item.sn_ativo)
+        procedure.ativo = item.dt_fim is None
         procedure.dias_permanencia = item.dias_permanencia
 
     for item in payload.isolations:

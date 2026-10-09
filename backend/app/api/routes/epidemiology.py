@@ -31,7 +31,8 @@ def _month_period(periodo: str) -> tuple[datetime, datetime]:
     year, month = [int(part) for part in periodo.split("-")]
     start = datetime(year, month, 1, tzinfo=timezone.utc)
     end = datetime(year + (month == 12), 1 if month == 12 else month + 1, 1, tzinfo=timezone.utc)
-    return start, end
+    now = datetime.now(timezone.utc)
+    return (start, min(end, now)) if start <= now else (start, start)
 
 
 def _overlap_days(start: datetime, end: datetime | None, period_start: datetime, period_end: datetime) -> int:

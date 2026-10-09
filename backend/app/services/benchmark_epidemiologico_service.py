@@ -145,7 +145,9 @@ class BenchmarkEpidemiologicoService:
         for offset in range(5, -1, -1):
             month = self._add_months(atual, -offset)
             next_month = self._add_months(month, 1)
-            _, _, value = self._calcular_indicador(codigo, self._as_datetime(month), self._as_datetime(next_month), tipo_unidade)
+            month_start = self._as_datetime(month)
+            month_end = min(self._as_datetime(next_month), datetime.now(timezone.utc))
+            _, _, value = self._calcular_indicador(codigo, month_start, max(month_start, month_end), tipo_unidade)
             rows.append({"mes": month.strftime("%m/%Y"), "valor": value, "p50": referencia.p50 if referencia else None, "p75": referencia.p75 if referencia else None})
         return rows
 
@@ -254,7 +256,10 @@ class BenchmarkEpidemiologicoService:
     def _periodo(self, periodo: str) -> tuple[datetime, datetime]:
         ano, mes = [int(part) for part in periodo.split("-")]
         start = date(ano, mes, 1)
-        return self._as_datetime(start), self._as_datetime(self._add_months(start, 1))
+        start_at = self._as_datetime(start)
+        end_at = self._as_datetime(self._add_months(start, 1))
+        now = datetime.now(timezone.utc)
+        return start_at, min(end_at, now) if start_at <= now else start_at
 
     def _add_months(self, value: date, months: int) -> date:
         year = value.year + ((value.month - 1 + months) // 12)
