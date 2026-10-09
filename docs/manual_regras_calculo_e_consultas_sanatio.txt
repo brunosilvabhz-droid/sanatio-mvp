@@ -1,0 +1,936 @@
+SANATIO - MANUAL SIMPLES DAS REGRAS DE EXIBICAO E CALCULO
+Versao: 09/10/2026
+Publico: analistas de suporte, implantacao e dados em nivel junior
+
+======================================================================
+1. OBJETIVO DESTE DOCUMENTO
+======================================================================
+
+Este documento explica de onde saem os numeros e registros mostrados nas
+principais telas do SANATIO.
+
+Para cada tela, o documento informa:
+- quais tabelas do banco SANATIO sao usadas;
+- quais filtros sao aplicados;
+- como os campos calculados sao obtidos;
+- uma consulta SQL de apoio para conferencia.
+
+As consultas deste documento sao para PostgreSQL, que e o banco do SANATIO.
+Elas nao devem ser executadas no banco do hospital.
+
+Parametros usados nos exemplos:
+- :inicio = data/hora inicial, por exemplo 2026-10-01 00:00:00+00;
+- :fim = data/hora final exclusiva, por exemplo 2026-11-01 00:00:00+00;
+- :unidade = nome da unidade ou setor;
+- :atendimento = codigo do atendimento no hospital;
+- :paciente = codigo do paciente no hospital.
+
+Quando o filtro final e exclusivo, um registro com data exatamente igual a
+:fim nao entra no periodo. A regra normal e: data >= :inicio e data < :fim.
+
+======================================================================
+2. TABELAS PRINCIPAIS DO SANATIO
+======================================================================
+
+pacientes
+  Cadastro interno do paciente. O campo id_origem_paciente e o codigo vindo
+  do hospital.
+
+atendimentos
+  Uma internacao ou atendimento do paciente. Campos importantes:
+  - id_origem_atendimento: codigo do atendimento no hospital;
+  - ativo: informa se o atendimento ainda esta aberto;
+  - data_hora_entrada e data_hora_saida;
+  - unidade_atual e leito_atual.
+
+snapshots_atendimento
+  Fotografia calculada de cada atendimento em uma execucao da integracao.
+  Guarda risco, dias de internacao, cultura positiva, maior tempo de uso de
+  antimicrobiano, maior tempo de dispositivo e isolamento ativo.
+
+antimicrobianos_atendimento
+  Prescricoes/aplicacoes de antimicrobianos recebidas do hospital.
+
+procedimentos_invasivos_atendimento
+  Periodos de CVC, ventilacao mecanica e cateter/sonda vesical.
+
+culturas_atendimento
+  Culturas e seus resultados.
+
+isolamentos_atendimento
+  Precaucoes e isolamentos do paciente.
+
+alerts e alert_actions
+  Alertas e historico das acoes feitas pelos usuarios.
+
+antimicrobial_audits e antimicrobial_audit_actions
+  Auditorias de antimicrobianos e seu historico.
+
+execucoes_integracao
+  Historico das cargas recebidas pelo SANATIO.
+
+referencias_epidemiologicas
+  Percentis e referencias publicas usados no benchmarking.
+
+======================================================================
+3. REGRAS GERAIS QUE AFETAM VARIAS TELAS
+======================================================================
+
+3.1 Atendimento ativo
+
+Um atendimento e ativo quando atendimentos.ativo = true.
+Normalmente, ele deixa de ser ativo quando recebe data_hora_saida (alta).
+
+SQL:
+SELECT a.*
+FROM atendimentos a
+WHERE a.ativo = true;
+
+3.2 Alta encerra itens clinicos
+
+Se um atendimento possui alta, antimicrobianos e procedimentos invasivos nao
+podem continuar ativos depois dela.
+
+Regra aplicada na integracao:
+- se DT_FIM estiver vazia, usa a data da alta como fim;
+- se DT_FIM for posterior a alta, limita o fim na data da alta;
+- recalcula dias_uso ou dias_permanencia ate a alta;
+- marca o item como encerrado.
+
+Formula simples:
+fim_efetivo = menor valor entre DT_FIM e data da alta
+
+Se DT_FIM for nula:
+fim_efetivo = data da alta
+
+3.3 Mes atual nao inclui dias futuros
+
+Indicadores mensais usam somente o periodo que ja aconteceu. No mes atual,
+o fim do periodo e o horario atual. Um mes futuro retorna periodo vazio.
+
+3.4 Contagem de dias por sobreposicao
+
+Para paciente-dia e dispositivo-dia, conta-se apenas a parte do intervalo que
+cruza o periodo selecionado.
+
+inicio_contado = maior entre inicio_do_item e inicio_do_periodo
+fim_contado = menor entre fim_efetivo e fim_do_periodo
+dias = data(fim_contado) - data(inicio_contado)
+
+Se houve sobreposicao positiva menor que 24 horas, o sistema conta no minimo
+1 dia. Se nao houve sobreposicao, conta 0.
+
+3.5 Ultimo snapshot
+
+Quando uma tela precisa do estado atual, usa o snapshot mais recente de cada
+atendimento, ordenando data_hora_coleta da mais nova para a mais antiga.
+
+SQL equivalente:
+SELECT DISTINCT ON (s.atendimento_id) s.*
+FROM snapshots_atendimento s
+ORDER BY s.atendimento_id, s.data_hora_coleta DESC;
+
+======================================================================
+4. DASHBOARD
+======================================================================
+
+Endpoint principal: GET /dashboard/summary
+
+4.1 Pacientes monitorados
+
+Conta o ultimo snapshot de cada atendimento que ainda esta ativo.
+
+SQL de conferencia:
+WITH ultimos AS (
+  SELECT DISTINCT ON (s.atendimento_id) s.*
+  FROM snapshots_atendimento s
+  JOIN atendimentos a ON a.id = s.atendimento_id
+  WHERE a.ativo = true
+  ORDER BY s.atendimento_id, s.data_hora_coleta DESC
+)
+SELECT COUNT(*) FROM ultimos;
+
+4.2 Alertas abertos
+
+Conta alerts com status ABERTO ou EM_ANALISE.
+
+SELECT COUNT(*)
+FROM alerts
+WHERE status IN ('ABERTO', 'EM_ANALISE');
+
+4.3 Alertas criticos
+
+Conta alertas abertos ou em analise com severidade ALTA.
+
+SELECT COUNT(*)
+FROM alerts
+WHERE severity = 'ALTA'
+  AND status IN ('ABERTO', 'EM_ANALISE');
+
+4.4 Pacientes de alto risco
+
+Conta os ultimos snapshots ativos com status_risco = 'alto'.
+
+WITH ultimos AS (
+  SELECT DISTINCT ON (s.atendimento_id) s.*
+  FROM snapshots_atendimento s
+  JOIN atendimentos a ON a.id = s.atendimento_id
+  WHERE a.ativo = true
+  ORDER BY s.atendimento_id, s.data_hora_coleta DESC
+)
+SELECT COUNT(*) FROM ultimos WHERE status_risco = 'alto';
+
+4.5 Culturas positivas
+
+Conta pacientes cujo ultimo snapshot informa possui_cultura_positiva = true.
+Nao e a quantidade de exames; e a quantidade de atendimentos no estado atual.
+
+4.6 Antimicrobianos prolongados
+
+Conta atendimentos ativos que possuem pelo menos um registro com dias_uso
+maior ou igual a 7. Cada atendimento e contado somente uma vez.
+
+SELECT COUNT(DISTINCT m.atendimento_id)
+FROM antimicrobianos_atendimento m
+JOIN atendimentos a ON a.id = m.atendimento_id
+WHERE a.ativo = true
+  AND m.dias_uso >= 7;
+
+Importante:
+- o card mede exposicao prolongada durante a internacao atual;
+- o antimicrobiano nao precisa estar vigente neste exato momento;
+- a tela de auditoria possui outra regra e pode mostrar somente prescricoes
+  ativas quando o filtro Ativos estiver marcado.
+
+4.7 Pacientes em isolamento
+
+No card, conta ultimos snapshots com possui_isolamento_ativo = true.
+No mapa, lista cada isolamento ativo de atendimento ativo. Por isso o numero
+de linhas do mapa pode ser maior que o numero de pacientes: um paciente pode
+ter mais de uma precaucao.
+
+SQL do mapa:
+SELECT a.id_origem_atendimento, p.id_origem_paciente,
+       a.unidade_atual, a.leito_atual,
+       i.isolamento, i.data_hora_inicio
+FROM isolamentos_atendimento i
+JOIN atendimentos a ON a.id = i.atendimento_id
+JOIN pacientes p ON p.id = a.paciente_id
+WHERE i.ativo = true
+  AND a.ativo = true
+ORDER BY a.unidade_atual, a.leito_atual, i.data_hora_inicio;
+
+4.8 Distribuicao de risco
+
+Usa a lista de pacientes exibida pela rota /patients. Para cada classificacao
+alto, medio e baixo:
+
+percentual = quantidade_da_classificacao / total_de_pacientes * 100
+
+O percentual e arredondado para inteiro na tela.
+
+4.9 Severidade e status dos alertas
+
+Sao contagens da lista retornada por /alerts:
+- severidade: ALTA e MEDIA;
+- status: ABERTO, EM_ANALISE, RESOLVIDO e IGNORADO.
+
+4.10 Uso de dispositivos invasivos no mes
+
+Mostra CVC-dia, VM-dia e SVD-dia do mes corrente. Veja a secao 9 para a
+formula completa de dispositivo-dia.
+
+======================================================================
+5. CLASSIFICACAO DE RISCO E GERACAO DE ALERTAS
+======================================================================
+
+5.1 Campos usados
+
+- cultura positiva;
+- maior numero de dias de antimicrobiano;
+- maior numero de dias de dispositivo invasivo;
+- dias de internacao;
+- isolamento ativo.
+
+5.2 Risco alto
+
+E alto quando pelo menos uma regra abaixo e verdadeira:
+- existe cultura positiva;
+- antimicrobiano atingiu o limite configurado, padrao 7 dias;
+- dispositivo invasivo atingiu o limite configurado, padrao 7 dias;
+- internacao atingiu o limite configurado, padrao 10 dias;
+- existe isolamento ativo.
+
+5.3 Risco medio
+
+Quando nao e alto, e medio se:
+- antimicrobiano tem 4 dias ou mais; ou
+- internacao tem 7 dias ou mais.
+
+Caso contrario, o risco e baixo.
+
+5.4 Motivo do alerta
+
+O alerta nao usa mais somente o texto generico "risco alto". Ele informa os
+fatores encontrados, por exemplo:
+- Cultura positiva;
+- Antimicrobiano por 8 dias;
+- Procedimento invasivo por 9 dias;
+- Internacao por 12 dias;
+- Isolamento ativo.
+
+Se um alerta INGESTED_RISK esta aberto e todos os fatores desaparecem, ele e
+marcado automaticamente como RESOLVIDO e recebe resolved_at.
+
+SQL dos alertas exibidos:
+SELECT *
+FROM alerts
+WHERE (:status IS NULL OR status = :status)
+  AND (:severidade IS NULL OR severity = :severidade)
+  AND (:unidade IS NULL OR unit ILIKE '%' || :unidade || '%')
+  AND (:atendimento IS NULL OR cd_atendimento ILIKE '%' || :atendimento || '%')
+  AND (:paciente IS NULL OR cd_paciente ILIKE '%' || :paciente || '%')
+ORDER BY
+  CASE severity WHEN 'ALTA' THEN 3 WHEN 'MEDIA' THEN 2 ELSE 1 END DESC,
+  created_at DESC;
+
+======================================================================
+6. LISTA DE PACIENTES E DETALHE DO PACIENTE
+======================================================================
+
+6.1 Lista de pacientes
+
+A tela usa o snapshot clinico mais recente de cada atendimento ativo.
+Filtros de texto verificam atendimento, paciente, unidade e risco.
+
+SQL base:
+SELECT DISTINCT ON (s.atendimento_id)
+       s.*, a.id_origem_atendimento, a.unidade_atual, a.leito_atual,
+       p.id_origem_paciente
+FROM snapshots_atendimento s
+JOIN atendimentos a ON a.id = s.atendimento_id
+JOIN pacientes p ON p.id = a.paciente_id
+WHERE a.ativo = true
+ORDER BY s.atendimento_id, s.data_hora_coleta DESC;
+
+6.2 Dias de internacao
+
+Se existe alta:
+dias_internacao = data(alta) - data(entrada)
+
+Se nao existe alta:
+dias_internacao = data_atual - data(entrada)
+
+Nunca retorna valor negativo.
+
+6.3 Motivos de risco no detalhe
+
+A tela monta a lista a partir do snapshot:
+- cultura positiva;
+- maior tempo de antimicrobiano;
+- maior tempo de procedimento invasivo;
+- isolamento ativo;
+- dias de internacao.
+
+6.4 Contadores do historico do paciente
+
+Para cada atendimento, sao contados:
+- todos os alertas;
+- alertas ABERTO ou EM_ANALISE;
+- intervencoes;
+- auditorias de antimicrobianos;
+- movimentacoes de leito;
+- procedimentos invasivos;
+- antimicrobianos.
+
+Exemplo:
+SELECT COUNT(*) FROM alerts WHERE cd_atendimento = :atendimento;
+SELECT COUNT(*) FROM alerts
+ WHERE cd_atendimento = :atendimento
+   AND status IN ('ABERTO', 'EM_ANALISE');
+
+6.5 Abas clinicas
+
+Antimicrobianos:
+SELECT m.*
+FROM antimicrobianos_atendimento m
+JOIN atendimentos a ON a.id = m.atendimento_id
+WHERE a.id_origem_atendimento = :atendimento
+ORDER BY m.ativo DESC, m.dias_uso DESC;
+
+Culturas:
+SELECT c.*
+FROM culturas_atendimento c
+JOIN atendimentos a ON a.id = c.atendimento_id
+WHERE a.id_origem_atendimento = :atendimento
+ORDER BY c.data_hora_coleta DESC;
+
+Procedimentos invasivos:
+SELECT pr.*
+FROM procedimentos_invasivos_atendimento pr
+JOIN atendimentos a ON a.id = pr.atendimento_id
+WHERE a.id_origem_atendimento = :atendimento
+ORDER BY pr.ativo DESC, pr.dias_permanencia DESC;
+
+Isolamentos:
+SELECT i.*
+FROM isolamentos_atendimento i
+JOIN atendimentos a ON a.id = i.atendimento_id
+WHERE a.id_origem_atendimento = :atendimento
+ORDER BY i.ativo DESC, i.data_hora_inicio DESC;
+
+6.6 Linha do tempo
+
+Combina snapshots, movimentacoes, antimicrobianos, culturas, procedimentos,
+isolamentos, notas, alertas, auditorias e intervencoes. Depois ordena todos os
+eventos pela data, do mais recente para o mais antigo.
+
+======================================================================
+7. AUDITORIA DE ANTIMICROBIANOS
+======================================================================
+
+7.1 Consolidacao de prescricoes
+
+Prescricoes do mesmo medicamento sao agrupadas em um curso de tratamento.
+Uma renovacao entra no mesmo curso quando comeca antes ou ate 1 dia depois do
+fim da prescricao anterior. Isso evita reiniciar os dias de uso a cada
+renovacao.
+
+7.2 Prescricao ativa
+
+Para o estado atual, a ultima prescricao do curso precisa:
+- ter sn_ativo = S; e
+- nao possuir fim vencido.
+
+A alta do atendimento encerra o curso.
+
+7.3 Dias de uso
+
+dias_uso = data(fim_do_curso ou agora) - data(inicio_do_curso)
+
+7.4 Prioridade
+
+- ALTA: 14 dias ou mais;
+- MEDIA: de 7 a 13 dias;
+- BAIXA: menos de 7 dias.
+
+7.5 Status inicial
+
+- ENCERRADO: curso inativo;
+- PENDENTE: curso ativo com 7 dias ou mais;
+- MONITORADO: curso ativo com menos de 7 dias.
+
+7.6 Ordenacao
+
+1. ativos antes dos encerrados;
+2. prioridade ALTA, depois MEDIA e BAIXA;
+3. prescricao mais recente primeiro.
+
+SQL base da tela:
+SELECT aa.*
+FROM antimicrobial_audits aa
+WHERE (:status IS NULL OR aa.status = :status)
+  AND (:prioridade IS NULL OR aa.priority = :prioridade)
+  AND (:unidade IS NULL OR aa.unit ILIKE '%' || :unidade || '%')
+  AND (:atendimento IS NULL OR aa.cd_atendimento ILIKE '%' || :atendimento || '%')
+  AND (:paciente IS NULL OR aa.cd_paciente ILIKE '%' || :paciente || '%')
+  AND (:antimicrobiano IS NULL OR aa.antimicrobial_name ILIKE '%' || :antimicrobiano || '%')
+  AND (:dias_minimos IS NULL OR aa.days_in_use >= :dias_minimos)
+  AND (:somente_ativos = false OR aa.active = true)
+ORDER BY aa.active DESC,
+  CASE aa.priority WHEN 'ALTA' THEN 3 WHEN 'MEDIA' THEN 2 ELSE 1 END DESC,
+  aa.started_at DESC
+LIMIT 500;
+
+======================================================================
+8. RELATORIO DE CONSUMO DE ANTIMICROBIANOS
+======================================================================
+
+Endpoint: GET /epidemiology/summary
+
+8.1 Periodo do evento
+
+Usa data_hora_aplicacao. Se ela estiver vazia, usa data_hora_inicio.
+
+8.2 Pacientes por medicamento
+
+Conta atendimentos distintos que receberam o medicamento no periodo.
+
+8.3 Dias de uso e DOT
+
+Para cada medicamento, cria pares unicos:
+(atendimento, data da aplicacao)
+
+Cada par conta 1 dia. Assim, varias doses no mesmo paciente e no mesmo dia
+contam apenas 1 DOT.
+
+DOT do medicamento = quantidade de pares unicos
+Total de dias de uso = soma dos DOT de todos os medicamentos
+
+Esta regra vale tambem para medicamentos medidos em mL. O volume nao muda o
+DOT; basta ter pelo menos uma administracao no dia.
+
+8.4 Dose total
+
+O cadastro de produto informa a quantidade por apresentacao e sua unidade.
+A quantidade prescrita e multiplicada pela quantidade cadastrada do produto.
+
+Quando a unidade final e massa, o valor e convertido para gramas e somado em
+quantidade_total_gramas. Quando a unidade e mL, soma quantidade_total.
+
+8.5 DDD
+
+No estado atual, DDD e exibido como 0,00. A tela ainda nao aplica uma dose
+padrao ATC/OMS no calculo epidemiologico.
+
+8.6 Duracao media da terapia
+
+duracao_media = total_de_dias_de_uso / atendimentos_distintos_tratados
+
+Se nao houver atendimento, o divisor usado e 1 para evitar divisao por zero.
+
+SQL base do consumo:
+SELECT m.*, a.id AS atendimento_interno
+FROM antimicrobianos_atendimento m
+JOIN atendimentos a ON a.id = m.atendimento_id
+WHERE COALESCE(m.data_hora_aplicacao, m.data_hora_inicio) >= :inicio
+  AND COALESCE(m.data_hora_aplicacao, m.data_hora_inicio) < :fim
+  AND (:unidade IS NULL OR a.unidade_atual = :unidade);
+
+8.7 Classes dos medicamentos
+
+Classificacao pelo nome:
+- mero, imipenem ou ertapenem: Carbapenemicos;
+- vanco: Glicopeptideos;
+- cef ou triax: Cefalosporinas;
+- clinda: Lincosamidas;
+- polimix: Polimixinas;
+- piperacilina ou tazobactam: Penicilinas;
+- demais: Outros.
+
+======================================================================
+9. DISPOSITIVO-DIA
+======================================================================
+
+9.1 Classificacao
+
+CVC:
+- procedimento igual a CVC;
+- ou texto contendo cateter venoso central/venoso central;
+- ou local contendo CVC.
+
+VM:
+- procedimento igual a VM;
+- ou texto contendo ventilacao mecanica/respirador;
+- ou local contendo ventil/respirador.
+
+CVD/SVD:
+- procedimento CVD ou SVD;
+- ou texto contendo sonda vesical/cateter vesical;
+- ou local contendo CVD, SVD ou sonda vesical.
+
+9.2 Fim efetivo
+
+Usa o primeiro fim aplicavel:
+- DT_FIM do procedimento;
+- fim calculado por dias_permanencia, se o item estiver inativo sem DT_FIM;
+- alta do atendimento, se for anterior aos valores acima.
+
+9.3 Consulta base
+
+SELECT pr.*, a.unidade_atual, a.data_hora_saida
+FROM procedimentos_invasivos_atendimento pr
+JOIN atendimentos a ON a.id = pr.atendimento_id
+WHERE pr.data_hora_inicio < :fim
+  AND (pr.data_hora_fim IS NULL OR pr.data_hora_fim >= :inicio)
+  AND (:unidade IS NULL OR a.unidade_atual = :unidade);
+
+A classificacao e a soma dos dias sao finalizadas pela aplicacao.
+
+======================================================================
+10. PACIENTE-DIA E FECHAMENTO ANVISA
+======================================================================
+
+10.1 Paciente-dia
+
+Seleciona atendimentos que cruzam o periodo:
+
+SELECT a.*
+FROM atendimentos a
+WHERE a.data_hora_entrada < :fim
+  AND (a.data_hora_saida IS NULL OR a.data_hora_saida >= :inicio);
+
+Depois soma os dias de sobreposicao de cada atendimento com o periodo.
+
+10.2 Filtro de setor
+
+No fechamento ANVISA, o padrao e UTI_ADULTO. Portanto, paciente-dia e
+dispositivo-dia sao especificos desse tipo de unidade, nao do hospital todo.
+
+UTI_ADULTO aceita:
+- unidade contendo "uti" e "adult";
+- unidade exatamente "cti";
+- unidade contendo "cti" e "adult".
+
+10.3 Campos do fechamento
+
+- paciente-dia: soma descrita acima;
+- CVC-dia: dias de CVC no setor e periodo;
+- VM-dia: dias de ventilacao mecanica;
+- CVD-dia: dias de cateter vesical;
+- casos IPCSL, PAV e ITU-CVD: culturas positivas classificadas por palavras;
+- densidades: casos / dispositivo-dia * 1.000.
+
+======================================================================
+11. BENCHMARKING EPIDEMIOLOGICO
+======================================================================
+
+11.1 IPCSL associada a CVC
+
+Numerador:
+culturas positivas cujo exame, material, microrganismo ou resultado contenha
+sangue, hemocultura, cateter ou corrente sanguinea.
+
+Denominador: CVC-dia.
+
+densidade_IPCSL = casos_IPCSL / CVC_dia * 1.000
+
+11.2 PAV
+
+Numerador: culturas positivas contendo respir, traque, pneumo, pulmao ou
+secrecao.
+
+Denominador: VM-dia.
+
+densidade_PAV = casos_PAV / VM_dia * 1.000
+
+11.3 ITU associada a CVD
+
+Numerador: culturas positivas contendo urina, urin ou urocultura.
+
+Denominador: CVD-dia.
+
+densidade_ITU = casos_ITU / CVD_dia * 1.000
+
+11.4 Resistencia antimicrobiana
+
+Numerador: culturas positivas contendo MRSA, KPC, ESBL, carbapenemase,
+resistente, resistencia, oxacilina, meticilina ou vancomicina.
+
+Denominador: todas as culturas positivas do setor e periodo.
+
+percentual = resistentes / positivas * 100
+
+Observacao importante:
+Essa e uma classificacao automatica por palavras. Ela auxilia a analise, mas
+nao substitui a validacao epidemiologica do caso pela equipe assistencial.
+
+11.5 Consulta base de culturas
+
+SELECT c.*
+FROM culturas_atendimento c
+JOIN atendimentos a ON a.id = c.atendimento_id
+WHERE c.positivo = true
+  AND c.data_hora_coleta >= :inicio
+  AND c.data_hora_coleta < :fim;
+
+11.6 Percentis
+
+A tela busca a referencia ativa mais recente para indicador, tipo de unidade
+e UF. Se nao for informada UF, prefere referencia nacional. Se nao existir,
+calcula a mediana dos percentis das UFs do ultimo ano disponivel.
+
+Faixas:
+- valor < P10: abaixo de P10;
+- P10 <= valor < P25: entre P10 e P25;
+- P25 <= valor < P50: entre P25 e P50;
+- P50 <= valor < P75: entre P50 e P75;
+- P75 <= valor < P90: entre P75 e P90;
+- valor >= P90: acima de P90.
+
+SQL base da referencia:
+SELECT *
+FROM referencias_epidemiologicas
+WHERE codigo_indicador = :indicador
+  AND tipo_unidade = :tipo_unidade
+  AND ativo = true
+  AND (:uf IS NULL OR uf = :uf)
+ORDER BY ano_referencia DESC, data_importacao DESC, id DESC;
+
+O grafico historico calcula o indicador para os ultimos 6 meses e mostra as
+linhas P50 e P75 da referencia selecionada.
+
+======================================================================
+12. PATOGENOS MULTIRRESISTENTES
+======================================================================
+
+A tela usa somente culturas positivas do periodo.
+
+Classificacao:
+- texto com ESBL: Enterobacterias produtoras de ESBL;
+- carbapenem + acinetobacter: Acinetobacter resistente;
+- carbapenem + pseudomonas: P. aeruginosa resistente;
+- oxacilina ou MRSA: S. aureus resistente;
+- carbapenemase: Enterobacterias produtoras de Carbapenemase;
+- demais: usa o nome do microrganismo recebido.
+
+percentual_do_grupo = quantidade_do_grupo / total_de_culturas_classificadas * 100
+
+======================================================================
+13. RELATORIOS E EXPORTACOES
+======================================================================
+
+Tipos: pacientes, antimicrobianos, isolamentos e alertas.
+
+Filtros:
+- periodo;
+- unidade (busca parcial, sem diferenciar maiusculas/minusculas);
+- status.
+
+Pacientes filtram o periodo pela data de entrada.
+Antimicrobianos filtram pela data de inicio.
+Isolamentos filtram pela data de inicio.
+Alertas filtram pela data de criacao.
+
+Cada consulta retorna no maximo 5.000 registros.
+PDF e Excel usam exatamente os mesmos dados e filtros da tela.
+
+======================================================================
+14. EXECUCOES DA INTEGRACAO
+======================================================================
+
+A tela lista as ultimas 100 execucoes, da mais recente para a mais antiga.
+
+SELECT e.*, h.hospital_name
+FROM execucoes_integracao e
+LEFT JOIN hospital_integrations h ON h.id = e.hospital_integracao_id
+ORDER BY e.data_hora_inicio DESC
+LIMIT 100;
+
+Duracao:
+data_hora_fim - data_hora_inicio, convertida para milissegundos/segundos.
+
+Status, pacientes, alertas e falha sao campos gravados ao final da carga.
+
+======================================================================
+15. IMPORTACAO DE EXAMES LABORATORIAIS
+======================================================================
+
+Antes da confirmacao, o arquivo passa por validacao e pre-visualizacao.
+Cancelar limpa o arquivo selecionado sem gravar os dados clinicos.
+
+Depois da importacao, a tela principal e limpa e o resultado fica no submenu
+de logs. Os logs registram arquivo, usuario, inicio, fim, status, totais e
+mensagem de erro, quando houver.
+
+======================================================================
+16. USUARIOS E PERFIS
+======================================================================
+
+Usuarios sao vinculados a uma empresa/hospital. As consultas devem respeitar
+o hospital do usuario autenticado.
+
+Perfis principais:
+- ADMIN GERAL: administracao global;
+- SUPORTE TI: administracao do hospital, sem os privilegios globais;
+- FARMACEUTICO: acesso assistencial e cadastro/auditoria de antimicrobianos;
+- demais perfis: conforme permissoes configuradas na aplicacao.
+
+16.1 Regra multi-hospital
+
+O vinculo fica em user_hospitals. ADMIN pode enxergar todos os hospitais.
+SUPORTE_TI enxerga somente usuarios e hospitais que cruzam sua area de
+atuacao e nao pode criar ou alterar ADMIN geral. Todo usuario que nao seja
+ADMIN precisa ter pelo menos um hospital selecionado.
+
+SQL base:
+SELECT u.id, u.email, u.full_name, r.name AS perfil,
+       h.id AS hospital_id, h.hospital_name
+FROM users u
+JOIN roles r ON r.id = u.role_id
+LEFT JOIN user_hospitals uh ON uh.user_id = u.id
+LEFT JOIN hospital_integrations h ON h.id = uh.hospital_id
+ORDER BY u.email, h.hospital_name;
+
+16.2 Permissao para nome do paciente
+
+can_view_patient_name define se o usuario pode receber o nome resolvido do
+paciente. Sem permissao, a interface usa identificador e texto protegido.
+
+======================================================================
+17. CADASTRO DE PRODUTOS ANTIMICROBIANOS
+======================================================================
+
+Acesso: perfis ADMIN ou FARMACIA.
+
+Campos:
+- codigo_produto: deve ser unico;
+- descricao;
+- quantidade por apresentacao;
+- unidade: mg, g, mcg, mL, UI ou g/mg;
+- codigo ATC, gravado em maiusculas.
+
+Calculo da quantidade:
+quantidade_total = QT_DOSE da prescricao * quantidade cadastrada
+
+Conversao para gramas:
+- g: mantem o valor;
+- mg: divide por 1.000;
+- mcg: divide por 1.000.000.
+
+Para apresentacoes combinadas, como g/mg, quantidades separadas por barra
+sao multiplicadas separadamente e exibidas no mesmo formato.
+
+SELECT *
+FROM produtos_antimicrobianos
+ORDER BY descricao;
+
+======================================================================
+18. INTERVENCOES
+======================================================================
+
+A lista e ordenada da solicitacao mais recente para a mais antiga e permite
+filtrar atendimento, paciente e status.
+
+SELECT *
+FROM intervention_requests
+WHERE (:atendimento IS NULL OR cd_atendimento ILIKE '%' || :atendimento || '%')
+  AND (:paciente IS NULL OR cd_paciente ILIKE '%' || :paciente || '%')
+  AND (:status IS NULL OR status = :status)
+ORDER BY created_at DESC;
+
+Ao criar:
+- exige pelo menos um destinatario ativo;
+- grava status ENVIADA;
+- grava os destinatarios em intervention_recipients;
+- registra acao no alerta ou auditoria de origem;
+- tenta enviar e-mail pelo Brevo;
+- o e-mail usa IDs, sem expor o nome do paciente.
+
+======================================================================
+19. AJUDA E CHAMADOS
+======================================================================
+
+Categorias validas: ERRO, DUVIDA e SOLICITACAO.
+Status validos: ABERTO, EM_ANALISE, RESPONDIDO, RESOLVIDO e CANCELADO.
+
+ADMIN visualiza todos os chamados. Os demais usuarios visualizam somente os
+chamados que eles mesmos abriram. A ordem e do mais recente para o mais
+antigo. Abertura e atualizacao disparam e-mail quando a configuracao estiver
+ativa.
+
+SELECT *
+FROM support_tickets
+WHERE (:admin = true OR requester_user_id = :usuario_id)
+  AND (:status IS NULL OR status = :status)
+  AND (:categoria IS NULL OR category = :categoria)
+ORDER BY created_at DESC;
+
+======================================================================
+20. CONFIGURACOES E REGRAS DE MONITORAMENTO
+======================================================================
+
+As configuracoes ficam em settings como chave, valor e descricao. Somente
+ADMIN geral pode alterar a tela de configuracoes.
+
+SELECT * FROM settings ORDER BY key;
+
+As regras ficam em monitoring_rules. A tela ordena regras ativas primeiro e,
+depois, pelo nome.
+
+SELECT *
+FROM monitoring_rules
+ORDER BY active DESC, name;
+
+Os principais limites usados pela carga possuem padroes:
+- antimicrobiano de alto risco: 7 dias;
+- dispositivo invasivo: 7 dias;
+- internacao prolongada: 10 dias;
+- risco medio por antimicrobiano: 4 dias;
+- risco medio por internacao: 7 dias.
+
+======================================================================
+21. CONSULTAS RAPIDAS PARA SUPORTE
+======================================================================
+
+21.1 Ultima carga
+
+SELECT *
+FROM execucoes_integracao
+ORDER BY data_hora_inicio DESC
+LIMIT 1;
+
+21.2 Atendimento especifico
+
+SELECT a.*, p.id_origem_paciente
+FROM atendimentos a
+JOIN pacientes p ON p.id = a.paciente_id
+WHERE a.id_origem_atendimento = :atendimento;
+
+21.3 Ultimo snapshot do atendimento
+
+SELECT s.*
+FROM snapshots_atendimento s
+JOIN atendimentos a ON a.id = s.atendimento_id
+WHERE a.id_origem_atendimento = :atendimento
+ORDER BY s.data_hora_coleta DESC
+LIMIT 1;
+
+21.4 Alertas abertos do atendimento
+
+SELECT *
+FROM alerts
+WHERE cd_atendimento = :atendimento
+  AND status IN ('ABERTO', 'EM_ANALISE')
+ORDER BY created_at DESC;
+
+21.5 Antimicrobianos do atendimento
+
+SELECT m.*
+FROM antimicrobianos_atendimento m
+JOIN atendimentos a ON a.id = m.atendimento_id
+WHERE a.id_origem_atendimento = :atendimento
+ORDER BY m.data_hora_inicio DESC, m.data_hora_aplicacao DESC;
+
+21.6 Procedimentos do atendimento
+
+SELECT pr.*
+FROM procedimentos_invasivos_atendimento pr
+JOIN atendimentos a ON a.id = pr.atendimento_id
+WHERE a.id_origem_atendimento = :atendimento
+ORDER BY pr.data_hora_inicio DESC;
+
+21.7 Conferir card de antimicrobianos prolongados
+
+SELECT COUNT(DISTINCT m.atendimento_id)
+FROM antimicrobianos_atendimento m
+JOIN atendimentos a ON a.id = m.atendimento_id
+WHERE a.ativo = true
+  AND m.dias_uso >= 7;
+
+21.8 Alertas genericos ainda abertos
+
+SELECT id, cd_atendimento, cd_paciente, description
+FROM alerts
+WHERE status IN ('ABERTO', 'EM_ANALISE')
+  AND description = 'Motivos: risco alto';
+
+O resultado esperado e zero.
+
+======================================================================
+22. ROTEIRO DE INVESTIGACAO DE DIVERGENCIAS
+======================================================================
+
+1. Confirme a ultima execucao em execucoes_integracao.
+2. Confirme se o atendimento esta ativo e se possui alta.
+3. Consulte o ultimo snapshot do atendimento.
+4. Consulte a tabela clinica relacionada ao card ou tela.
+5. Confira datas de inicio, fim e alta.
+6. Confira se a tela conta pacientes, atendimentos, prescricoes ou dias.
+7. Confira o setor e o periodo selecionados.
+8. Para o mes atual, lembre que dias futuros nao entram.
+9. Para benchmarking, confirme a referencia, UF, ano e tipo de unidade.
+10. Se o SQL base estiver correto e a tela divergir, consulte os logs da API
+    e registre um chamado com atendimento, periodo, unidade e captura da tela.
+
+FIM DO DOCUMENTO
