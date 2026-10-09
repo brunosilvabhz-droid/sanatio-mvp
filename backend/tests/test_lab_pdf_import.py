@@ -9,7 +9,7 @@ from sqlalchemy import create_engine, select
 from sqlalchemy.orm import Session
 
 import app.models  # noqa: F401
-from app.api.routes.lab_pdf import LinkRequest, cancel_import, confirm_suggestions, import_pdf, link_result, list_results, patient_results, validate_import
+from app.api.routes.lab_pdf import LinkRequest, cancel_import, confirm_suggestions, discard_result, import_pdf, link_result, list_results, patient_results, validate_import
 from app.models.base import Base
 from app.models.clinical import Atendimento, CulturaAtendimento, Paciente, SolicitacaoExameAtendimento
 from app.models.lab_pdf_import import ResultadoPdfLaboratorio
@@ -78,6 +78,25 @@ class LabPdfImportTest(unittest.TestCase):
 
         self.assertEqual(resumed["id"], first["id"])
         self.assertTrue(resumed["retomada"])
+
+    def test_unlinked_result_can_be_removed_before_validation(self):
+        from app.models.lab_pdf_import import ImportacaoPdfLaboratorio
+        batch = ImportacaoPdfLaboratorio(nome_arquivo="parcial.pdf", sha256="d" * 64, paginas=1, total_resultados=1, usuario_id=self.user.id)
+        self.db.add(batch)
+        self.db.flush()
+        row = ResultadoPdfLaboratorio(
+            importacao_id=batch.id, ordem=1, pagina=1, os_pedido="SEM-OS",
+            data_coleta=datetime(2026, 9, 3), data_resultado=datetime(2026, 9, 7),
+            exame_amostra="Cultura", resultado="Negativo", situacao="FINAL",
+        )
+        self.db.add(row)
+        self.db.commit()
+
+        removed = discard_result(row.id, self.db, self.user)
+
+        self.assertEqual(removed["status"], "REMOVIDO")
+        self.assertEqual(removed["total_resultados"], 0)
+        self.assertEqual(validate_import(batch.id, self.db, self.user)["status"], "VALIDADA")
 
     def test_unmatched_os_needs_explicit_manual_confirmation(self):
         row = ResultadoPdfLaboratorio(

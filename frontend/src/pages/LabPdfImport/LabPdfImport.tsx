@@ -123,6 +123,21 @@ export default function LabPdfImport() {
     }
   }
 
+  async function discard(row: LabPdfResult) {
+    if (!window.confirm(`Remover a OS 750.${row.os_pedido} desta carga?`)) return;
+    setBusy(true);
+    setError('');
+    try {
+      await api.delete(`/lab-pdf/results/${row.id}`);
+      if (selected) await loadResults(selected);
+      setMessage(`OS 750.${row.os_pedido} removida da carga.`);
+    } catch (cause) {
+      setError(errorMessage(cause));
+    } finally {
+      setBusy(false);
+    }
+  }
+
   async function validateImport() {
     if (!selected) return;
     setBusy(true);
@@ -206,6 +221,11 @@ export default function LabPdfImport() {
               <Button variant="contained" startIcon={<CheckCircleOutlineIcon />} disabled={busy || linked !== rows.length} onClick={validateImport}>Validar carga</Button>
             </Stack>
           </Stack>
+          {linked !== rows.length && (
+            <Alert severity="warning" sx={{ mb: 2 }}>
+              Faltam {rows.length - linked} resultado(s). Para cada linha pendente, informe o atendimento e clique em Vincular. A opção "Confirmar sem OS no SOUL" apenas autoriza esse vínculo manual. Se o resultado não deve entrar na carga, use Remover.
+            </Alert>
+          )}
           <Box sx={{ overflowX: 'auto' }}>
             <Table size="small" sx={{ minWidth: 1100 }}>
               <TableHead><TableRow>
@@ -221,10 +241,10 @@ export default function LabPdfImport() {
                   <TableCell><Chip size="small" label={row.situacao} color={row.situacao === 'POSITIVA' ? 'warning' : 'default'} /></TableCell>
                   <TableCell sx={{ minWidth: 190 }}>
                     <TextField size="small" label={row.cd_atendimento_sugerido ? 'Sugerido por OS' : 'Informe atendimento'} value={attendance[row.id] || ''} onChange={(event) => setAttendance({ ...attendance, [row.id]: event.target.value })} fullWidth />
-                    {!row.cd_atendimento_sugerido && !row.cd_atendimento && <FormControlLabel control={<Checkbox size="small" checked={Boolean(manual[row.id])} onChange={(event) => setManual({ ...manual, [row.id]: event.target.checked })} />} label="Confirmar sem OS no SOUL" sx={{ '& .MuiFormControlLabel-label': { fontSize: 11 } }} />}
+                    {!row.cd_atendimento_sugerido && !row.cd_atendimento && <FormControlLabel control={<Checkbox size="small" checked={Boolean(manual[row.id])} onChange={(event) => setManual({ ...manual, [row.id]: event.target.checked })} />} label="Autorizar vínculo manual sem OS" sx={{ '& .MuiFormControlLabel-label': { fontSize: 11 } }} />}
                   </TableCell>
                   <TableCell>
-                    {row.cd_atendimento ? <Button size="small" onClick={() => navigate(`/patients/${row.cd_atendimento}`)}>Paciente</Button> : <Button size="small" disabled={busy || !attendance[row.id]} onClick={() => link(row)}>Vincular</Button>}
+                    {row.cd_atendimento ? <Button size="small" onClick={() => navigate(`/patients/${row.cd_atendimento}`)}>Paciente</Button> : <Stack direction="row" spacing={0.5}><Button size="small" disabled={busy || !attendance[row.id]} onClick={() => link(row)}>Vincular</Button><Button size="small" color="error" disabled={busy} onClick={() => discard(row)}>Remover</Button></Stack>}
                   </TableCell>
                 </TableRow>
               ))}</TableBody>

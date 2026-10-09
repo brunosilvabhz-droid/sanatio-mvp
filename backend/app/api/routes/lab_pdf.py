@@ -222,6 +222,22 @@ def link_result(result_id: int, payload: LinkRequest, db: Session = Depends(get_
     return _row_read(row, user, db)
 
 
+@router.delete("/results/{result_id}")
+def discard_result(result_id: int, db: Session = Depends(get_db), _: User = Depends(require_lab_user)) -> dict:
+    row = db.get(ResultadoPdfLaboratorio, result_id)
+    if not row:
+        raise HTTPException(status_code=404, detail="Resultado não encontrado")
+    batch = row.importacao
+    if batch.status != "PENDENTE":
+        raise HTTPException(status_code=409, detail="A carga não está pendente")
+    if row.atendimento_id:
+        raise HTTPException(status_code=409, detail="Desvincule o atendimento antes de remover um resultado já confirmado")
+    db.delete(row)
+    batch.total_resultados = max(batch.total_resultados - 1, 0)
+    db.commit()
+    return {"id": result_id, "status": "REMOVIDO", "total_resultados": batch.total_resultados}
+
+
 @router.get("/patients/{cd_atendimento}/results")
 def patient_results(cd_atendimento: str, db: Session = Depends(get_db), user: User = Depends(get_current_user)) -> list[dict]:
     attendance = db.scalar(select(Atendimento).where(Atendimento.id_origem_atendimento == cd_atendimento))
