@@ -270,6 +270,21 @@ def _calculate_snapshot_from_details(
     }
 
 
+def _risk_reasons(snapshot: dict, antimicrobial_days: int, invasive_device_days: int, hospital_stay_days: int) -> list[str]:
+    reasons = []
+    if snapshot["has_positive_culture"]:
+        reasons.append("Cultura positiva")
+    if snapshot["max_antimicrobial_days"] >= min(4, antimicrobial_days):
+        reasons.append(f"Antimicrobiano por {snapshot['max_antimicrobial_days']} dias")
+    if snapshot["max_invasive_device_days"] >= invasive_device_days:
+        reasons.append(f"Procedimento invasivo por {snapshot['max_invasive_device_days']} dias")
+    if snapshot["days_in_hospital"] >= min(7, hospital_stay_days):
+        reasons.append(f"Internacao por {snapshot['days_in_hospital']} dias")
+    if snapshot["has_active_isolation"]:
+        reasons.append("Isolamento ativo")
+    return reasons
+
+
 def _scheme_change_events(items: list, reference_date: date, window_days: int) -> list[str]:
     window_start = reference_date - timedelta(days=window_days - 1)
     events: dict[date, set[str]] = defaultdict(set)
@@ -527,15 +542,7 @@ def ingest_snapshots(
                 monitoring_run_id=monitoring_run.id,
                 collected_at=reference_at,
             ))
-        reasons = []
-        if calculated_snapshot["risk_status"] == "alto":
-            reasons.append("risco alto")
-        if calculated_snapshot["has_positive_culture"]:
-            reasons.append("cultura positiva")
-        if calculated_snapshot["max_invasive_device_days"] >= invasive_device_days:
-            reasons.append(f"procedimento invasivo por {calculated_snapshot['max_invasive_device_days']} dias")
-        if calculated_snapshot["days_in_hospital"] >= hospital_stay_days:
-            reasons.append(f"{calculated_snapshot['days_in_hospital']} dias de internacao")
+        reasons = _risk_reasons(calculated_snapshot, antimicrobial_days, invasive_device_days, hospital_stay_days)
         if not historical:
             created_alerts += _create_antimicrobial_alerts(
                 db,
@@ -560,6 +567,8 @@ def ingest_snapshots(
             )
         )
         if existing:
+            existing.severity = "ALTA" if calculated_snapshot["risk_status"] == "alto" else "MEDIA"
+            existing.description = "Motivos: " + ", ".join(reasons)
             continue
         db.add(
             Alert(
