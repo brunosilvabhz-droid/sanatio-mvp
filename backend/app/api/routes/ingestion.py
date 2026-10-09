@@ -556,8 +556,6 @@ def ingest_snapshots(
             )
         if historical:
             continue
-        if not reasons:
-            continue
         existing = db.scalar(
             select(Alert).where(
                 Alert.cd_atendimento == item.cd_atendimento,
@@ -566,6 +564,12 @@ def ingest_snapshots(
                 Alert.source == "client_ingestion",
             )
         )
+        if not reasons:
+            if existing:
+                existing.status = "RESOLVIDO"
+                existing.resolved_at = started_at
+                existing.description = "Resolvido automaticamente: fatores de risco nao estao mais presentes no snapshot atual."
+            continue
         if existing:
             existing.severity = "ALTA" if calculated_snapshot["risk_status"] == "alto" else "MEDIA"
             existing.description = "Motivos: " + ", ".join(reasons)
