@@ -139,6 +139,30 @@ def _antimicrobial_key(item) -> str:
     return str(item.ds_principio_ativo or "Principio ativo nao identificado").strip()
 
 
+def _stored_antimicrobials(db: Session, attendance: Atendimento, reference_at: datetime) -> list[dict]:
+    rows = db.scalars(
+        select(AntimicrobianoAtendimento).where(AntimicrobianoAtendimento.atendimento_id == attendance.id)
+    ).all()
+    return [
+        {
+            "cd_prescricao": row.id_origem_prescricao,
+            "cd_item_prescricao": row.id_origem_item_prescricao,
+            "cd_produto": row.id_origem_produto,
+            "ds_antimicrobiano": row.nome_antimicrobiano,
+            "ds_principio_ativo": row.principio_ativo,
+            "dt_inicio": row.data_hora_inicio,
+            "dt_aplicacao": row.data_hora_aplicacao,
+            "dt_fim": row.data_hora_fim,
+            "sn_ativo": "S" if row.data_hora_fim is None or row.data_hora_fim > reference_at else "N",
+            "ds_dose": row.dose,
+            "ds_via": row.via,
+            "ds_frequencia": row.frequencia,
+            "dias_uso": row.dias_uso,
+        }
+        for row in rows
+    ]
+
+
 def _days_between(start: datetime | None, end: datetime | None = None, reference_date: date | None = None) -> int:
     if not start:
         return 0
@@ -225,7 +249,7 @@ def _calculate_snapshot_from_details(
     else:
         reference_at = datetime.now(timezone.utc)
         antimicrobial_courses, _ = antimicrobial_audit_service.treatment_courses(
-            [antimicrobial.model_dump() for antimicrobial in antimicrobials],
+            [antimicrobial if isinstance(antimicrobial, dict) else antimicrobial.model_dump() for antimicrobial in antimicrobials],
             now=reference_at,
         )
         active_antimicrobials = [course for course in antimicrobial_courses if _is_active(course.get("sn_ativo"))]
@@ -484,9 +508,11 @@ def ingest_snapshots(
 
     for item in payload.patients:
         attendance = _upsert_attendance(db, item)
+        current_antimicrobials = [entry.model_dump() for entry in antimicrobials_by_attendance.get(item.cd_atendimento, [])]
+        antimicrobial_history = _stored_antimicrobials(db, attendance, reference_at) + current_antimicrobials
         calculated_snapshot = _calculate_snapshot_from_details(
             item=item,
-            antimicrobials=antimicrobials_by_attendance.get(item.cd_atendimento, []),
+            antimicrobials=antimicrobial_history if not historical else antimicrobials_by_attendance.get(item.cd_atendimento, []),
             cultures=cultures_by_attendance.get(item.cd_atendimento, []),
             invasive_procedures=invasive_by_attendance.get(item.cd_atendimento, []),
             isolations=isolations_by_attendance.get(item.cd_atendimento, []),

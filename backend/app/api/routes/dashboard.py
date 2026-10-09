@@ -54,7 +54,7 @@ def summary(db: Session = Depends(get_db)) -> dict:
             "critical_alerts": critical_alerts,
             "high_risk_patients": len([p for p in snapshot_values if p.status_risco == "alto"]),
             "positive_cultures": len([p for p in snapshot_values if p.possui_cultura_positiva]),
-            "prolonged_antimicrobials": len([p for p in snapshot_values if p.maior_dias_antimicrobiano > 7]),
+            "prolonged_antimicrobials": len([p for p in snapshot_values if p.maior_dias_antimicrobiano >= 7]),
             "active_isolations": len([p for p in snapshot_values if p.possui_isolamento_ativo]),
         }
 
@@ -72,7 +72,7 @@ def summary(db: Session = Depends(get_db)) -> dict:
             "critical_alerts": critical_alerts,
             "high_risk_patients": len([p for p in snapshot_values if p.risk_status == "alto"]),
             "positive_cultures": len([p for p in snapshot_values if p.has_positive_culture]),
-            "prolonged_antimicrobials": len([p for p in snapshot_values if p.max_antimicrobial_days > 7]),
+            "prolonged_antimicrobials": len([p for p in snapshot_values if p.max_antimicrobial_days >= 7]),
             "active_isolations": len([p for p in snapshot_values if p.has_active_isolation]),
         }
 
