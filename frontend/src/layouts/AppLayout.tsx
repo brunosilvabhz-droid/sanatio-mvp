@@ -4,6 +4,7 @@ import FactCheckIcon from '@mui/icons-material/FactCheck';
 import GroupIcon from '@mui/icons-material/Group';
 import LocalHospitalIcon from '@mui/icons-material/LocalHospital';
 import LogoutIcon from '@mui/icons-material/Logout';
+import MenuIcon from '@mui/icons-material/Menu';
 import ManageHistoryIcon from '@mui/icons-material/ManageHistory';
 import MedicationIcon from '@mui/icons-material/Medication';
 import NotificationsActiveIcon from '@mui/icons-material/NotificationsActive';
@@ -32,7 +33,9 @@ import {
   Stack,
   Toolbar,
   Tooltip,
-  Typography
+  Typography,
+  useMediaQuery,
+  useTheme
 } from '@mui/material';
 import { useEffect, useState } from 'react';
 import { Outlet, useLocation, useNavigate } from 'react-router-dom';
@@ -88,6 +91,9 @@ const groups = [
 export default function AppLayout() {
   const navigate = useNavigate();
   const location = useLocation();
+  const theme = useTheme();
+  const mobile = useMediaQuery(theme.breakpoints.down('md'));
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [roleName, setRoleName] = useState(() => {
     const stored = localStorage.getItem('sanatio_user');
     return stored ? JSON.parse(stored)?.role?.name || '' : '';
@@ -110,6 +116,54 @@ export default function AppLayout() {
     });
   }, []);
 
+  useEffect(() => {
+    setMobileMenuOpen(false);
+  }, [location.pathname]);
+
+  const navigation = (
+    <Box sx={{ overflowY: 'auto', px: 1.25, py: 1.5 }}>
+      {groups.map((group, index) => (
+        <Box key={group.title} sx={{ mb: 1.25 }}>
+          {index > 0 && <Divider sx={{ my: 1.25 }} />}
+          <Typography
+            variant="caption"
+            sx={{ display: 'block', px: 1.5, py: 0.75, color: 'text.secondary', fontWeight: 800, textTransform: 'uppercase' }}
+          >
+            {group.title}
+          </Typography>
+          <List disablePadding>
+            {group.items.filter((item) => !item.roles || item.roles.includes(roleName)).map((item) => {
+              const selected = location.pathname.startsWith(item.path);
+              return (
+                <ListItemButton
+                  key={item.path}
+                  selected={selected}
+                  onClick={() => {
+                    navigate(item.path);
+                    setMobileMenuOpen(false);
+                  }}
+                  sx={{
+                    minHeight: 44,
+                    borderRadius: 1.5,
+                    mb: 0.25,
+                    '&.Mui-selected': {
+                      bgcolor: 'primary.light',
+                      color: 'primary.dark',
+                      '& .MuiListItemIcon-root': { color: 'primary.main' }
+                    }
+                  }}
+                >
+                  <ListItemIcon sx={{ minWidth: 36, color: selected ? 'primary.main' : 'text.secondary' }}>{item.icon}</ListItemIcon>
+                  <ListItemText primary={item.label} primaryTypographyProps={{ fontWeight: selected ? 800 : 600, fontSize: 14 }} />
+                </ListItemButton>
+              );
+            })}
+          </List>
+        </Box>
+      ))}
+    </Box>
+  );
+
   return (
     <Box sx={{ display: 'flex', minHeight: '100vh', bgcolor: 'background.default' }}>
       <AppBar
@@ -123,8 +177,17 @@ export default function AppLayout() {
           borderColor: 'divider'
         }}
       >
-        <Toolbar sx={{ minHeight: '64px !important', px: 2.5 }}>
-          <Box sx={{ flexGrow: 1 }}>
+        <Toolbar sx={{ minHeight: { xs: '56px !important', md: '64px !important' }, px: { xs: 1, sm: 2.5 }, gap: 0.5 }}>
+          <Tooltip title="Abrir menu">
+            <IconButton
+              onClick={() => setMobileMenuOpen(true)}
+              aria-label="Abrir menu de navegação"
+              sx={{ display: { xs: 'inline-flex', md: 'none' }, color: 'text.secondary' }}
+            >
+              <MenuIcon />
+            </IconButton>
+          </Tooltip>
+          <Box sx={{ flexGrow: 1, minWidth: 0 }}>
             <BrandLogo compact />
           </Box>
           <Stack direction="row" spacing={1.5} alignItems="center">
@@ -132,7 +195,7 @@ export default function AppLayout() {
               icon={<LocalHospitalIcon />}
               label={hospitalLabel}
               variant="outlined"
-              sx={{ borderColor: '#c9dce2', color: 'text.secondary', bgcolor: '#f8fbfc' }}
+              sx={{ display: { xs: 'none', sm: 'inline-flex' }, maxWidth: { sm: 260, lg: 420 }, borderColor: '#c9dce2', color: 'text.secondary', bgcolor: '#f8fbfc', '& .MuiChip-label': { overflow: 'hidden', textOverflow: 'ellipsis' } }}
             />
             <Tooltip title="Sair do SANATIO">
               <IconButton onClick={logout} aria-label="Sair" sx={{ color: 'text.secondary' }}>
@@ -146,6 +209,7 @@ export default function AppLayout() {
       <Drawer
         variant="permanent"
         sx={{
+          display: { xs: 'none', md: 'block' },
           width: drawerWidth,
           flexShrink: 0,
           '& .MuiDrawer-paper': {
@@ -158,48 +222,29 @@ export default function AppLayout() {
         }}
       >
         <Toolbar />
-        <Box sx={{ overflow: 'auto', px: 1.25, py: 1.5 }}>
-          {groups.map((group, index) => (
-            <Box key={group.title} sx={{ mb: 1.25 }}>
-              {index > 0 && <Divider sx={{ my: 1.25 }} />}
-              <Typography
-                variant="caption"
-                sx={{ display: 'block', px: 1.5, py: 0.75, color: 'text.secondary', fontWeight: 800, textTransform: 'uppercase' }}
-              >
-                {group.title}
-              </Typography>
-              <List disablePadding>
-                {group.items.filter((item) => !item.roles || item.roles.includes(roleName)).map((item) => {
-                  const selected = location.pathname.startsWith(item.path);
-                  return (
-                    <ListItemButton
-                      key={item.path}
-                      selected={selected}
-                      onClick={() => navigate(item.path)}
-                      sx={{
-                        minHeight: 42,
-                        borderRadius: 1.5,
-                        mb: 0.25,
-                        '&.Mui-selected': {
-                          bgcolor: 'primary.light',
-                          color: 'primary.dark',
-                          '& .MuiListItemIcon-root': { color: 'primary.main' }
-                        }
-                      }}
-                    >
-                      <ListItemIcon sx={{ minWidth: 36, color: selected ? 'primary.main' : 'text.secondary' }}>{item.icon}</ListItemIcon>
-                      <ListItemText primary={item.label} primaryTypographyProps={{ fontWeight: selected ? 800 : 600, fontSize: 14 }} />
-                    </ListItemButton>
-                  );
-                })}
-              </List>
-            </Box>
-          ))}
-        </Box>
+        {navigation}
       </Drawer>
 
-      <Box component="main" sx={{ flexGrow: 1, p: { xs: 2, md: 3 }, minWidth: 0 }}>
-        <Toolbar />
+      <Drawer
+        variant="temporary"
+        open={mobile && mobileMenuOpen}
+        onClose={() => setMobileMenuOpen(false)}
+        ModalProps={{ keepMounted: true }}
+        sx={{
+          display: { xs: 'block', md: 'none' },
+          '& .MuiDrawer-paper': {
+            width: 'min(86vw, 320px)',
+            boxSizing: 'border-box',
+            bgcolor: '#fbfdfd'
+          }
+        }}
+      >
+        <Toolbar sx={{ minHeight: '56px !important' }} />
+        {navigation}
+      </Drawer>
+
+      <Box component="main" sx={{ flexGrow: 1, width: { xs: '100%', md: `calc(100% - ${drawerWidth}px)` }, p: { xs: 1.5, sm: 2, md: 3 }, minWidth: 0, overflow: 'hidden' }}>
+        <Toolbar sx={{ minHeight: { xs: '56px !important', md: '64px !important' } }} />
         <Outlet />
       </Box>
     </Box>

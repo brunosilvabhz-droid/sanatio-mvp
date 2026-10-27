@@ -20,7 +20,11 @@ const theme = createTheme({
   shape: { borderRadius: 8 },
   typography: {
     fontFamily: ['Inter', 'Roboto', 'Arial', 'sans-serif'].join(','),
-    h4: { letterSpacing: 0, color: '#13232c' },
+    h4: {
+      letterSpacing: 0,
+      color: '#13232c',
+      '@media (max-width:600px)': { fontSize: '1.65rem', lineHeight: 1.2 }
+    },
     h5: { letterSpacing: 0 },
     h6: { letterSpacing: 0 },
     button: { textTransform: 'none', fontWeight: 700 }

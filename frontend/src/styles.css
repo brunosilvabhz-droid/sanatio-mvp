@@ -18,6 +18,13 @@ html {
   scrollbar-color: #a9bdc5 #edf3f5;
 }
 
+html,
+body,
+#root {
+  min-width: 0;
+  min-height: 100%;
+}
+
 .clinical-table {
   overflow: hidden;
 }
@@ -36,4 +43,50 @@ html {
 
 .risk-alto {
   color: #b42318;
+}
+
+@media (max-width: 899.95px) {
+  body {
+    overflow-x: hidden;
+  }
+
+  .MuiPaper-root:has(> table),
+  .MuiPaper-root:has(> .MuiTable-root),
+  .MuiTableContainer-root {
+    max-width: 100%;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .MuiTable-root {
+    min-width: 720px;
+  }
+
+  .MuiDialog-paper {
+    width: 100%;
+    max-width: 100%;
+    max-height: 100%;
+    margin: 0;
+    border-radius: 0;
+  }
+
+  .MuiDialogContent-root {
+    padding-left: 16px;
+    padding-right: 16px;
+  }
+
+  .MuiTextField-root,
+  .MuiFormControl-root {
+    max-width: 100%;
+  }
+}
+
+@media (max-width: 599.95px) {
+  .page-header-actions > .MuiButton-root {
+    flex: 1 1 auto;
+  }
+
+  .MuiPaper-root {
+    background-clip: padding-box;
+  }
 }

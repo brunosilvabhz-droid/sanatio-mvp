@@ -12,7 +12,7 @@ type PageHeaderProps = {
 export default function PageHeader({ title, subtitle, eyebrow, actions, chips }: PageHeaderProps) {
   return (
     <Stack direction={{ xs: 'column', md: 'row' }} justifyContent="space-between" alignItems={{ xs: 'flex-start', md: 'flex-end' }} gap={2}>
-      <Box>
+      <Box sx={{ minWidth: 0 }}>
         {eyebrow && (
           <Chip
             size="small"
@@ -37,7 +37,7 @@ export default function PageHeader({ title, subtitle, eyebrow, actions, chips }:
           </Stack>
         )}
       </Box>
-      {actions && <Stack direction="row" gap={1} flexWrap="wrap">{actions}</Stack>}
+      {actions && <Stack className="page-header-actions" direction="row" gap={1} flexWrap="wrap" sx={{ width: { xs: '100%', md: 'auto' } }}>{actions}</Stack>}
     </Stack>
   );
 }
